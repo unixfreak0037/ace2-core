@@ -32,8 +32,6 @@ from ace.error import report_exception
 from ace.indicators import Indicator, IndicatorList
 from ace.system.locking import Lockable
 
-STATE_KEY_WHITELISTED = 'whitelisted'
-
 class MergableObject():
     """An object is mergable if a newer version of it can be merged into an older existing version."""
     def apply_merge(self, target: 'MergableObject') -> Union['MergableObject', None]:
@@ -226,18 +224,6 @@ class TaggableObject(MergableObject):
                 self.add_tag(tag)
 
         return self
-
-    # XXX this moves elsewhere
-    @property
-    def whitelisted(self):
-        """Returns True if this observable has been whitelisted."""
-        return self.has_tag('whitelisted') or self.has_directive(DIRECTIVE_WHITELISTED)
-
-    def mark_as_whitelisted(self):
-        """Utility function to mark this Observable as whietlisted by adding the tag 'whitelisted'."""
-        self.add_tag('whitelisted')
-        self.add_directive(DIRECTIVE_WHITELISTED)
-        self.root.whitelisted = True
 
 # XXX forward declaraction
 class Observable:
@@ -2164,20 +2150,6 @@ class RootAnalysis(Analysis, MergableObject):
     def remediation(self, value):
         assert value is None or isinstance(value, list)
         self._remediation = value
-
-    @property
-    def whitelisted(self):
-        """A boolean value (stored as a state field) that indicates the entire analysis has been whitelisted.
-           Analysis that is whitelisted does not become an alert."""
-        if STATE_KEY_WHITELISTED not in self.state:
-            return False
-
-        return self.state[STATE_KEY_WHITELISTED]
-
-    @whitelisted.setter
-    def whitelisted(self, value):
-        assert isinstance(value, bool)
-        self.state[STATE_KEY_WHITELISTED] = value
 
     # XXX one of these should go away
     def record_observable(self, observable):

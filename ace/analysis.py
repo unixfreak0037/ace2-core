@@ -157,7 +157,6 @@ class DetectableObject(MergableObject):
 
         return self
 
-
 class TaggableObject(MergableObject):
     """A mixin class that adds a tags property that is a list of tags assigned to this object."""
 
@@ -225,7 +224,7 @@ class TaggableObject(MergableObject):
 
         return self
 
-# XXX forward declaraction
+# forward declaraction
 class Observable:
     pass
 
@@ -569,7 +568,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         else:
             return create_observable(o_or_o_type, o_value) in self.observables
 
-    # TODO I feel like this should be a part of an implementation of an abstract tree-type class?
     @property
     def children(self):
         """Returns what is considered all of the "children" of this object (in this case is the the Observables.)"""
@@ -688,48 +686,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
         return self
 
-    ##########################################################################
-    # GUI PROPERTIES
-
-    # XXX these all need to move out
-
-    @property
-    def jinja_should_render(self):
-        """An Analysis should be rendered if the summary is not None or if it has 1 or more observables."""
-        if self.summary is not None:
-            return True
-
-        if len(self.observables) > 0:
-            return True
-
-        return False
-
-    @property
-    def jinja_display_name(self):
-        """Returns a visual name to display in the GUI."""
-        if self.summary is not None:
-            return self.summary
-        
-        # if we don't have a summary then just return the name of the class
-        return type(self).__name__
-
-    @property
-    def jinja_is_drillable(self):
-        """Returns True if the user is intended to click on the Analysis for more details, False otherwise."""
-        return True
-
-    @property
-    def jinja_template_path(self):
-        """Returns the jinja template to use to view the details of the analysis."""
-        return "analysis/default_template.html"
-
-    @property
-    def jinja_details(self):
-        """Return an alternative object to be used when displaying to the GUI.  Defaults to just returning the details propery as is."""
-        return self.details
-
-    ##########################################################################
-
     def add_observable(self, o_or_o_type: Union[Observable, str], *args, **kwargs) -> 'Observable':
         """Adds the Observable to this Analysis.  Returns the Observable object, or the one that already existed."""
         from ace.system.observables import create_observable
@@ -750,7 +706,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
         return observable
 
-    # XXX this moves out of core
     def add_file(self, path: str, **kwargs) -> 'FileObservable':
         """Utility function that adds a F_FILE observable to the root analysis by passing a path to the file."""
         from ace.system.storage import store_file
@@ -788,11 +743,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
     ##########################################################################
     # OVERRIDABLES 
-
-    # XXX moves to the gui
-    def always_visible(self):
-        """If this returns True then this Analysis is always visible in the GUI."""
-        return False
 
 class Relationship(object):
     """Represents a relationship to another object."""
@@ -843,33 +793,6 @@ class Relationship(object):
             self.r_type = value[Relationship.KEY_RELATIONSHIP_TYPE]
         if Relationship.KEY_RELATIONSHIP_TARGET in value:
             self.target = value[Relationship.KEY_RELATIONSHIP_TARGET]
-
-# XXX moves out 
-class DispositionHistory(collections.abc.MutableMapping):
-    def __init__(self, observable):
-        self.observable = observable
-        self.history = {} # key = disposition, value = count
-
-    def __getitem__(self, key):
-        return self.history[key]
-
-    def __setitem__(self, key, value):
-        if key == DISPOSITION_UNKNOWN:
-            return
-        self.history[key] = value
-
-    def __delitem__(self, key):
-        pass
-
-    def __iter__(self):
-        total = sum([self.history[disp] for disp in self.history.keys()])
-        dispositions = [disposition for disposition in self.history]
-        dispositions = sorted(dispositions, key=lambda disposition: (self.history[disposition] / total) * 100.0, reverse=True)
-        for disposition in dispositions:
-            yield disposition, self.history[disposition], (self.history[disposition] / total) * 100.0
-
-    def __len__(self):
-        return len(self.history)
 
 class Observable(TaggableObject, DetectableObject, MergableObject):
     """Represents a piece of information discovered in an analysis that can itself be analyzed."""
@@ -951,89 +874,9 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
         return None
 
-    # XXX moves out
     def matches(self, value):
         """Returns True if the given value matches this value of this observable.  This can be overridden to provide more advanced matching such as CIDR for ipv4."""
         return self.value == value
-
-    # XXX moves out
-    @property
-    def display_preview(self):
-        """Returns a value that can be used by a display to preview the observation."""
-        return None 
-
-    # XXX moves out
-    @property
-    def display_value(self):
-        if isinstance(self.value, str):
-            try:
-                return self.value.encode('utf-8', errors='ignore').decode()
-            except Exception as e:
-                logging.warning("unable to decode value: {}".format(e))
-        else:
-            return self.value
-
-    # XXX moves out
-    @property
-    def display_time(self):
-        if self.time is None:
-            return ''
-
-        return self.time.strftime(event_time_format_tz)
-
-    # XXX moves out
-    def always_visible(self):
-        """If this returns True then this Analysis is always visible in the GUI."""
-        return False
-
-    # XXX moves out
-    @property
-    def disposition_history(self):
-        """Returns a DispositionHistory object if self.obj is an Observable, None otherwise."""
-        from ace.database import get_db_connection
-
-        if hasattr(self, '_disposition_history'):
-            return self._disposition_history
-
-        self._disposition_history = None
-
-        if self.whitelisted:
-            return None
-
-        if self.type == F_FILE:
-            from ace.modules.file_analysis import FileHashAnalysis
-            for child in self.children:
-                if isinstance(child, FileHashAnalysis):
-                    for grandchild in child.children:
-                        if isinstance(grandchild.obj, ace.analysis.Observable) and grandchild.obj.type == F_SHA256:
-                            self._disposition_history = grandchild.disposition_history
-                            return self._disposition_history
-
-            return None
-
-        self._disposition_history = DispositionHistory(self)
-
-        with get_db_connection() as db:
-            c = db.cursor()
-            c.execute("""
-        SELECT 
-            a.disposition, COUNT(*) 
-        FROM 
-            observables o JOIN observable_mapping om ON o.id = om.observable_id
-            JOIN alerts a ON om.alert_id = a.id
-        WHERE 
-            o.type = %s AND 
-            o.md5 = UNHEX(%s) AND
-            a.alert_type != 'faqueue' AND
-            (a.disposition IS NULL OR
-            a.disposition != 'UNKNOWN')
-        GROUP BY a.disposition""", (self.type, self.md5_hex))
-
-            for row in c:
-                disposition, count = row
-                self._disposition_history[disposition] = count
-
-        return self._disposition_history
 
     @property
     def json(self):
@@ -1166,12 +1009,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         else:
             raise ValueError("time must be a datetime.datetime object or a string in the format "
                              "%Y-%m-%d %H:%M:%S %z but you passed {}".format(type(value).__name__))
-
-    # XXX can we get rid of this now?
-    @property
-    def time_datetime(self):
-        """Returns self.time. Remains for backwards compatibility."""
-        return self.time
 
     @property
     def directives(self) -> list[str]:
@@ -1306,6 +1143,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
         return amt in self.excluded_analysis
 
+    # XXX this needs to come out
     def remove_analysis_exclusion(self, amt: Union[AnalysisModuleType, str]):
         """Removes AnalysisModule exclusion added to this observable."""
         assert isinstance(amt, str) or isinstance(amt, AnalysisModuleType)
@@ -1451,22 +1289,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         """Returns a list of Analysis objects that have this Observable."""
         return [a for a in self.root.all_analysis if a and a.has_observable(self)]
 
-    # XXX move out
-    @property
-    def jinja_template_path(self):
-        """Return what is to be used when viewing this object via jinja."""
-        return "analysis/default_observable.html"
-
-    # XXX move out
-    @property
-    def jinja_available_actions(self):
-        """Returns a list of ObservableAction-based objects that represent what a user can do with this Observable."""
-        from ace.gui import ObservableActionUnWhitelist, ObservableActionWhitelist
-        if self.type in ace.GUI_WHITELIST_EXCLUDED_OBSERVABLE_TYPES:
-            return [ ]
-        else:
-            return [ ObservableActionWhitelist(), ObservableActionUnWhitelist() ]
-
     def add_analysis(self, *args, **kwargs):
         assert isinstance(self.root, RootAnalysis)
 
@@ -1548,7 +1370,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             analysis.json = self.analysis[amt_type_name]
             self.analysis[amt_type_name] = analysis # replace the JSON dict with the actual object
 
-    # TODO refactor
+    # XXX refactor
     def clear_analysis(self):
         """Deletes all analysis records for this observable."""
         self.analysis = {}
@@ -1709,6 +1531,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         else:
             return u'{}({})'.format(self.type, self.value)
 
+    # XXX there is also a match function for this?
     def _compare_value(self, other_value):
         """Default implementation to compare the value of this observable to the value of another observable.
            By default does == comparison, can be overridden."""
@@ -1739,10 +1562,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
         return self.type < other.type
 
-    def __hash__(self):
-        """Returns the hash of type:value."""
-        return str(self).__hash__() # XXX this isn't right, is it?
-
 class CaselessObservable(Observable):
     """An observable that doesn't care about the case of the value."""
     def __init__(self, *args, **kwargs):
@@ -1758,15 +1577,6 @@ class CaselessObservable(Observable):
     def _compare_value(self, other):
         return self.normalize_caseless(self.value) == self.normalize_caseless(other)
 
-#
-# ace.database.Alert vs ace.analysis.Alert
-# This system is designed to work both with and without the database running.
-# This means you can load Alert objects directly from the JSON rather than
-# requiring you to do a database query first.
-#
-# The hiearchy of relationships goes Analysis --> Alert --> ace.database.Alert
-#
-
 class RootAnalysis(Analysis, MergableObject):
     """Root analysis object."""
 
@@ -1776,10 +1586,8 @@ class RootAnalysis(Analysis, MergableObject):
                  alert_type=None, 
                  desc=None, 
                  event_time=None, 
-                 action_counters=None,
                  details=None, 
                  name=None,
-                 remediation=None,
                  state=None,
                  uuid=None,
                  storage_dir=None,
@@ -1841,17 +1649,9 @@ class RootAnalysis(Analysis, MergableObject):
         if name:
             self.name = name
 
-        self._remediation = None
-        if remediation:
-            self.remediation = remediation
-
         self._details = None
         if details:
             self.details = details
-
-        self._action_counters = {}
-        if action_counters:
-            self.action_counters = action_counters
 
         self._storage_dir = None
         if storage_dir:
@@ -1885,7 +1685,6 @@ class RootAnalysis(Analysis, MergableObject):
     KEY_DETAILS = 'details'
     KEY_OBSERVABLE_STORE = 'observable_store'
     KEY_NAME = 'name'
-    KEY_REMEDIATION = 'remediation'
     KEY_NETWORK = 'network'
     KEY_QUEUE = 'queue'
     KEY_INSTRUCTIONS = 'instructions'
@@ -1914,7 +1713,6 @@ class RootAnalysis(Analysis, MergableObject):
             #RootAnalysis.KEY_DETAILS: self.details, <-- this is saved externally
             RootAnalysis.KEY_OBSERVABLE_STORE: self.observable_store,
             RootAnalysis.KEY_NAME: self.name,
-            RootAnalysis.KEY_REMEDIATION: self.remediation,
             RootAnalysis.KEY_QUEUE: self.queue,
             RootAnalysis.KEY_INSTRUCTIONS: self.instructions,
         })
@@ -1949,8 +1747,6 @@ class RootAnalysis(Analysis, MergableObject):
             self.event_time = value[RootAnalysis.KEY_EVENT_TIME]
         if RootAnalysis.KEY_NAME in value:
             self.name = value[RootAnalysis.KEY_NAME]
-        if RootAnalysis.KEY_REMEDIATION in value:
-            self.remediation = value[RootAnalysis.KEY_REMEDIATION]
         if RootAnalysis.KEY_QUEUE in value:
             self.queue = value[RootAnalysis.KEY_QUEUE]
         if RootAnalysis.KEY_INSTRUCTIONS in value:
@@ -2141,16 +1937,6 @@ class RootAnalysis(Analysis, MergableObject):
     def name(self, value):
         self._name = value
 
-    @property
-    def remediation(self):
-        """A list of remediation actions that are possible for this alert."""
-        return self._remediation
-
-    @remediation.setter
-    def remediation(self, value):
-        assert value is None or isinstance(value, list)
-        self._remediation = value
-
     # XXX one of these should go away
     def record_observable(self, observable):
         """Records the given observable into the observable_store if it does not already exist.  
@@ -2324,9 +2110,6 @@ class RootAnalysis(Analysis, MergableObject):
         # NOTE there's currently no way to know which tags originally came with the alert
         for o in self.observables:
             o.clear_tags()
-
-        # clear the action counters
-        self.action_counters = {} 
 
         # clear the state
         # this also clears any pre/post analysis module tracking
@@ -2564,141 +2347,6 @@ class RootAnalysis(Analysis, MergableObject):
         for o in self.all_observables:
             if o.has_detection_points():
                 return True
-
-    # XXX move out
-    @property
-    def event_name_candidate(self):
-        """Generates and returns an event name based on the observables in this alert."""
-
-        def _get_lowest_fp_observable(observables):
-            lowest_fp_observable = None
-            lowest_fp_percent = 100
-            for ob in observables:
-                if not ob.disposition_history:
-                    lowest_fp_observable = ob
-                    lowest_fp_percent = 0
-
-                for history in ob.disposition_history:
-                    # disposition_history example: ('FALSE_POSITIVE', 1, 50.0)
-                    if 'FALSE_POSITIVE' in history:
-                        if history[2] < lowest_fp_percent:
-                            lowest_fp_observable = ob
-                            lowest_fp_percent = history[2]
-                    else:
-                        lowest_fp_observable = ob
-                        lowest_fp_percent = 0
-
-            return lowest_fp_observable
-
-        if not self.completed:
-            return ''
-
-        if isinstance(self.event_time, datetime.datetime):
-            yyyymmdd = datetime.datetime.strftime(self.event_time, '%Y%m%d')
-        elif isinstance(self.event_time, str):
-            event_time_obj = datetime.datetime.strptime(self.event_time, '%Y-%m-%dT%H:%M:%S.%f%z')
-            yyyymmdd = datetime.datetime.strftime(event_time_obj, '%Y%m%d')
-        else:
-            yyyymmdd = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d')
-
-        possible_tags = []
-
-        # First preferred tag is the phish sender domain. There are a couple ways to get this in order of preference:
-        #
-        # 1. domain from email_address observable if its not one of our own domains and not tagged "smtp_mail_from"
-        # 2. domain from email_address observable tagged "smtp_mail_from"
-        phish_sender_tag = next(
-            (
-                o.value.lower().split('@')[1] for o in self.all_observables
-                if o.type == F_EMAIL_ADDRESS
-                and not any(t.name == 'smtp_mail_from' for t in o.tags)
-                and o.value.lower().split('@')[1] not in ace.CONFIG['global']['local_email_domains']
-            ), ''
-        )
-        if phish_sender_tag:
-            possible_tags.append(phish_sender_tag)
-        else:
-            phish_sender_tag = next(
-                (
-                    o.value.lower().split('@')[1] for o in self.all_observables
-                    if o.type == F_EMAIL_ADDRESS
-                    and any(t.name == 'smtp_mail_from' for t in o.tags)
-                ), ''
-            )
-            if phish_sender_tag:
-                possible_tags.append(phish_sender_tag)
-
-        # Second preferred tag is a portion of the email subject
-        email_subject_tag = next(
-            (
-                o.value for o in self.all_observables
-                if o.type == F_EMAIL_SUBJECT
-            ), ''
-        )
-        if email_subject_tag:
-            possible_tags.append(email_subject_tag[:32])
-
-        # Third preferred tag is the FQDN observable with lowest FP percentage
-        fqdn_observables = [
-            o for o in self.all_observables
-            if o.type == F_FQDN
-            and o.value.lower() not in phish_sender_tag
-            and o.value.lower() not in ace.CONFIG['global']['local_email_domains'].split(',')
-        ]
-
-        lowest_fp_fqdn_observable = _get_lowest_fp_observable(fqdn_observables)
-        if lowest_fp_fqdn_observable:
-            possible_tags.append(lowest_fp_fqdn_observable.value)
-
-        # Fourth preferred tag is the domain from the URL observable with lowest FP percentage
-        url_observables = [
-            o for o in self.all_observables
-            if o.type == F_URL
-            and not any(domain in o.value for domain in ace.CONFIG['global']['local_email_domains'].split(','))
-        ]
-
-        lowest_fp_url_observable = _get_lowest_fp_observable(url_observables)
-        if lowest_fp_url_observable:
-            try:
-                split_url = urlsplit(lowest_fp_url_observable.value)
-                if split_url.netloc:
-                    possible_tags.append(split_url.netloc)
-            except ValueError:
-                pass
-
-        # Fifth preferred tag is the hostname observable with lowest FP percentage
-        lowest_fp_hostname_observable = _get_lowest_fp_observable([o for o in self.all_observables if o.type == F_HOSTNAME])
-        if lowest_fp_hostname_observable:
-            possible_tags.append(lowest_fp_hostname_observable.value)
-
-        # Sixth preferred tag is the filename observable with lowest FP percentage
-        lowest_fp_filename_observable = _get_lowest_fp_observable([o for o in self.all_observables if o.type == F_FILE_NAME])
-        if lowest_fp_filename_observable:
-            possible_tags.append(lowest_fp_filename_observable.value)
-
-        # Seventh preferred tag is the IPv4 observable with the lowest FP percentage
-        lowest_fp_ip_observable = _get_lowest_fp_observable([o for o in self.all_observables if o.type == F_IPV4])
-        if lowest_fp_ip_observable:
-            possible_tags.append(lowest_fp_ip_observable.value)
-
-        # Use the alert description UUID as a fallback in case no other tags exist
-        if self.description:
-            possible_tags.append(self.description[:32])
-        else:
-            possible_tags.append('Unknown')
-        possible_tags.append(self.uuid)
-
-        result = f'{yyyymmdd}-{self.alert_type.replace(" ", "")}-{possible_tags[0]}-{possible_tags[1]}'
-
-        # Remove any invalid characters from the name
-        invalid_chars = re.findall(r'[^a-zA-Z0-9-. ]', result)
-        for invalid_char in invalid_chars:
-            result = result.replace(invalid_char, '-')
-
-        logging.debug(f'event_name_candidate for {self.uuid}: {result[:128]}')
-
-        # Event name in the database can only be 128 characters long
-        return result.rstrip('-')[:128]
 
     def create_analysis_request(self):
         """Creates and returns a new ace.system.analysis_request.AnalysisRequest object from this RootAnalysis."""

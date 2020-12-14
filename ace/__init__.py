@@ -19,34 +19,12 @@ from getpass import getpass
 
 from ace.configuration import load_configuration, import_encrypted_passwords
 from ace.constants import *
-#from ace.messaging import initialize_message_system
-#from ace.network_semaphore import initialize_fallback_semaphores
-#from ace.sla import SLA
-#from ace.util import create_directory
 
 import pytz
-#import requests
 import tzlocal
-
-# this is set to True when unit testing, False otherwise
-UNIT_TESTING = 'SAQ_UNIT_TESTING' in os.environ
-
-# global user ID for the "automation" user
-AUTOMATION_USER_ID = None # (initialized in ace.database.initialize_database())
-
-# disable the verbose logging in the requests module
-#logging.getLogger("requests").setLevel(logging.WARNING)
 
 # local timezone
 LOCAL_TIMEZONE = pytz.timezone(tzlocal.get_localzone().zone)
-
-# the global sqlalchemy.orm.scoped_session object
-# this object is used to get Session objects by ACE throughout the application
-# except for the WSGI app which uses Flask
-db = None # (see ace.database.initialize_database)
-
-# the global message system, used to send external messages async
-MESSAGE_SYSTEM = None
 
 class CustomFileHandler(logging.StreamHandler):
     def __init__(self, log_dir=None, filename_format=None, *args, **kwargs):
@@ -117,17 +95,6 @@ def initialize_logging(logging_config_path):
         #logging.getLogger('sqlalchemy.pool').setLevel(logging.DEBUG)
         #logging.getLogger('sqlalchemy.orm').setLevel(logging.DEBUG)
 
-def set_node(name):
-    """Sets the value for ace.SAQ_NODE. Typically this is auto-set using the local fqdn."""
-    from ace.database import initialize_node
-    global SAQ_NODE
-    global SAQ_NODE_ID
-    
-    if name != SAQ_NODE:
-        SAQ_NODE = name
-        SAQ_NODE_ID = None
-        initialize_node()
-
 def initialize(
         ace_home=None,
         config_paths=[],
@@ -166,8 +133,6 @@ def initialize(
     global OTHER_PROXIES 
     global OTHER_SLA_SETTINGS
     global SAQ_HOME
-    global SAQ_NODE
-    global SAQ_NODE_ID
     global SAQ_RELATIVE_DIR
     global SEMAPHORES_ENABLED
     global SERVICES_DIR
@@ -176,8 +141,6 @@ def initialize(
     global TOR_PROXY
 
     SAQ_HOME = None
-    SAQ_NODE = None
-    SAQ_NODE_ID = None
     API_PREFIX = None
     SAQ_RELATIVE_DIR = None
     CONFIG = None
@@ -442,24 +405,6 @@ def initialize(
                                       #CONFIG[section]['property'],
                                       #CONFIG[section]['value']))
 
-    # what node is this?
-    try:
-        SAQ_NODE = CONFIG['global']['node']
-        if SAQ_NODE == 'AUTO':
-            SAQ_NODE = socket.getfqdn()
-    except Exception as e:
-        sys.stderr.write("unable to get hostname: {}\n".format(e))
-        sys.exit(1)
-
-    # what prefix do other systems use to communicate to the API server for this node?
-    try:
-        API_PREFIX = CONFIG['api']['prefix']
-        if API_PREFIX == 'AUTO':
-            API_PREFIX = socket.getfqdn()
-        logging.debug("node {} has api prefix {}".format(SAQ_NODE, API_PREFIX))
-    except Exception as e:
-        sys.stderr.write("unable to get hostname: {}\n".format(e))
-        sys.exit(1)
 
     # what type of instance is this?
     INSTANCE_TYPE = CONFIG['global']['instance_type']

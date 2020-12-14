@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Union, Optional
 
-from ace.analysis import _JSONEncoder
+from ace.json import JSONEncoder
 from ace.system.caching import CachingInterface
 from ace.system.analysis_request import AnalysisRequest
 
@@ -32,7 +32,7 @@ class ThreadedCachingInterface(CachingInterface):
             return None
 
     def cache_analysis_result(self, cache_key: str, request: AnalysisRequest, expiration: Optional[int]) -> str:
-        cached_result = CachedAnalysisResult(json.dumps(request.to_dict(), cls=_JSONEncoder))
+        cached_result = CachedAnalysisResult(json.dumps(request.to_dict(), cls=JSONEncoder))
         if expiration is not None:
             cached_result.expiration = datetime.datetime.now() + datetime.timedelta(seconds=expiration)
 

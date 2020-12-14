@@ -4,7 +4,8 @@ import copy
 import datetime
 import json
 
-from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType, DetectionPoint, DetectableObject, _JSONEncoder, TaggableObject, Observable
+from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType, DetectionPoint, DetectableObject, TaggableObject, Observable
+from ace.json import JSONEncoder
 from ace.system.analysis_module import register_analysis_module_type
 from ace.system.analysis_request import AnalysisRequest
 from ace.constants import F_TEST
@@ -38,7 +39,7 @@ def test_encoding():
         'null': None, 
         'bool': True }
 
-    json_output = json.dumps(test_data, sort_keys=True, cls=_JSONEncoder)
+    json_output = json.dumps(test_data, sort_keys=True, cls=JSONEncoder)
     assert json_output == r'{"binary_string": "\u00e4\u00bd\u00a0\u00e5\u00a5\u00bd\u00ef\u00bc\u008c\u00e4\u00b8\u0096\u00e7\u0095\u008c", "bool": true, "custom_object": "hello world", "datetime": "2017-11-11T07:36:01.000001", "dict": {}, "float": 1.0, "int": 1, "list": [], "null": null, "str": "test"}'
 
 #

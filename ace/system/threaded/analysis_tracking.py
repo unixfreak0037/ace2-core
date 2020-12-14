@@ -5,7 +5,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Union, List, Optional, Any
 
-from ace.analysis import RootAnalysis, Observable, Analysis, _JSONEncoder
+from ace.analysis import RootAnalysis, Observable, Analysis
+from ace.json import JSONEncoder
 from ace.system.analysis_tracking import AnalysisTrackingInterface, get_root_analysis
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.exceptions import *
@@ -23,7 +24,7 @@ class ThreadedAnalysisTrackingInterface(AnalysisTrackingInterface):
     def track_root_analysis(self, uuid: str, root: dict):
         assert isinstance(uuid, str)
         assert isinstance(root, dict)
-        self.root_analysis[uuid] = RootAnalysisTracking(root=json.dumps(root, cls=_JSONEncoder))
+        self.root_analysis[uuid] = RootAnalysisTracking(root=json.dumps(root, cls=JSONEncoder))
         
     def get_root_analysis(self, uuid: str) -> Union[dict, None]:
         try:

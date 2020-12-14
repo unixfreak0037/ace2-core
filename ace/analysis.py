@@ -26,6 +26,7 @@ from typing import List, Union, Optional, Any
 from urllib.parse import urlsplit
 
 import ace
+from ace.json import JSONEncoder
 from ace.constants import *
 from ace.error import report_exception
 from ace.indicators import Indicator, IndicatorList
@@ -158,18 +159,6 @@ class DetectableObject(MergableObject):
 
         return self
 
-# utility class to translate custom objects into JSON
-class _JSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, datetime.datetime):
-            return obj.strftime(event_time_format_json_tz)
-        elif isinstance(obj, bytes):
-            return obj.decode('unicode_escape', 'replace')
-        elif hasattr(obj, 'json'):
-            return obj.json
-        else:
-            logging.debug('json type {0}'.format(type(obj)))
-            return super(_JSONEncoder, self).default(obj)
 
 class TaggableObject(MergableObject):
     """A mixin class that adds a tags property that is a list of tags assigned to this object."""

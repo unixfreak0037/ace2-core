@@ -20,6 +20,7 @@ from ace.system.work_queue import get_next_analysis_request
 
 import pytest
 
+
 @pytest.mark.system
 def test_basic_analysis():
 
@@ -27,19 +28,19 @@ def test_basic_analysis():
     owner_uuid = str(uuid.uuid4())
 
     # register a basic analysis module
-    amt = AnalysisModuleType('test', '', [F_TEST])
+    amt = AnalysisModuleType("test", "", [F_TEST])
     assert register_analysis_module_type(amt)
 
     # submit an analysis request with a single observable
     root = RootAnalysis()
-    observable = root.add_observable(F_TEST, 'test')
+    observable = root.add_observable(F_TEST, "test")
     process_analysis_request(root.create_analysis_request())
 
     # have the amt receive the next work item
     request = get_next_analysis_request(owner_uuid, amt, 0)
     assert isinstance(request, AnalysisRequest)
 
-    analysis_details = {'test': 'result'}
+    analysis_details = {"test": "result"}
 
     # "analyze" it
     request.result = request.create_result()
@@ -57,6 +58,7 @@ def test_basic_analysis():
     assert isinstance(analysis, Analysis)
     assert analysis.details == analysis_details
 
+
 @pytest.mark.system
 def test_multiple_amts():
     """Test having two different AMTs for the same observable type."""
@@ -66,15 +68,15 @@ def test_multiple_amts():
     owner_2 = str(uuid.uuid4())
 
     # register two basic analysis modules
-    amt_1 = AnalysisModuleType('test_1', '', [F_TEST])
+    amt_1 = AnalysisModuleType("test_1", "", [F_TEST])
     assert register_analysis_module_type(amt_1)
 
-    amt_2 = AnalysisModuleType('test_2', '', [F_TEST])
+    amt_2 = AnalysisModuleType("test_2", "", [F_TEST])
     assert register_analysis_module_type(amt_2)
 
     # submit an analysis request with a single observable
     root = RootAnalysis()
-    observable = root.add_observable(F_TEST, 'test')
+    observable = root.add_observable(F_TEST, "test")
     process_analysis_request(root.create_analysis_request())
 
     # have both amts receive work items
@@ -84,8 +86,8 @@ def test_multiple_amts():
     request_2 = get_next_analysis_request(owner_2, amt_2, 0)
     assert isinstance(request_2, AnalysisRequest)
 
-    analysis_details_1 = {'test_1': 'result_1'}
-    analysis_details_2 = {'test_2': 'result_2'}
+    analysis_details_1 = {"test_1": "result_1"}
+    analysis_details_2 = {"test_2": "result_2"}
 
     # "analyze" them
     request_1.result = request_1.create_result()
@@ -112,6 +114,7 @@ def test_multiple_amts():
     assert isinstance(analysis, Analysis)
     assert analysis.details == analysis_details_2
 
+
 @pytest.mark.system
 def test_multiple_amt_workers():
     """Test having more than one worker for a single amt."""
@@ -121,12 +124,12 @@ def test_multiple_amt_workers():
     owner_uuid_2 = str(uuid.uuid4())
 
     # register a single basic analysis module
-    amt = AnalysisModuleType('test', '', [F_TEST])
+    amt = AnalysisModuleType("test", "", [F_TEST])
     assert register_analysis_module_type(amt)
 
     # submit an analysis request with a single observable
     root = RootAnalysis()
-    observable = root.add_observable(F_TEST, 'test')
+    observable = root.add_observable(F_TEST, "test")
     process_analysis_request(root.create_analysis_request())
 
     # have both workers try to grab the request
@@ -136,6 +139,7 @@ def test_multiple_amt_workers():
     # one of them should have received it
     assert (request_1 is not None and request_2 is None) or (request_1 is None and request_2 is not None)
 
+
 @pytest.mark.system
 def test_expected_status():
     """Test that the status of various components is what we expect as we step through the process."""
@@ -144,12 +148,12 @@ def test_expected_status():
     owner_uuid = str(uuid.uuid4())
 
     # register a basic analysis module
-    amt = AnalysisModuleType('test', '', [F_TEST])
+    amt = AnalysisModuleType("test", "", [F_TEST])
     assert register_analysis_module_type(amt)
 
     # create a new root analysis object
     root = RootAnalysis()
-    observable = root.add_observable(F_TEST, 'test')
+    observable = root.add_observable(F_TEST, "test")
 
     # this should not be tracked yet
     assert get_root_analysis(root.uuid) is None
@@ -183,7 +187,7 @@ def test_expected_status():
     assert request.status == TRACKING_STATUS_ANALYZING
     assert not request.result
 
-    analysis_details = {'test': 'result'}
+    analysis_details = {"test": "result"}
 
     # "analyze" it
     request.result = request.create_result()
@@ -195,13 +199,14 @@ def test_expected_status():
     # now this request should not be tracked anymore
     assert get_analysis_request(request_id) is None
 
+
 @pytest.mark.system
 def test_get_next_analysis_request_locking():
     owner_uuid = str(uuid.uuid4())
-    assert register_analysis_module_type(amt := AnalysisModuleType(F_TEST, ''))
+    assert register_analysis_module_type(amt := AnalysisModuleType(F_TEST, ""))
 
     root = RootAnalysis()
-    observable = root.add_observable(F_TEST, 'test')
+    observable = root.add_observable(F_TEST, "test")
     root.submit()
 
     root = get_root_analysis(root)
@@ -240,13 +245,14 @@ def test_get_next_analysis_request_locking():
     work_request = get_next_analysis_request(owner_uuid, amt, 0)
     assert work_request
 
+
 @pytest.mark.system
 def test_process_analysis_request_locking():
     owner_uuid = str(uuid.uuid4())
-    assert register_analysis_module_type(amt := AnalysisModuleType(F_TEST, ''))
+    assert register_analysis_module_type(amt := AnalysisModuleType(F_TEST, ""))
 
     root = RootAnalysis()
-    observable = root.add_observable(F_TEST, 'test')
+    observable = root.add_observable(F_TEST, "test")
     root.submit()
 
     root = get_root_analysis(root)

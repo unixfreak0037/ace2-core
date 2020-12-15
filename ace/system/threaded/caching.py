@@ -10,14 +10,16 @@ from ace.json import JSONEncoder
 from ace.system.caching import CachingInterface
 from ace.system.analysis_request import AnalysisRequest
 
+
 @dataclass
 class CachedAnalysisResult:
     request: str
     expiration: datetime.datetime = None
 
+
 class ThreadedCachingInterface(CachingInterface):
 
-    cache = {} # key = generate_cache_key(), value = CachedAnalysis.to_dict
+    cache = {}  # key = generate_cache_key(), value = CachedAnalysis.to_dict
 
     def get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
         try:

@@ -9,20 +9,21 @@ from ace.constants import F_TEST
 from ace.system import get_system
 from ace.system.analysis_module import register_analysis_module_type
 from ace.system.analysis_tracking import (
-        get_analysis_details,
-        track_root_analysis,
-        get_root_analysis,
-        delete_root_analysis,
-        track_analysis_details,
-        get_analysis_details,
-        delete_analysis_details,
+    get_analysis_details,
+    track_root_analysis,
+    get_root_analysis,
+    delete_root_analysis,
+    track_analysis_details,
+    get_analysis_details,
+    delete_analysis_details,
 )
 
 from ace.system.exceptions import UnknownRootAnalysisError
 
-TEST_DETAILS = { 'hello': 'world' }
-OBSERVABLE_VALUE = 'observable value'
-OBSERVABLE_VALUE_2 = 'observable value 2'
+TEST_DETAILS = {"hello": "world"}
+OBSERVABLE_VALUE = "observable value"
+OBSERVABLE_VALUE_2 = "observable value 2"
+
 
 @pytest.mark.integration
 def test_track_root_analysis():
@@ -34,6 +35,7 @@ def test_track_root_analysis():
     assert delete_root_analysis(root.uuid)
     # make sure it's gone
     assert get_root_analysis(root.uuid) is None
+
 
 @pytest.mark.integration
 def test_track_analysis_details():
@@ -60,12 +62,13 @@ def test_track_analysis_details():
     # make sure it's gone
     assert get_analysis_details(root.uuid) is None
 
+
 @pytest.mark.integration
 def test_analysis_details_deleted_with_root():
     # any details associated to a root are deleted when the root is deleted
-    register_analysis_module_type(amt := AnalysisModuleType(F_TEST, ''))
+    register_analysis_module_type(amt := AnalysisModuleType(F_TEST, ""))
     root = RootAnalysis(details=TEST_DETAILS)
-    observable = root.add_observable(F_TEST, 'test')
+    observable = root.add_observable(F_TEST, "test")
     observable.add_analysis(analysis := Analysis(root=root, type=amt, details=TEST_DETAILS))
     root.save()
 
@@ -80,9 +83,11 @@ def test_analysis_details_deleted_with_root():
     # and analysis details should be gone
     assert get_analysis_details(analysis.uuid) is None
 
+
 @pytest.mark.integration
 def test_delete_unknown_root():
-    assert not delete_root_analysis(str(uuid.uuid4())) 
+    assert not delete_root_analysis(str(uuid.uuid4()))
+
 
 @pytest.mark.integration
 def test_track_details_to_unknown_root():
@@ -94,6 +99,7 @@ def test_track_details_to_unknown_root():
     with pytest.raises(UnknownRootAnalysisError):
         track_analysis_details(root, _uuid, details)
 
+
 @pytest.mark.integration
 def test_delete_unknown_analysis_details():
-    assert not delete_analysis_details(str(uuid.uuid4())) 
+    assert not delete_analysis_details(str(uuid.uuid4()))

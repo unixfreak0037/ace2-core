@@ -7,8 +7,8 @@ from ace.system.analysis_request import AnalysisRequest
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.work_queue import WorkQueueManagerInterface, WorkQueue
 
-class ThreadedWorkQueue(WorkQueue):
 
+class ThreadedWorkQueue(WorkQueue):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.queue = queue.Queue()
@@ -25,9 +25,10 @@ class ThreadedWorkQueue(WorkQueue):
     def size(self) -> int:
         return self.queue.qsize()
 
+
 class ThreadedWorkQueueManagerInterface(WorkQueueManagerInterface):
 
-    work_queues = {} # key = amt.name, value = ThreadedWorkQueue
+    work_queues = {}  # key = amt.name, value = ThreadedWorkQueue
 
     def invalidate_work_queue(self, analysis_module_name: str) -> bool:
         try:

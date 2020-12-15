@@ -10,7 +10,8 @@ from typing import Union, Optional
 from ace.system.threaded import ThreadedInterface
 from ace.system.locking import LockingInterface
 
-class TimeoutRLock():
+
+class TimeoutRLock:
     """An implementation of an RLock that can timeout into an unlocked state."""
 
     def __init__(self, *args, **kwargs):
@@ -41,7 +42,7 @@ class TimeoutRLock():
 
                     # wait for that long or until the lock is released
                     self.condition.wait(wait_seconds)
-                    
+
                     # are we able to grab it now?
                     if not self.lock.acquire(blocking=False):
                         # has our request expired yet?
@@ -92,6 +93,7 @@ class TimeoutRLock():
 
         return True
 
+
 def synchronized(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
@@ -100,13 +102,14 @@ def synchronized(func):
 
     return wrapper
 
+
 class ThreadedLockingInterface(ThreadedInterface, LockingInterface):
 
-    locks = {} # key = lock_id, value = threading.RLock
-    lock_ownership = {} # key = lock_id, value = str (owner_id)
-    owner_wait_targets = {} # key = owner_id, value = str (lock_id)
-    lock_timeouts = {} # key = lock_id, value = datetime.datetime when lock expires
-    current_locks = set() # key = lock_id
+    locks = {}  # key = lock_id, value = threading.RLock
+    lock_ownership = {}  # key = lock_id, value = str (owner_id)
+    owner_wait_targets = {}  # key = owner_id, value = str (lock_id)
+    lock_timeouts = {}  # key = lock_id, value = datetime.datetime when lock expires
+    current_locks = set()  # key = lock_id
 
     def get_lock_owner(self, lock_id: str) -> Union[str, None]:
         return self.lock_ownership.get(lock_id)
@@ -117,13 +120,15 @@ class ThreadedLockingInterface(ThreadedInterface, LockingInterface):
     def track_wait_target(self, lock_id: str, owner_id: str):
         self.owner_wait_targets[owner_id] = lock_id
 
-    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[int]=None):
+    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[int] = None):
         self.lock_ownership[lock_id] = owner_id
         if lock_timeout:
             lock_timeout = datetime.datetime.now() + datetime.timedelta(seconds=lock_timeout)
         self.lock_timeouts[lock_id] = lock_timeout
 
-    def acquire(self, lock_id: str, owner_id: str, timeout: Optional[int]=None, lock_timeout: Optional[int]=None) -> bool:
+    def acquire(
+        self, lock_id: str, owner_id: str, timeout: Optional[int] = None, lock_timeout: Optional[int] = None
+    ) -> bool:
         lock = self.locks.get(lock_id)
         if not lock:
             lock = self.locks[lock_id] = TimeoutRLock()
@@ -170,6 +175,6 @@ class ThreadedLockingInterface(ThreadedInterface, LockingInterface):
         return lock_id in self.current_locks
 
     def reset(self):
-        self.locks = {} # key = lock_id, value = threading.RLock
-        self.lock_ownership = {} # key = lock_id, value = str (owner_id)
-        self.owner_wait_targets = {} # key = owner_id, value = str (lock_id)
+        self.locks = {}  # key = lock_id, value = threading.RLock
+        self.lock_ownership = {}  # key = lock_id, value = str (owner_id)
+        self.owner_wait_targets = {}  # key = owner_id, value = str (lock_id)

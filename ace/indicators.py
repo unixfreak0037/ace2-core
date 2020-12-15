@@ -10,14 +10,14 @@ from ace.constants import *
 
 
 class Indicator:
-    def __init__(self, type: str, value: str, status: str = 'New', tags: Iterable[str] = []):
+    def __init__(self, type: str, value: str, status: str = "New", tags: Iterable[str] = []):
         self.type = type
         self.value = value
         self.status = status
         self._tags = tags
 
     def to_dict(self) -> dict:
-        return {'type': self.type, 'value': self.value, 'status': self.status, 'tags': self.tags}
+        return {"type": self.type, "value": self.value, "status": self.status, "tags": self.tags}
 
     @property
     def tags(self):
@@ -34,19 +34,21 @@ class Indicator:
         return hash((self.type, self.value))
 
     def __str__(self):
-        return f'<Indicator {self.type}: {self.value}>'
+        return f"<Indicator {self.type}: {self.value}>"
 
     def __repr__(self):
-        return f'<Indicator {self.type}: {self.value}>'
+        return f"<Indicator {self.type}: {self.value}>"
 
 
 class IndicatorList(UserList):
     def append(self, indicator: Union[Indicator, dict]):
         if isinstance(indicator, dict):
             try:
-                indicator = Indicator(indicator['type'], indicator['value'], status=indicator['status'], tags=indicator['tags'])
+                indicator = Indicator(
+                    indicator["type"], indicator["value"], status=indicator["status"], tags=indicator["tags"]
+                )
             except KeyError:
-                logging.error(f'Trying to add invalid indicator to list: {indicator}')
+                logging.error(f"Trying to add invalid indicator to list: {indicator}")
                 return
 
         if isinstance(indicator, Indicator):
@@ -57,7 +59,7 @@ class IndicatorList(UserList):
             else:
                 self.data.append(indicator)
 
-    def add_url_iocs(self, urls: Union[List[str], str], status: str = 'New', tags: List[str] = []):
+    def add_url_iocs(self, urls: Union[List[str], str], status: str = "New", tags: List[str] = []):
         if isinstance(urls, str):
             urls = [urls]
 

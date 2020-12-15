@@ -2,9 +2,12 @@
 #
 # global system components
 
+
 class ACESystemInterface:
     """The base class that all system interfaces inherit from."""
+
     pass
+
 
 class ACESystem:
     work_queue = None
@@ -19,11 +22,14 @@ class ACESystem:
     event = None
     observable = None
 
+
 # the global system object that contains references to all the interfaces
 ace = ACESystem()
 
+
 def get_system() -> ACESystem:
     return ace
+
 
 def set_system(system: ACESystem):
     global ace

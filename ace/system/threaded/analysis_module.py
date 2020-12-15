@@ -4,9 +4,10 @@ from typing import Union, List
 
 from ace.system.analysis_module import AnalysisModuleTrackingInterface, AnalysisModuleType
 
+
 class ThreadedAnalysisModuleTrackingInterface(AnalysisModuleTrackingInterface):
 
-    amt_tracking = {} # key = str, value = AnalysisModuleType
+    amt_tracking = {}  # key = str, value = AnalysisModuleType
 
     def track_analysis_module_type(self, amt: AnalysisModuleType):
         self.amt_tracking[amt.name] = amt

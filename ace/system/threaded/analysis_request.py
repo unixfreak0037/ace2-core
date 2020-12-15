@@ -13,23 +13,23 @@ from ace.system.analysis_request import AnalysisRequestTrackingInterface, Analys
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.caching import generate_cache_key
 
-class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface):
 
+class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # we have different ways to tracking the requests
         # track by AnalysisRequest.id
-        self.analysis_requests = {} # key = AnalysisRequest.id, value = AnalysisRequest
+        self.analysis_requests = {}  # key = AnalysisRequest.id, value = AnalysisRequest
         # track by the cache index, if it exists
-        self.cache_index = {} # key = generate_cache_key(observable, amt), value = AnalysisRequest
+        self.cache_index = {}  # key = generate_cache_key(observable, amt), value = AnalysisRequest
 
         # expiration tracking
-        self.expiration_tracking = {} # key = request.id, value = of (datetime, request)
+        self.expiration_tracking = {}  # key = request.id, value = of (datetime, request)
 
         # sync changes to any of these tracking dicts
         self.sync_lock = threading.RLock()
-    
+
     def track_analysis_request(self, request: AnalysisRequest):
         with self.sync_lock:
             # are we already tracking this?
@@ -60,8 +60,9 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         # are we already tracking this?
         if request.id not in self.expiration_tracking:
             self.expiration_tracking[request.id] = (
-                    datetime.datetime.now() + datetime.timedelta(seconds=request.type.timeout),
-                    request)
+                datetime.datetime.now() + datetime.timedelta(seconds=request.type.timeout),
+                request,
+            )
 
     def _delete_request_expiration(self, request: AnalysisRequest) -> bool:
         """Utility function that implements the deletion of the tracking of the expiration of the request."""
@@ -108,7 +109,7 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
     # this is called when an analysis module type is removed (or expired)
     def clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
         with self.sync_lock:
-            target_list = [] # the list of request.id that we need to get rid of
+            target_list = []  # the list of request.id that we need to get rid of
             for request_id, request in self.request_tracking.items():
                 if request.type.name == amt.name:
                     target_list.append(request_id)

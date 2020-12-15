@@ -5,14 +5,15 @@ from typing import Any
 
 from ace.system.config import ConfigurationInterface
 
+
 class ThreadedConfigurationInterface(ConfigurationInterface):
 
-    config = {} 
+    config = {}
 
-    def get_config(self, key:str) -> Any:
+    def get_config(self, key: str) -> Any:
         return self.config.get(key, None)
 
-    def set_config(self, key:str, value: Any):
+    def set_config(self, key: str, value: Any):
         self.config[key] = value
 
     def reset(self):

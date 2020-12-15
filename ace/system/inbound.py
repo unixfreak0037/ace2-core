@@ -9,12 +9,12 @@ from ace.system.analysis_tracking import (
     track_root_analysis,
 )
 from ace.system.analysis_request import (
-        AnalysisRequest, 
-        delete_analysis_request,
-        get_analysis_request,
-        get_analysis_request_by_observable,
-        submit_analysis_request,
-        track_analysis_request,
+    AnalysisRequest,
+    delete_analysis_request,
+    get_analysis_request,
+    get_analysis_request_by_observable,
+    submit_analysis_request,
+    track_analysis_request,
 )
 from ace.system.analysis_module import get_all_analysis_module_types
 from ace.system.caching import cache_analysis_result, get_cached_analysis_result
@@ -25,17 +25,18 @@ from ace.system.exceptions import (
     UnknownRootAnalysisError,
 )
 
+
 def process_analysis_request(ar: AnalysisRequest):
     # need to lock this at the beginning so that nothing else modifies it
     # while we're processing it
     try:
         # TODO how long do we wait?
-        with ar.lock(): # NOTE since AnalysisRequest.lock_id returns RootAnalysis.uuid this also locks the root obj
+        with ar.lock():  # NOTE since AnalysisRequest.lock_id returns RootAnalysis.uuid this also locks the root obj
             target_root = None
             # did we complete a request?
             if ar.is_observable_analysis_result:
                 existing_ar = get_analysis_request(ar.id)
-                
+
                 # is this analysis request gone?
                 if not existing_ar:
                     raise UnknownAnalysisRequest(ar)
@@ -66,7 +67,7 @@ def process_analysis_request(ar: AnalysisRequest):
                     raise UnknownObservableError(observable)
 
                 target_observable.apply_diff_merge(ar.observable, ar.result.observable)
-                target_root.save() 
+                target_root.save()
 
             elif ar.is_root_analysis_request:
                 # are we updating an existing root analysis?
@@ -117,16 +118,20 @@ def process_analysis_request(ar: AnalysisRequest):
                             # the AR was completed before we could lock it
                             # oh well -- it could be in the cache
 
-                        except Exception as e: # TODO what can be thrown here?
+                        except Exception as e:  # TODO what can be thrown here?
                             logging.fatal(f"unknown error: {e}")
                             continue
 
                     # is this analysis in the cache?
                     cached_result = get_cached_analysis_result(observable, amt)
                     if cached_result:
-                        logging.debug(f"using cached result {cached_result} for {observable} type {amt} in {target_root}")
+                        logging.debug(
+                            f"using cached result {cached_result} for {observable} type {amt} in {target_root}"
+                        )
                         target_root.apply_diff_merge(cached_result.root, cached_result.result.root)
-                        target_observable = target_root.get_observable(observable).apply_diff_merge(cached_result.observable, cached_result.result.observable)
+                        target_observable = target_root.get_observable(observable).apply_diff_merge(
+                            cached_result.observable, cached_result.result.observable
+                        )
                         target_root.save()
                         continue
 
@@ -135,7 +140,7 @@ def process_analysis_request(ar: AnalysisRequest):
                     # (we also track the request inside the RootAnalysis object)
                     observable.track_analysis_request(new_ar)
                     track_analysis_request(new_ar)
-                    target_root.save() 
+                    target_root.save()
                     submit_analysis_request(new_ar)
                     continue
 

@@ -9,14 +9,15 @@ from typing import Union, Optional, Iterator
 from ace.system import ACESystemInterface
 from ace.system.storage import StorageInterface, ContentMetadata, has_valid_root_reference
 
+
 class ThreadedStorageInterface(ACESystemInterface):
 
     #
     # simple storage interface that stores everything in memory
     #
 
-    content = {} # key = sha256 hash, value = ContentMetadata
-    data = {} # key = sha256 hash, value = bytes
+    content = {}  # key = sha256 hash, value = ContentMetadata
+    data = {}  # key = sha256 hash, value = bytes
 
     def store_content(self, content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
         # if this is a string then just convert it into utf-8

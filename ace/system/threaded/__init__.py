@@ -6,10 +6,12 @@
 
 import threading
 
-class ThreadedInterface():
+
+class ThreadedInterface:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sync_lock = threading.RLock()
+
 
 from ace.system import ACESystem, set_system
 from ace.system.threaded.analysis_module import ThreadedAnalysisModuleTrackingInterface
@@ -21,6 +23,7 @@ from ace.system.threaded.locking import ThreadedLockingInterface
 from ace.system.threaded.observables import ThreadedObservableInterface
 from ace.system.threaded.storage import ThreadedStorageInterface
 from ace.system.threaded.work_queue import ThreadedWorkQueueManagerInterface
+
 
 class ThreadedACESystem(ACESystem):
     work_queue = ThreadedWorkQueueManagerInterface()
@@ -42,6 +45,7 @@ class ThreadedACESystem(ACESystem):
         self.storage.reset()
         self.locking.reset()
         self.config.reset()
+
 
 def initialize():
     set_system(ThreadedACESystem())

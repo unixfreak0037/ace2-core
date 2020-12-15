@@ -15,20 +15,24 @@ from ace.system.storage import (
     iter_expired_content,
     store_content,
     store_file,
-    ContentMetadata
+    ContentMetadata,
 )
 
-TEST_STRING = 'hello world'
-TEST_BYTES = b'hello world'
-TEST_IO = io.BytesIO(b'hello world')
+TEST_STRING = "hello world"
+TEST_BYTES = b"hello world"
+TEST_IO = io.BytesIO(b"hello world")
 
-TEST_NAME = 'test.txt'
+TEST_NAME = "test.txt"
 
-@pytest.mark.parametrize('input_data,name,meta', [
-    (TEST_STRING, TEST_NAME, ContentMetadata(TEST_NAME)),
-    (TEST_BYTES, TEST_NAME, ContentMetadata(TEST_NAME)),
-    (TEST_IO, TEST_NAME, ContentMetadata(TEST_NAME)),
-])
+
+@pytest.mark.parametrize(
+    "input_data,name,meta",
+    [
+        (TEST_STRING, TEST_NAME, ContentMetadata(TEST_NAME)),
+        (TEST_BYTES, TEST_NAME, ContentMetadata(TEST_NAME)),
+        (TEST_IO, TEST_NAME, ContentMetadata(TEST_NAME)),
+    ],
+)
 @pytest.mark.integration
 def test_get_store_delete_content(input_data, name, meta, tmpdir):
     sha256 = store_content(input_data, meta)
@@ -56,21 +60,22 @@ def test_get_store_delete_content(input_data, name, meta, tmpdir):
     assert get_content_bytes(sha256) is None
     assert get_content_stream(sha256) is None
 
+
 @pytest.mark.integration
 def test_store_duplicate(tmpdir):
-    path = str(tmpdir / 'test.txt')
-    with open(path, 'w') as fp:
-        fp.write('Hello, world!')
+    path = str(tmpdir / "test.txt")
+    with open(path, "w") as fp:
+        fp.write("Hello, world!")
 
     # store the file content
-    sha256 = store_file(path, custom={'a': '1'})
+    sha256 = store_file(path, custom={"a": "1"})
     assert sha256
 
     previous_meta = get_content_meta(sha256)
     assert previous_meta
 
     # then try to store it again
-    sha256 = store_file(path, custom={'a': '2'})
+    sha256 = store_file(path, custom={"a": "2"})
     assert sha256
     current_meta = get_content_meta(sha256)
 
@@ -78,13 +83,14 @@ def test_store_duplicate(tmpdir):
     assert current_meta.insert_date >= previous_meta.insert_date
 
     # and the custom dict should have changed
-    assert current_meta.custom['a'] == '2'
+    assert current_meta.custom["a"] == "2"
+
 
 @pytest.mark.unit
 def test_store_get_file(tmpdir):
-    path = str(tmpdir / 'test.txt')
-    with open(path, 'w') as fp:
-        fp.write('Hello, world!')
+    path = str(tmpdir / "test.txt")
+    with open(path, "w") as fp:
+        fp.write("Hello, world!")
 
     sha256 = store_file(path)
     assert sha256
@@ -97,11 +103,12 @@ def test_store_get_file(tmpdir):
     assert get_file(sha256)
     assert os.path.exists(path)
 
+
 @pytest.mark.integration
 def test_file_expiration(tmpdir):
-    path = str(tmpdir / 'test.txt')
-    with open(path, 'w') as fp:
-        fp.write('Hello, world!')
+    path = str(tmpdir / "test.txt")
+    with open(path, "w") as fp:
+        fp.write("Hello, world!")
 
     # store the file and have it expire right away
     sha256 = store_file(path, expiration_date=datetime.datetime.now())
@@ -119,14 +126,15 @@ def test_file_expiration(tmpdir):
     # and the file should be gone
     assert get_content_meta(sha256) is None
 
+
 @pytest.mark.integration
 def test_file_no_expiration(tmpdir):
-    path = str(tmpdir / 'test.txt')
-    with open(path, 'w') as fp:
-        fp.write('Hello, world!')
+    path = str(tmpdir / "test.txt")
+    with open(path, "w") as fp:
+        fp.write("Hello, world!")
 
     # store the file and have it never expire
-    sha256 = store_file(path) # defaults to never expire
+    sha256 = store_file(path)  # defaults to never expire
     assert sha256
 
     # we should have no files expired
@@ -141,14 +149,15 @@ def test_file_no_expiration(tmpdir):
     # should still have no files expired
     assert len(list(iter_expired_content())) == 0
 
+
 @pytest.mark.integration
 def test_file_expiration_with_root_reference(tmpdir):
     """Tests that a file that expires but still has a root reference does not
     get deleted until the root is also deleted."""
 
-    path = str(tmpdir / 'test.txt')
-    with open(path, 'w') as fp:
-        fp.write('Hello, world!')
+    path = str(tmpdir / "test.txt")
+    with open(path, "w") as fp:
+        fp.write("Hello, world!")
 
     root = RootAnalysis()
     # have the file expire right away
@@ -178,14 +187,15 @@ def test_file_expiration_with_root_reference(tmpdir):
     # and the content is gone
     assert get_content_meta(file_observable.value) is None
 
+
 @pytest.mark.integration
 def test_file_expiration_with_multiple_root_reference(tmpdir):
     """Tests that a file that expires but still has a root references are not
     deleted until all root references are deleted."""
 
-    path = str(tmpdir / 'test.txt')
-    with open(path, 'w') as fp:
-        fp.write('Hello, world!')
+    path = str(tmpdir / "test.txt")
+    with open(path, "w") as fp:
+        fp.write("Hello, world!")
 
     # add a root with a file that expires right away
     root_1 = RootAnalysis()

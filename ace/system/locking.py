@@ -23,22 +23,29 @@ from ace.system import ACESystemInterface, get_system
 # what owns what lock and what is waiting on what lock for the purpose of deadlock prevention.
 #
 
+
 class DeadlockException(Exception):
     """Raised when an attempt to lock something would enter into a deadlock condition."""
+
     def __init__(self, lock_chain):
         self.lock_chain = lock_chain
         self.message = f'deadlock detected {"->".join(self.lock_chain)}'
         super().__init__(self.message)
 
+
 class InvalidLockOwnership(Exception):
     """Raised when a call is made to release a lock the caller does not own."""
+
     pass
+
 
 class LockAcquireFailed(Exception):
     """Raised when a call to acquire a lock fails from a with statement."""
+
     pass
 
-class Lockable():
+
+class Lockable:
     """Represents something that can be locked with the lock() function.
 
     lock_id is a unique ID that represents this object.
@@ -63,7 +70,7 @@ class Lockable():
             if lock_result:
                 release(self.lock_id, self.lock_owner_id)
 
-    def acquire(self, timeout:Optional[int]=None, lock_timeout:Optional[int]=None) -> bool:
+    def acquire(self, timeout: Optional[int] = None, lock_timeout: Optional[int] = None) -> bool:
         return acquire(self.lock_id, self.lock_owner_id, timeout, lock_timeout)
 
     def release(self) -> bool:
@@ -81,6 +88,7 @@ class Lockable():
 # requestor_id = P1
 # lock_owner_id = P2
 # get_owner_wait_target(P2) = L2 (in between acquire and clear wait target)
+
 
 def check_deadlock(lock_id: str, requestor_id: str, chain=None):
     assert lock_id is None or isinstance(lock_id, str)
@@ -111,9 +119,10 @@ def check_deadlock(lock_id: str, requestor_id: str, chain=None):
     chain.append(lock_id)
 
     if len(chain) > 10:
-        print(f'lock_id = {lock_id} requestor_id = {requestor_id} lock_owner_id = {lock_owner_id} chain = {chain}')
+        print(f"lock_id = {lock_id} requestor_id = {requestor_id} lock_owner_id = {lock_owner_id} chain = {chain}")
 
     check_deadlock(get_owner_wait_target(lock_owner_id), requestor_id, chain)
+
 
 class LockingInterface(ACESystemInterface):
     def get_lock_owner(self, lock_id: str) -> Union[str, None]:
@@ -125,11 +134,13 @@ class LockingInterface(ACESystemInterface):
     def track_wait_target(self, lock_id: str, owner_id: str):
         raise NotImplementedError()
 
-    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[int]=None):
+    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[int] = None):
         raise NotImplementedError()
 
     # lock must be re-entrant
-    def acquire(self, lock_id: str, owner_id: str, timeout: Optional[int]=None, lock_timeout: Optional[int]=None) -> bool:
+    def acquire(
+        self, lock_id: str, owner_id: str, timeout: Optional[int] = None, lock_timeout: Optional[int] = None
+    ) -> bool:
         raise NotImplementedError()
 
     def release(self, lock_id: str, owner_id: str) -> bool:
@@ -138,41 +149,53 @@ class LockingInterface(ACESystemInterface):
     def is_locked(self, lock_id: str) -> bool:
         raise NotImplementedError()
 
+
 def get_lock_owner(lock_id: str) -> Union[str, None]:
     assert isinstance(lock_id, str)
     return get_system().locking.get_lock_owner(lock_id)
 
+
 def get_owner_wait_target(owner_id: str) -> Union[str, None]:
     assert isinstance(owner_id, str)
     return get_system().locking.get_owner_wait_target(owner_id)
+
 
 def track_wait_target(lock_id: Union[str, None], owner_id: str):
     assert lock_id is None or isinstance(lock_id, str)
     assert isinstance(owner_id, str)
     get_system().locking.track_wait_target(lock_id, owner_id)
 
+
 def clear_wait_target(owner_id: str):
     assert isinstance(owner_id, str)
     track_wait_target(None, owner_id)
 
-def track_lock_acquire(lock_id: str, owner_id: str, lock_timeout: Optional[int]=None):
+
+def track_lock_acquire(lock_id: str, owner_id: str, lock_timeout: Optional[int] = None):
     assert isinstance(lock_id, str)
     assert isinstance(owner_id, str)
     get_system().locking.track_lock_acquire(lock_id, owner_id, lock_timeout)
+
 
 def is_locked(lock_id: str) -> bool:
     assert isinstance(lock_id, str)
     return get_system().locking.is_locked(lock_id)
 
+
 def default_owner_id():
     import socket, os, threading
-    return f'{socket.gethostname()}-{os.getpid()}-{threading.get_ident()}'
+
+    return f"{socket.gethostname()}-{os.getpid()}-{threading.get_ident()}"
+
 
 # timeout > 0 --> wait for timeout seconds
 # timeout = 0  --> try and return immediately regardless of success
 # timeout = None --> wait forever
 
-def acquire(lock_id: str, owner_id: Optional[str]=None, timeout:Optional[int]=None, lock_timeout:Optional[int]=None) -> bool:
+
+def acquire(
+    lock_id: str, owner_id: Optional[str] = None, timeout: Optional[int] = None, lock_timeout: Optional[int] = None
+) -> bool:
     assert isinstance(lock_id, str)
     assert owner_id is None or isinstance(owner_id, str)
     assert timeout is None or isinstance(timeout, int)
@@ -208,7 +231,8 @@ def acquire(lock_id: str, owner_id: Optional[str]=None, timeout:Optional[int]=No
     clear_wait_target(owner_id)
     return True
 
-def release(lock_id: str, owner_id: Optional[str]=None) -> bool:
+
+def release(lock_id: str, owner_id: Optional[str] = None) -> bool:
     assert isinstance(lock_id, str)
 
     if owner_id is None:
@@ -217,8 +241,9 @@ def release(lock_id: str, owner_id: Optional[str]=None) -> bool:
     # actually release the lock
     return get_system().locking.release(lock_id, owner_id)
 
+
 @contextmanager
-def lock(lock_id: str, timeout:Optional[int]=None, lock_timeout:Optional[int]=None):
+def lock(lock_id: str, timeout: Optional[int] = None, lock_timeout: Optional[int] = None):
     try:
         lock_result = acquire(lock_id, timeout=timeout, lock_timeout=lock_timeout)
 

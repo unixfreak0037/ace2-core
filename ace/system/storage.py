@@ -13,6 +13,7 @@ from ace.analysis import RootAnalysis
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_tracking import get_root_analysis
 
+
 @dataclass
 class ContentMetadata:
     # the meta "name" of the content
@@ -43,6 +44,7 @@ class ContentMetadata:
 # content is referenced by the sha256 of the data in lower case hex string format
 #
 
+
 class StorageInterface(ACESystemInterface):
     def store_content(self, content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
         raise NotImplementedError()
@@ -62,39 +64,48 @@ class StorageInterface(ACESystemInterface):
     def delete_content(self, sha256: str) -> bool:
         raise NotImplementedError()
 
+
 def store_content(content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
     assert isinstance(content, bytes) or isinstance(content, str) or isinstance(content, io.IOBase)
     assert isinstance(meta, ContentMetadata)
     return get_system().storage.store_content(content, meta)
 
+
 def get_content_bytes(sha256: str) -> Union[bytes, None]:
     return get_system().storage.get_content_bytes(sha256)
+
 
 def get_content_stream(sha256: str) -> Union[io.IOBase, None]:
     return get_system().storage.get_content_stream(sha256)
 
+
 def get_content_meta(sha256: str) -> Union[ContentMetadata, None]:
     return get_system().storage.get_content_meta(sha256)
+
 
 def iter_expired_content() -> Iterator[ContentMetadata]:
     """Returns an iterator for all the expired content."""
     return get_system().storage.iter_expired_content()
 
+
 def delete_content(sha256: str) -> bool:
     return get_system().storage.delete_content(sha256)
+
 
 #
 # utility functions
 #
 
+
 def store_file(path: str, **kwargs) -> str:
     """Utility function that stores the contents of the given file and returns the sha2 hash."""
     assert isinstance(path, str)
     meta = ContentMetadata(path, **kwargs)
-    with open(path, 'rb') as fp:
+    with open(path, "rb") as fp:
         return store_content(fp, meta)
 
-def get_file(sha256: str, path: Optional[str]=None) -> bool:
+
+def get_file(sha256: str, path: Optional[str] = None) -> bool:
     """Utility function that pulls data out of storage into a local file. The
     original path is used unless a target path is specified."""
     assert isinstance(sha256, str)
@@ -107,11 +118,12 @@ def get_file(sha256: str, path: Optional[str]=None) -> bool:
     if path is None:
         path = meta.name
 
-    with open(path, 'wb') as fp_out:
+    with open(path, "wb") as fp_out:
         with contextlib.closing(get_content_stream(sha256)) as fp_in:
             shutil.copyfileobj(fp_in, fp_out)
 
     return True
+
 
 def has_valid_root_reference(meta: ContentMetadata) -> bool:
     """Returns True if the given meta has a valid (existing) RootAnalysis reference."""
@@ -120,6 +132,7 @@ def has_valid_root_reference(meta: ContentMetadata) -> bool:
             return True
 
     return False
+
 
 def delete_expired_content() -> int:
     """Deletes all expired content and returns the number of items deleted."""

@@ -9,15 +9,12 @@ from ace.analysis import RootAnalysis, Observable
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.analysis_module import AnalysisModuleType
-from ace.system.constants import (
-    TRACKING_STATUS_NEW,
-    TRACKING_STATUS_QUEUED,
-    SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS
-)
+from ace.system.constants import TRACKING_STATUS_NEW, TRACKING_STATUS_QUEUED, SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS
 from ace.system.exceptions import InvalidWorkQueueError
 from ace.system.locking import Lockable, acquire, release
 
-class AnalysisResult():
+
+class AnalysisResult:
     def __init__(self, root: RootAnalysis, observable: Observable):
         assert isinstance(root, RootAnalysis)
         assert isinstance(observable, Observable)
@@ -27,27 +24,31 @@ class AnalysisResult():
 
     def to_dict(self) -> dict:
         return {
-            'root': self.root.to_dict(),
-            'observable': self.observable.to_dict(),
+            "root": self.root.to_dict(),
+            "observable": self.observable.to_dict(),
         }
 
     @staticmethod
-    def from_dict(json_dict: dict) -> 'AnalysisResult':
+    def from_dict(json_dict: dict) -> "AnalysisResult":
         assert isinstance(json_dict, dict)
-        root = RootAnalysis.from_dict(json_dict['root'])
-        observable = Observable.from_dict(json_dict['observable'], root)
+        root = RootAnalysis.from_dict(json_dict["root"])
+        observable = Observable.from_dict(json_dict["observable"], root)
         return AnalysisResult(root, observable)
 
     @property
     def json(self):
         return self.to_dict()
 
+
 class AnalysisRequest(Lockable):
     """Represents a request to analyze a single observable, or all the observables in a RootAnalysis."""
-    def __init__(self, 
-            root: Union[str, RootAnalysis],
-            observable: Optional[Observable]=None, 
-            type: Optional[AnalysisModuleType]=None):
+
+    def __init__(
+        self,
+        root: Union[str, RootAnalysis],
+        observable: Optional[Observable] = None,
+        type: Optional[AnalysisModuleType] = None,
+    ):
 
         from ace.system.caching import generate_cache_key
 
@@ -59,7 +60,7 @@ class AnalysisRequest(Lockable):
         if isinstance(root, str):
             self.root = get_root_analysis(root)
         else:
-            self.root = root 
+            self.root = root
 
         #
         # static data
@@ -80,7 +81,7 @@ class AnalysisRequest(Lockable):
         # key = analysis_module, value = Analysis
         self.dependency_analysis = {}
 
-        # 
+        #
         # dynamic data
         #
 
@@ -104,42 +105,42 @@ class AnalysisRequest(Lockable):
 
     def to_dict(self) -> dict:
         return {
-            'id': self.id,
-            'observable': self.observable.to_dict() if self.observable else None,
-            'type': self.type.to_dict() if self.type else None,
-            'root': self.root.to_dict(),
-            'additional_roots': self.additional_roots,
-            'dependency_analysis': self.dependency_analysis,
-            'status': self.status,
-            'owner': self.owner,
-            'result': self.result.to_dict() if self.result else None,
+            "id": self.id,
+            "observable": self.observable.to_dict() if self.observable else None,
+            "type": self.type.to_dict() if self.type else None,
+            "root": self.root.to_dict(),
+            "additional_roots": self.additional_roots,
+            "dependency_analysis": self.dependency_analysis,
+            "status": self.status,
+            "owner": self.owner,
+            "result": self.result.to_dict() if self.result else None,
         }
 
     @staticmethod
-    def from_dict(json_data: dict) -> 'AnalysisRequest':
+    def from_dict(json_data: dict) -> "AnalysisRequest":
         assert isinstance(json_data, dict)
 
-        root = RootAnalysis.from_dict(json_data['root'])
+        root = RootAnalysis.from_dict(json_data["root"])
 
         observable = None
-        if json_data['observable']:
-            observable = Observable.from_dict(json_data['observable'], root)
+        if json_data["observable"]:
+            observable = Observable.from_dict(json_data["observable"], root)
             observable = root.get_observable(observable)
 
         type = None
-        if json_data['type']:
-            type = AnalysisModuleType.from_dict(json_data['type'])
+        if json_data["type"]:
+            type = AnalysisModuleType.from_dict(json_data["type"])
 
         ar = AnalysisRequest(root, observable, type)
-        ar.id = json_data['id']
-        ar.additional_roots = json_data['additional_roots']
-        ar.dependency_analysis = json_data['dependency_analysis']
-        ar.status = json_data['status']
-        ar.owner = json_data['owner']
+        ar.id = json_data["id"]
+        ar.additional_roots = json_data["additional_roots"]
+        ar.dependency_analysis = json_data["dependency_analysis"]
+        ar.status = json_data["status"]
+        ar.owner = json_data["owner"]
 
         ar.result = None
-        if json_data['result']:
-            ar.result = AnalysisResult.from_dict(json_data['result'])
+        if json_data["result"]:
+            ar.result = AnalysisResult.from_dict(json_data["result"])
 
         return ar
 
@@ -168,7 +169,7 @@ class AnalysisRequest(Lockable):
     @property
     def is_observable_analysis_request(self) -> bool:
         """Was this a request to analyze an Observable?"""
-        return self.observable is not None 
+        return self.observable is not None
 
     @property
     def is_observable_analysis_result(self) -> bool:
@@ -187,14 +188,16 @@ class AnalysisRequest(Lockable):
             if self.is_observable_analysis_result:
                 # process both the new observables and the one we already processed
                 # doing so resolves dependencies
-                observables = self.result.observable.get_analysis(self.type).observables[:] # get all the observables from the Analysis object
-                observables.append(self.result.observable) # and also reprocess our original observable
+                observables = self.result.observable.get_analysis(self.type).observables[
+                    :
+                ]  # get all the observables from the Analysis object
+                observables.append(self.result.observable)  # and also reprocess our original observable
                 return observables
             else:
                 # otherwise we just want to look at the observable
-                return [ self.observable ]
+                return [self.observable]
         else:
-            # otherwise we analyze all the observables in the entire RootAnalysis 
+            # otherwise we analyze all the observables in the entire RootAnalysis
             return self.root.all_observables
 
     def append_root(self, root: RootAnalysis):
@@ -202,16 +205,13 @@ class AnalysisRequest(Lockable):
         self.additional_roots.append(root.uuid)
 
     def duplicate(self):
-        dup = AnalysisRequest(
-                self.root,
-                self.observable,
-                self.type)
+        dup = AnalysisRequest(self.root, self.observable, self.type)
 
         dup.dependency_analysis = self.dependency_analysis
         dup.status = self.status
         dup.additional_roots = self.additional_roots
         dup.owner = self.owner
-        dup.result = self.result # XXX need another duplicate here?
+        dup.result = self.result  # XXX need another duplicate here?
         return dup
 
     def create_result(self) -> AnalysisResult:
@@ -221,6 +221,7 @@ class AnalysisRequest(Lockable):
 
     def submit(self):
         submit_analysis_request(self)
+
 
 class AnalysisRequestTrackingInterface(ACESystemInterface):
     def track_analysis_request(self, request: AnalysisRequest):
@@ -241,23 +242,30 @@ class AnalysisRequestTrackingInterface(ACESystemInterface):
     def clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
         raise NotImplementedError()
 
+
 def track_analysis_request(request: AnalysisRequest):
     """Begins tracking the given AnalysisRequest."""
     assert isinstance(request, AnalysisRequest)
     return get_system().request_tracking.track_analysis_request(request)
 
+
 def get_analysis_request_by_request_id(request_id: str) -> Union[AnalysisRequest, None]:
     return get_system().request_tracking.get_analysis_request_by_request_id(request_id)
+
 
 def get_analysis_request_by_cache_key(cache_key: str) -> Union[AnalysisRequest, None]:
     return get_system().request_tracking.get_analysis_request_by_cache_key(cache_key)
 
+
 def get_analysis_request(key: str) -> Union[AnalysisRequest, None]:
     return get_analysis_request_by_request_id(key)
 
+
 def get_analysis_request_by_observable(observable: Observable, amt: AnalysisModuleType) -> Union[AnalysisRequest, None]:
     from ace.system.caching import generate_cache_key
+
     return get_analysis_request_by_cache_key(generate_cache_key(observable, amt))
+
 
 def delete_analysis_request(target: Union[AnalysisRequest, str]) -> bool:
     assert isinstance(target, AnalysisRequest) or isinstance(target, str)
@@ -266,17 +274,21 @@ def delete_analysis_request(target: Union[AnalysisRequest, str]) -> bool:
 
     return get_system().request_tracking.delete_analysis_request(target)
 
+
 def get_expired_analysis_requests() -> List[AnalysisRequest]:
     """Returns all AnalysisRequests that are in the TRACKING_STATUS_ANALYZING state and have expired."""
     return get_system().request_tracking.get_expired_analysis_requests()
+
 
 def clear_tracking_by_analysis_module_type(amt: AnalysisModuleType):
     """Deletes tracking for any requests assigned to the given analysis module type."""
     return get_system().request_tracking.clear_tracking_by_analysis_module_type(amt)
 
+
 def submit_analysis_request(ar: AnalysisRequest):
     """Submits the given AnalysisRequest to the appropriate queue for analysis."""
     from ace.system.inbound import process_analysis_request
+
     assert isinstance(ar, AnalysisRequest)
     assert isinstance(ar.root, RootAnalysis)
 
@@ -296,6 +308,7 @@ def submit_analysis_request(ar: AnalysisRequest):
 
     work_queue.put(ar)
 
+
 def process_expired_analysis_requests():
     """Moves all unlocked expired analysis requests back into the queue."""
 
@@ -314,4 +327,3 @@ def process_expired_analysis_requests():
                     delete_analysis_request(request.id)
     finally:
         release(SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS)
-

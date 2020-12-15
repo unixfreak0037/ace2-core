@@ -12,6 +12,7 @@ from ace.system import get_system
 from ace.system.observables import ObservableInterface
 from ace.system.storage import get_file
 
+
 class FileObservable(Observable):
     def __init__(self, *args, **kwargs):
         super().__init__(F_FILE, *args, **kwargs)
@@ -30,9 +31,11 @@ class FileObservable(Observable):
         self._loaded = get_file(self.value, path=self.path)
         return self._loaded
 
+
 class ThreadedObservableInterface(ObservableInterface):
     """A default implementation that returns the basic Observables appropriate for testing."""
-    def create_observable(self, type: str, *args, **kwargs) -> Observable: 
+
+    def create_observable(self, type: str, *args, **kwargs) -> Observable:
         if type == F_FILE:
             return FileObservable(*args, **kwargs)
         else:

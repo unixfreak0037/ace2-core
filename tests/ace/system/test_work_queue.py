@@ -8,41 +8,33 @@ from ace.analysis import RootAnalysis
 from ace.constants import *
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.analysis_request import (
-    AnalysisRequest, 
-    track_analysis_request, 
-    process_expired_analysis_requests, 
+    AnalysisRequest,
+    track_analysis_request,
+    process_expired_analysis_requests,
     submit_analysis_request,
 )
 from ace.system.constants import *
 from ace.system.work_queue import (
-        WorkQueue,
-        get_next_analysis_request,
-        get_work_queue, 
-        invalidate_work_queue, 
-        register_work_queue, 
+    WorkQueue,
+    get_next_analysis_request,
+    get_work_queue,
+    invalidate_work_queue,
+    register_work_queue,
 )
 
-amt_1 = AnalysisModuleType(
-        name='test',
-        description='test',
-        version='1.0.0',
-        timeout=30,
-        cache_ttl=600)
+amt_1 = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600)
 
-amt_2 = AnalysisModuleType(
-        name='test',
-        description='test',
-        version='1.0.0',
-        timeout=30,
-        cache_ttl=600)
+amt_2 = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600)
 
-TEST_1 = 'test_1'
+TEST_1 = "test_1"
 TEST_OWNER = str(uuid.uuid4())
+
 
 @pytest.mark.integration
 def test_register_work_queue():
     wq = register_work_queue(amt_1)
     assert get_work_queue(amt_1) is wq
+
 
 @pytest.mark.integration
 def test_register_existing_work_queue():
@@ -53,6 +45,7 @@ def test_register_existing_work_queue():
     wq_2 = register_work_queue(amt_2)
     assert get_work_queue(amt_2) is wq_1
 
+
 @pytest.mark.integration
 def test_invalidate_work_queue():
     wq_1 = register_work_queue(amt_1)
@@ -60,9 +53,11 @@ def test_invalidate_work_queue():
     assert invalidate_work_queue(amt_1.name)
     assert get_work_queue(amt_1) is None
 
+
 @pytest.mark.integration
 def test_get_invalid_work_queue():
     assert get_work_queue(amt_1) is None
+
 
 @pytest.mark.integration
 def test_get_next_analysis_request():
@@ -77,15 +72,13 @@ def test_get_next_analysis_request():
     assert request.owner == TEST_OWNER
     assert get_next_analysis_request(TEST_OWNER, amt_1, 0) is None
 
+
 @pytest.mark.integration
 def test_get_next_analysis_request_expired():
 
     amt = AnalysisModuleType(
-            name='test',
-            description='test',
-            version='1.0.0',
-            timeout=0, # immediately expire
-            cache_ttl=600)
+        name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600  # immediately expire
+    )
 
     register_work_queue(amt)
     root = RootAnalysis()

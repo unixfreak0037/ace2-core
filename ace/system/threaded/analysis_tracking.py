@@ -11,21 +11,23 @@ from ace.system.analysis_tracking import AnalysisTrackingInterface, get_root_ana
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.exceptions import *
 
+
 @dataclass
 class RootAnalysisTracking:
     root: str
     details: List[str] = field(default_factory=list)
 
+
 class ThreadedAnalysisTrackingInterface(AnalysisTrackingInterface):
 
-    root_analysis = {} # key = RootAnalysis.uuid, value = RootAnalysisTracking
-    analysis_details = {} # key = Analysis.uuid, value = Any
+    root_analysis = {}  # key = RootAnalysis.uuid, value = RootAnalysisTracking
+    analysis_details = {}  # key = Analysis.uuid, value = Any
 
     def track_root_analysis(self, uuid: str, root: dict):
         assert isinstance(uuid, str)
         assert isinstance(root, dict)
         self.root_analysis[uuid] = RootAnalysisTracking(root=json.dumps(root, cls=JSONEncoder))
-        
+
     def get_root_analysis(self, uuid: str) -> Union[dict, None]:
         try:
             return json.loads(self.root_analysis[uuid].root)

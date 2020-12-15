@@ -9,11 +9,12 @@ from ace.analysis import RootAnalysis, Observable, Analysis
 from ace.system import get_system, ACESystemInterface
 from ace.system.locking import lock
 
+
 class AnalysisTrackingInterface(ACESystemInterface):
     def get_root_analysis(self, uuid: str) -> Union[dict, None]:
         """Returns the JSON dict for the given RootAnalysis uuid or None if it does not exist.."""
         raise NotImplementedError()
-    
+
     def track_root_analysis(self, uuid: str, root: dict):
         """Tracks the given RootAnalysis JSON dict to the given RootAnalysis uuid."""
         raise NotImplementedError()
@@ -31,6 +32,7 @@ class AnalysisTrackingInterface(ACESystemInterface):
     def delete_analysis_details(self, uuid: str) -> bool:
         raise NotImplementedError()
 
+
 def get_root_analysis(root: Union[RootAnalysis, str]) -> Union[RootAnalysis, None]:
     """Returns the loaded RootAnalysis for the given RootAnalysis or uuid, or None if it does not exist."""
     assert isinstance(root, RootAnalysis) or isinstance(root, str)
@@ -45,6 +47,7 @@ def get_root_analysis(root: Union[RootAnalysis, str]) -> Union[RootAnalysis, Non
 
     return RootAnalysis.from_dict(root_dict)
 
+
 def track_root_analysis(root: RootAnalysis):
     assert isinstance(root, RootAnalysis)
 
@@ -53,6 +56,7 @@ def track_root_analysis(root: RootAnalysis):
 
     logging.debug(f"tracking {root}")
     get_system().analysis_tracking.track_root_analysis(root.uuid, root.to_dict())
+
 
 def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:
     assert isinstance(root, RootAnalysis) or isinstance(root, str)
@@ -63,14 +67,16 @@ def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:
     logging.debug(f"deleting RootAnalysis with uuid {root}")
     return get_system().analysis_tracking.delete_root_analysis(root)
 
+
 def get_analysis_details(uuid: str) -> Any:
     assert isinstance(uuid, str)
 
     logging.debug(f"loading analysis details {uuid}")
     return get_system().analysis_tracking.get_analysis_details(uuid)
 
+
 def track_analysis_details(root: RootAnalysis, uuid: str, value: Any) -> bool:
-    assert isinstance(root, RootAnalysis) 
+    assert isinstance(root, RootAnalysis)
     assert isinstance(uuid, str)
 
     # we don't save Analysis that doesn't have the details set
@@ -80,6 +86,7 @@ def track_analysis_details(root: RootAnalysis, uuid: str, value: Any) -> bool:
     logging.debug(f"tracking {root} analysis details {uuid}")
     get_system().analysis_tracking.track_analysis_details(root.uuid, uuid, value)
     return True
+
 
 def delete_analysis_details(uuid: str) -> bool:
     assert isinstance(uuid, str)

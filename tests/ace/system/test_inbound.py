@@ -2,7 +2,11 @@ import uuid
 
 from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis
 from ace.constants import *
-from ace.system.analysis_module import register_analysis_module_type, UnknownAnalysisModuleTypeError, CircularDependencyError
+from ace.system.analysis_module import (
+    register_analysis_module_type,
+    UnknownAnalysisModuleTypeError,
+    CircularDependencyError,
+)
 from ace.system.analysis_request import AnalysisRequest, get_analysis_request
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.caching import get_cached_analysis_result
@@ -12,18 +16,19 @@ from ace.system.work_queue import get_next_analysis_request, get_work_queue
 
 import pytest
 
-ANALYSIS_TYPE_TEST = 'test'
-ANALYSIS_TYPE_TEST_DEP = 'test_dep'
+ANALYSIS_TYPE_TEST = "test"
+ANALYSIS_TYPE_TEST_DEP = "test_dep"
 OWNER_UUID = str(uuid.uuid4())
+
 
 @pytest.mark.integration
 def test_process_root_analysis_request():
-    amt = AnalysisModuleType(name=ANALYSIS_TYPE_TEST, description='blah', cache_ttl=60)
+    amt = AnalysisModuleType(name=ANALYSIS_TYPE_TEST, description="blah", cache_ttl=60)
     assert register_analysis_module_type(amt) == amt
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, 'test')
-    
+    test_observable = root.add_observable(F_TEST, "test")
+
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -47,14 +52,15 @@ def test_process_root_analysis_request():
     # the original root analysis request should be deleted
     assert get_analysis_request(root_request.id) is None
 
+
 @pytest.mark.integration
 def test_process_duplicate_root_analysis_request():
-    amt = AnalysisModuleType(name=ANALYSIS_TYPE_TEST, description='blah', cache_ttl=60)
+    amt = AnalysisModuleType(name=ANALYSIS_TYPE_TEST, description="blah", cache_ttl=60)
     assert register_analysis_module_type(amt) == amt
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, 'test')
-    
+    test_observable = root.add_observable(F_TEST, "test")
+
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -68,18 +74,22 @@ def test_process_duplicate_root_analysis_request():
     # should still only have one request
     assert get_work_queue(amt).size() == 1
 
-@pytest.mark.parametrize('cache_ttl', [
-    (None),
-    (60),
-])
+
+@pytest.mark.parametrize(
+    "cache_ttl",
+    [
+        (None),
+        (60),
+    ],
+)
 @pytest.mark.integration
 def test_process_duplicate_observable_analysis_request(cache_ttl):
-    amt = AnalysisModuleType(name=ANALYSIS_TYPE_TEST, description='blah', cache_ttl=cache_ttl)
+    amt = AnalysisModuleType(name=ANALYSIS_TYPE_TEST, description="blah", cache_ttl=cache_ttl)
     assert register_analysis_module_type(amt) == amt
 
     original_root = RootAnalysis()
-    test_observable = original_root.add_observable(F_TEST, 'test')
-    
+    test_observable = original_root.add_observable(F_TEST, "test")
+
     root_request = original_root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -88,7 +98,7 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
 
     # make another request for the same observable but from a different root analysis
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, 'test')
+    test_observable = root.add_observable(F_TEST, "test")
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -104,7 +114,7 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
 
         # process the result of the original request
         request.result = request.create_result()
-        request.result.observable.add_analysis(type=amt, details={'Hello': 'World'})
+        request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
         process_analysis_request(request)
 
         # now the second root analysis should have it's analysis completed
@@ -119,18 +129,22 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
         # otherwise there should be two requests
         assert get_work_queue(amt).size() == 2
 
-@pytest.mark.parametrize('cache_ttl', [
-    (None),
-    (60),
-])
+
+@pytest.mark.parametrize(
+    "cache_ttl",
+    [
+        (None),
+        (60),
+    ],
+)
 @pytest.mark.integration
 def test_process_analysis_result(cache_ttl):
-    amt = AnalysisModuleType(ANALYSIS_TYPE_TEST, 'blah', cache_ttl=cache_ttl)
+    amt = AnalysisModuleType(ANALYSIS_TYPE_TEST, "blah", cache_ttl=cache_ttl)
     assert register_analysis_module_type(amt) == amt
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, 'test')
-    
+    test_observable = root.add_observable(F_TEST, "test")
+
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -144,7 +158,7 @@ def test_process_analysis_result(cache_ttl):
     assert request.owner == OWNER_UUID
 
     request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt, details={'Hello': 'World'})
+    request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
     process_analysis_request(request)
 
     if cache_ttl is not None:
@@ -165,14 +179,15 @@ def test_process_analysis_result(cache_ttl):
     # request should be deleted
     assert get_analysis_request(request.id) is None
 
+
 @pytest.mark.integration
 def test_cached_analysis_result():
-    amt = AnalysisModuleType(ANALYSIS_TYPE_TEST, 'blah', cache_ttl=60)
+    amt = AnalysisModuleType(ANALYSIS_TYPE_TEST, "blah", cache_ttl=60)
     assert register_analysis_module_type(amt) == amt
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, 'test')
-    
+    test_observable = root.add_observable(F_TEST, "test")
+
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -184,7 +199,7 @@ def test_cached_analysis_result():
 
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
     request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt, details={'Hello': 'World'})
+    request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
     process_analysis_request(request)
 
     # this analysis result for this observable should be cached now
@@ -198,8 +213,8 @@ def test_cached_analysis_result():
 
     # make another request for the same observable
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, 'test')
-    
+    test_observable = root.add_observable(F_TEST, "test")
+
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -220,17 +235,18 @@ def test_cached_analysis_result():
     assert analysis.observable == request.observable
     assert analysis.details == request.result.observable.get_analysis(amt).details
 
+
 @pytest.mark.integration
 def test_process_existing_analysis_merge():
     # register two different analysis modules
-    amt_1 = AnalysisModuleType('test_1', '')
+    amt_1 = AnalysisModuleType("test_1", "")
     register_analysis_module_type(amt_1)
 
-    amt_2 = AnalysisModuleType('test_2', '')
+    amt_2 = AnalysisModuleType("test_2", "")
     register_analysis_module_type(amt_2)
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, 'test')
+    test_observable = root.add_observable(F_TEST, "test")
     root.submit()
 
     # act like these two modules are running at the same time
@@ -239,7 +255,7 @@ def test_process_existing_analysis_merge():
 
     # process the first one
     request_1.result = request_1.create_result()
-    request_1.result.observable.add_tag('tag_1') # make a modification to the observable
+    request_1.result.observable.add_tag("tag_1")  # make a modification to the observable
     analysis = request_1.result.observable.add_analysis(type=amt_1)
     process_analysis_request(request_1)
 
@@ -250,29 +266,31 @@ def test_process_existing_analysis_merge():
 
     root = get_root_analysis(root)
     test_observable = root.get_observable(test_observable)
-    assert test_observable.has_tag('tag_1')
+    assert test_observable.has_tag("tag_1")
     assert test_observable.get_analysis(amt_1)
     assert test_observable.get_analysis(amt_2)
+
 
 @pytest.mark.integration
 def test_unknown_dependency():
     # amt_dep depends on amt which has not registered yet
-    amt_dep = AnalysisModuleType(ANALYSIS_TYPE_TEST_DEP, 'test', dependencies=[ANALYSIS_TYPE_TEST])
+    amt_dep = AnalysisModuleType(ANALYSIS_TYPE_TEST_DEP, "test", dependencies=[ANALYSIS_TYPE_TEST])
     with pytest.raises(UnknownAnalysisModuleTypeError):
         assert register_analysis_module_type(amt_dep)
 
+
 @pytest.mark.integration
 def test_known_dependency():
-    amt = AnalysisModuleType(ANALYSIS_TYPE_TEST, 'test')
+    amt = AnalysisModuleType(ANALYSIS_TYPE_TEST, "test")
     assert register_analysis_module_type(amt) == amt
 
-    # amt_dep depends on amt 
-    amt_dep = AnalysisModuleType(ANALYSIS_TYPE_TEST_DEP, 'test', dependencies=[ANALYSIS_TYPE_TEST])
+    # amt_dep depends on amt
+    amt_dep = AnalysisModuleType(ANALYSIS_TYPE_TEST_DEP, "test", dependencies=[ANALYSIS_TYPE_TEST])
     assert register_analysis_module_type(amt_dep)
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, 'test')
-    
+    test_observable = root.add_observable(F_TEST, "test")
+
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -285,28 +303,29 @@ def test_known_dependency():
     # process the amt request
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
     request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt, details={'Hello': 'World'})
+    request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
     process_analysis_request(request)
 
     # now we should have a request for the dependency
     assert get_work_queue(amt_dep).size() == 1
 
+
 @pytest.mark.integration
 def test_chained_dependency():
-    amt_1 = AnalysisModuleType('test_1', '')
+    amt_1 = AnalysisModuleType("test_1", "")
     assert register_analysis_module_type(amt_1)
 
     # amt_2 depends on amt_1
-    amt_2 = AnalysisModuleType('test_2', '', dependencies=['test_1'])
+    amt_2 = AnalysisModuleType("test_2", "", dependencies=["test_1"])
     assert register_analysis_module_type(amt_2)
 
     # amt_3 depends on amt_2
-    amt_3 = AnalysisModuleType('test_3', '', dependencies=['test_2'])
+    amt_3 = AnalysisModuleType("test_3", "", dependencies=["test_2"])
     assert register_analysis_module_type(amt_3)
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, 'test')
-    
+    test_observable = root.add_observable(F_TEST, "test")
+
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -320,7 +339,7 @@ def test_chained_dependency():
     # process the amt request
     request = get_next_analysis_request(OWNER_UUID, amt_1, 0)
     request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt_1, details={'Hello': 'World'})
+    request.result.observable.add_analysis(type=amt_1, details={"Hello": "World"})
     process_analysis_request(request)
 
     # now amt_2 should be ready but still not amt_3
@@ -331,7 +350,7 @@ def test_chained_dependency():
     # process the amt request
     request = get_next_analysis_request(OWNER_UUID, amt_2, 0)
     request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt_2, details={'Hello': 'World'})
+    request.result.observable.add_analysis(type=amt_2, details={"Hello": "World"})
     process_analysis_request(request)
 
     # now amt_3 should be ready
@@ -339,34 +358,35 @@ def test_chained_dependency():
     assert get_work_queue(amt_2).size() == 0
     assert get_work_queue(amt_3).size() == 1
 
+
 @pytest.mark.integration
 def test_circ_dependency():
-    amt_1 = AnalysisModuleType('test_1', '')
+    amt_1 = AnalysisModuleType("test_1", "")
     assert register_analysis_module_type(amt_1)
 
     # amt_2 depends on amt_1
-    amt_2 = AnalysisModuleType('test_2', '', dependencies=['test_1'])
+    amt_2 = AnalysisModuleType("test_2", "", dependencies=["test_1"])
     assert register_analysis_module_type(amt_2)
 
     # and now amt_1 depends on amt_2
-    amt_1 = AnalysisModuleType('test_1', '', dependencies=['test_2'])
+    amt_1 = AnalysisModuleType("test_1", "", dependencies=["test_2"])
     with pytest.raises(CircularDependencyError):
         assert register_analysis_module_type(amt_1)
+
 
 @pytest.mark.integration
 def test_self_dependency():
     # depending on amt when amt isn' registered yet
-    amt_1 = AnalysisModuleType('test_1', '', dependencies=['test_1'])
+    amt_1 = AnalysisModuleType("test_1", "", dependencies=["test_1"])
     with pytest.raises(UnknownAnalysisModuleTypeError):
         assert register_analysis_module_type(amt_1)
 
     # define it
-    amt_1 = AnalysisModuleType('test_1', '')
+    amt_1 = AnalysisModuleType("test_1", "")
     assert register_analysis_module_type(amt_1)
 
     # redefine to depend on yourself
     # cannot depend on yourself! (low self esteem error)
-    amt_1 = AnalysisModuleType('test_1', '', dependencies=['test_1'])
+    amt_1 = AnalysisModuleType("test_1", "", dependencies=["test_1"])
     with pytest.raises(CircularDependencyError):
         assert register_analysis_module_type(amt_1)
-

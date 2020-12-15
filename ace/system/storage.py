@@ -47,21 +47,35 @@ class ContentMetadata:
 
 class StorageInterface(ACESystemInterface):
     def store_content(self, content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
+        """Stores the content with the given meta data and returns the key needed to lookup the content.
+
+        Args:
+            content: the content to store
+            meta: metadata about the content
+
+        Returns:
+            the lookup key for the content (sha256 hash)
+        """
         raise NotImplementedError()
 
     def get_content_bytes(self, sha256: str) -> Union[bytes, None]:
+        """Returns the requested stored content as a bytes object, or None if the content does not exist."""
         raise NotImplementedError()
 
     def get_content_stream(self, sha256: str) -> Union[io.IOBase, None]:
+        """Returns the requested stored content as some kind of stream, or None if the content does not exist."""
         raise NotImplementedError()
 
     def get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:
+        """Returns the meta data of the stored content, or None if the content does not exist."""
         raise NotImplementedError()
 
     def iter_expired_content(self) -> Iterator[ContentMetadata]:
+        """Iterates over expired content metadata."""
         raise NotImplementedError()
 
     def delete_content(self, sha256: str) -> bool:
+        """Deletes the given content. Returns True if content was actually deleted."""
         raise NotImplementedError()
 
 
@@ -98,7 +112,7 @@ def delete_content(sha256: str) -> bool:
 
 
 def store_file(path: str, **kwargs) -> str:
-    """Utility function that stores the contents of the given file and returns the sha2 hash."""
+    """Utility function that stores the contents of the given file and returns the sha256 hash."""
     assert isinstance(path, str)
     meta = ContentMetadata(path, **kwargs)
     with open(path, "rb") as fp:

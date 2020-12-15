@@ -40,10 +40,6 @@ class AnalysisModuleTrackingInterface(ACESystemInterface):
     def get_all_analysis_module_types(self) -> List[AnalysisModuleType]:
         raise NotImplementedError()
 
-    def get_dependencies(self, amt: AnalysisModuleType) -> List[AnalysisModuleType]:
-        """Returns a list of analysis modules that depend on the given analysis module."""
-        raise NotImplementedError()
-
 
 def _circ_dep_check(
     source_amt: AnalysisModuleType,
@@ -92,14 +88,11 @@ def track_analysis_module_type(amt: AnalysisModuleType):
 
 
 def get_analysis_module_type(name: str) -> Union[AnalysisModuleType, None]:
+    """Returns the registered AnalysisModuleType by name, or None if it has not been or is no longer registered."""
     assert isinstance(name, str)
     return get_system().module_tracking.get_analysis_module_type(name)
 
 
 def get_all_analysis_module_types() -> List[AnalysisModuleType]:
+    """Returns the full list of all registered analysis module types."""
     return get_system().module_tracking.get_all_analysis_module_types()
-
-
-def get_dependencies(self, amt: AnalysisModuleType) -> List[AnalysisModuleType]:
-    assert isinstance(amt, AnalysisModuleType)
-    return get_system().module_tracking.get_dependencies(amt)

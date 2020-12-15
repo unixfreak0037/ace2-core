@@ -39,9 +39,11 @@ def generate_cache_key(observable: Observable, amt: AnalysisModuleType) -> str:
 
 class CachingInterface(ACESystemInterface):
     def get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
+        """Returns the cached AnalysisRequest for the analysis with the given cache key, or None if it does not exist."""
         raise NotImplementedError()
 
     def cache_analysis_result(self, cache_key: str, request: AnalysisRequest, expiration: Optional[int]) -> str:
+        """Caches the AnalysisRequest to the cache key and returns the cache id."""
         raise NotImplementedError()
 
 

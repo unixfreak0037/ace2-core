@@ -15,6 +15,14 @@ from ace.system.locking import Lockable, acquire, release
 
 
 class AnalysisResult:
+    """Contains the results of an analysis by an analysis module.
+
+    The root and observable properties of object contain the modifications made
+    by the analysis module.  These are compared to the root and observable
+    properties of the parent AnalysisRequest object in order to determine what
+    changed during analysis, so that the changes can be made to the tracked
+    root object."""
+
     def __init__(self, root: RootAnalysis, observable: Observable):
         assert isinstance(root, RootAnalysis)
         assert isinstance(observable, Observable)
@@ -41,7 +49,7 @@ class AnalysisResult:
 
 
 class AnalysisRequest(Lockable):
-    """Represents a request to analyze a single observable, or all the observables in a RootAnalysis."""
+    """Represents a request to analyze a single observable or a new analysis."""
 
     def __init__(
         self,
@@ -201,9 +209,13 @@ class AnalysisRequest(Lockable):
             return self.root.all_observables
 
     def append_root(self, root: RootAnalysis):
+        """Append the given root to this analysis request so that when request
+        has finished processing, the root that was appended will also be
+        analyzed with the same result data."""
         assert isinstance(root, RootAnalysis)
         self.additional_roots.append(root.uuid)
 
+    # XXX shall we use copy.deepcopy instead?
     def duplicate(self):
         dup = AnalysisRequest(self.root, self.observable, self.type)
 
@@ -215,15 +227,19 @@ class AnalysisRequest(Lockable):
         return dup
 
     def create_result(self) -> AnalysisResult:
+        """Utility function to create an AnalysisResult for a given AnalysisRequest object."""
         root = copy.deepcopy(self.root)
         observable = root.get_observable(self.observable)
         return AnalysisResult(root, observable)
 
     def submit(self):
+        """Submits this analysis request for processing."""
         submit_analysis_request(self)
 
 
 class AnalysisRequestTrackingInterface(ACESystemInterface):
+    """Tracks and manages analysis requests."""
+
     def track_analysis_request(self, request: AnalysisRequest):
         raise NotImplementedError()
 

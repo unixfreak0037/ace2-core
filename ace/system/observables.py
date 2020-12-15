@@ -9,9 +9,18 @@ from ace.analysis import Observable
 from ace.constants import F_FILE
 from ace.system import get_system, ACESystemInterface
 
+#
+# this class is used to create Observable instances
+# for example, an implementation could return a custom FileObservable class for F_FILE type observables
+# that implements additional functionality
+#
+
 
 class ObservableInterface(ACESystemInterface):
+    """Provides an interface to instantiate overloaded Observable classes based on type."""
+
     def create_observable(self, type: str, *args, **kwargs) -> Observable:
+        """Returns a new Observable-based object with the given parameters."""
         raise NotImplementedError()
 
 

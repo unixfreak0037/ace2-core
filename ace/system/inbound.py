@@ -28,6 +28,9 @@ from ace.system.exceptions import (
 
 
 def process_analysis_request(ar: AnalysisRequest):
+    """Processes an analysis request.
+    This function implements the core logic of the system."""
+
     # need to lock this at the beginning so that nothing else modifies it
     # while we're processing it
     try:

@@ -12,11 +12,11 @@ from ace.system.locking import lock
 
 class AnalysisTrackingInterface(ACESystemInterface):
     def get_root_analysis(self, uuid: str) -> Union[dict, None]:
-        """Returns the JSON dict for the given RootAnalysis uuid or None if it does not exist.."""
+        """Returns the root for the given uuid or None if it does not exist.."""
         raise NotImplementedError()
 
     def track_root_analysis(self, uuid: str, root: dict):
-        """Tracks the given RootAnalysis JSON dict to the given RootAnalysis uuid."""
+        """Tracks the given root to the given RootAnalysis uuid."""
         raise NotImplementedError()
 
     def delete_root_analysis(self, uuid: str) -> bool:
@@ -24,12 +24,15 @@ class AnalysisTrackingInterface(ACESystemInterface):
         raise NotImplementedError()
 
     def get_analysis_details(self, uuid: str) -> Any:
+        """Returns the details for the given Analysis object, or None if is has not been set."""
         raise NotImplementedError()
 
     def track_analysis_details(self, root_uuid: str, uuid: str, value: Any):
+        """Tracks the details for the given Analysis object (uuid) in the given root (root_uuid)."""
         raise NotImplementedError()
 
     def delete_analysis_details(self, uuid: str) -> bool:
+        """Deletes the analysis details for the given Analysis referenced by id."""
         raise NotImplementedError()
 
 

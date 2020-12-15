@@ -28,9 +28,11 @@ ace = ACESystem()
 
 
 def get_system() -> ACESystem:
+    """Returns a reference to the global ACESystem object."""
     return ace
 
 
 def set_system(system: ACESystem):
+    """Sets the reference to the global ACESystem object."""
     global ace
     ace = system

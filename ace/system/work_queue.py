@@ -16,12 +16,21 @@ from ace.system.locking import LockAcquireFailed
 
 class WorkQueue:
     def put(self, analysis_request: AnalysisRequest):
+        """Adds the AnalysisRequest to the end of the work queue."""
         raise NotImplementedError()
 
     def get(self, timeout: int) -> Union[AnalysisRequest, None]:
+        """Gets the next AnalysisRequest from the work queue, or None if no content is available.
+
+        Args:
+            timeout: how long to wait in seconds
+            Passing 0 returns immediately
+
+        """
         raise NotImplementedError()
 
     def size(self) -> int:
+        """Returns the current size of the work queue."""
         raise NotImplementedError()
 
 
@@ -37,6 +46,7 @@ class WorkQueueManagerInterface(ACESystemInterface):
 
 
 def get_work_queue(amt: AnalysisModuleType) -> Union[WorkQueue, None]:
+    """Returns the work queue for the given analysis module type, or None if the type is not currently registered."""
 
     # if this amt does not match what is already on record then it needs to fail
     existing_amt = get_analysis_module_type(amt.name)
@@ -47,14 +57,19 @@ def get_work_queue(amt: AnalysisModuleType) -> Union[WorkQueue, None]:
 
 
 def invalidate_work_queue(name: str) -> bool:
+    """Invalidates an existing work queue.
+    An invalidated work queue is removed from the system, and all work items in the queue are also deleted."""
     return get_system().work_queue.invalidate_work_queue(name)
 
 
 def add_work_queue(name: str) -> WorkQueue:
+    """Creates a new work queue for the given analysis module type."""
     return get_system().work_queue.add_work_queue(name)
 
 
 def register_work_queue(amt: AnalysisModuleType) -> WorkQueue:
+    """Registers a work queue for the given analysis module type.
+    If the queue already exists then the existing queue is returned. Otherwise a new queue is created."""
     queue = get_work_queue(amt)
 
     # are we going to need to create a new queue?

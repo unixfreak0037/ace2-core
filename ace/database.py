@@ -1,3 +1,5 @@
+# vim: sw=4:ts=4:et:cc=120
+
 import collections
 import datetime
 import functools
@@ -17,15 +19,15 @@ from contextlib import closing, contextmanager
 from typing import Dict, List, Set
 from urllib.parse import urlsplit
 
-import saq
-import saq.analysis
-import saq.constants
+import ace
+import ace.analysis
+import ace.constants
 
-from saq.analysis import RootAnalysis, Indicator, IndicatorList
-from saq.constants import *
-from saq.error import report_exception
-from saq.performance import track_execution_time
-from saq.util import abs_path, validate_uuid, create_timedelta, find_all_url_domains
+from ace.analysis import RootAnalysis, Indicator, IndicatorList
+from ace.constants import *
+from ace.error import report_exception
+from ace.performance import track_execution_time
+from ace.util import abs_path, validate_uuid, create_timedelta, find_all_url_domains
 from sqlalchemy.orm import aliased
 
 import pytz
@@ -50,7 +52,7 @@ class _database_pool(object):
         self.lock = threading.RLock()
 
         config_section = f'database_{name}'
-        section = saq.CONFIG[config_section]
+        section = ace.CONFIG[config_section]
         kwargs = {
             'db': section['database'],
             'user': section['username'],
@@ -174,7 +176,7 @@ class _database_pool(object):
         # keep track of when this connection should be invalidated
         setattr(connection,
                 'termination_date',
-                datetime.datetime.now() + create_timedelta(saq.CONFIG['database']['max_connection_lifetime']))
+                datetime.datetime.now() + create_timedelta(ace.CONFIG['database']['max_connection_lifetime']))
 
         logging.debug(f"got new database connection to {self.name} ({len(self.in_use)} existing connections)")
         return connection
@@ -321,7 +323,7 @@ def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=Fa
                 results.append(sql_or_func(db, cursor, *params))
             else:
                 for (_sql, _params) in zip(sql_or_func, params):
-                    if saq.CONFIG['global'].getboolean('log_sql'):
+                    if ace.CONFIG['global'].getboolean('log_sql'):
                         logging.debug(f"executing with retry (attempt #{count}) sql {_sql} with paramters {_params}")
                     cursor.execute(_sql, _params)
                     results.append(cursor.rowcount)
@@ -417,7 +419,7 @@ def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
        :param bool commit If set to True then the ``commit`` function is called on the session object before returning
        from the function. If a deadlock occurs during the commit then further attempts are made.
 
-       In the case where targets are functions, session can be omitted, in which case :meth:saq.db is used to 
+       In the case where targets are functions, session can be omitted, in which case :meth:ace.db is used to 
        acquire a Session to use. When this is the case, the acquired Session object is passed as a keyword parameter
        to the functions.
 
@@ -435,12 +437,12 @@ def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
             last_result = None
             for target in targets:
                 if isinstance(target, Executable) or isinstance(target, str):
-                    saq.db.execute(target, *args, **kwargs)
+                    ace.db.execute(target, *args, **kwargs)
                 elif callable(target):
                     last_result = target(*args, **kwargs)
 
             if commit:
-                saq.db.commit()
+                ace.db.commit()
 
             return last_result
 
@@ -451,7 +453,7 @@ def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
                 logging.debug(f"DEADLOCK STATEMENT attempt #{current_attempt + 1} SQL {e.statement} PARAMS {e.params}")
 
                 try:
-                    saq.db.rollback() # rolls back to the begin_nested()
+                    ace.db.rollback() # rolls back to the begin_nested()
                 except Exception as e:
                     logging.error(f"unable to roll back transaction: {e}")
                     report_exception()
@@ -809,8 +811,8 @@ class Event(Base):
         nullable=True)
 
 
-    malware = relationship("saq.database.MalwareMapping", passive_deletes=True, passive_updates=True)
-    alert_mappings = relationship("saq.database.EventMapping", passive_deletes=True, passive_updates=True)
+    malware = relationship("ace.database.MalwareMapping", passive_deletes=True, passive_updates=True)
+    alert_mappings = relationship("ace.database.EventMapping", passive_deletes=True, passive_updates=True)
 
     @property
     def json(self):
@@ -877,7 +879,7 @@ class Event(Base):
     @property
     def disposition(self):
         if not self.alert_mappings:
-            disposition = saq.constants.DISPOSITION_DELIVERY
+            disposition = ace.constants.DISPOSITION_DELIVERY
         else:
             disposition = None
 
@@ -886,13 +888,13 @@ class Event(Base):
                 logging.warning(f"alert {alert_mapping.alert} added to event without disposition {alert_mapping.event_id}")
                 continue
 
-            if disposition is None or saq.constants.DISPOSITION_RANK[alert_mapping.alert.disposition] > saq.constants.DISPOSITION_RANK[disposition]:
+            if disposition is None or ace.constants.DISPOSITION_RANK[alert_mapping.alert.disposition] > ace.constants.DISPOSITION_RANK[disposition]:
                 disposition = alert_mapping.alert.disposition
         return disposition
 
     @property
     def disposition_rank(self):
-        return saq.constants.DISPOSITION_RANK[self.disposition]
+        return ace.constants.DISPOSITION_RANK[self.disposition]
 
     @property
     def sorted_tags(self):
@@ -904,8 +906,8 @@ class Event(Base):
 
     @property
     def wiki(self):
-        if saq.CONFIG['mediawiki'].getboolean('enabled'):
-            domain = saq.CONFIG['mediawiki']['domain']
+        if ace.CONFIG['mediawiki'].getboolean('enabled'):
+            domain = ace.CONFIG['mediawiki']['domain']
             date = self.creation_date.strftime("%Y%m%d").replace(' ', '+')
             name = self.name.replace(' ', '+')
             return "{}display/integral/{}+{}".format(domain, date, name)
@@ -913,16 +915,16 @@ class Event(Base):
             return None
 
     @property
-    def alert_with_email_and_screenshot(self) -> 'saq.database.Alert':
+    def alert_with_email_and_screenshot(self) -> 'ace.database.Alert':
         return next((a for a in self.alert_objects if a.has_email_analysis and a.has_renderer_screenshot), None)
 
     @property
-    def all_emails(self) -> Set['saq.modules.email.EmailAnalysis']:
+    def all_emails(self) -> Set['ace.modules.email.EmailAnalysis']:
         emails = set()
 
         for alert in self.alert_objects:
-            observables = alert.find_observables(lambda o: o.get_analysis(saq.modules.email.EmailAnalysis))
-            email_analyses = {o.get_analysis(saq.modules.email.EmailAnalysis) for o in observables}
+            observables = alert.find_observables(lambda o: o.get_analysis(ace.modules.email.EmailAnalysis))
+            email_analyses = {o.get_analysis(ace.modules.email.EmailAnalysis) for o in observables}
 
             # Inject the alert's UUID into the EmailAnalysis so that we maintain a link of alert->email
             for email_analysis in email_analyses:
@@ -977,18 +979,18 @@ class Event(Base):
         return urls
 
     @property
-    def all_user_analysis(self) -> Set['saq.modules.user.UserAnalysis']:
+    def all_user_analysis(self) -> Set['ace.modules.user.UserAnalysis']:
         user_analysis = set()
 
         for alert in self.alert_objects:
-            observables = alert.find_observables(lambda o: o.get_analysis(saq.modules.user.UserAnalysis))
-            user_analysis |= {o.get_analysis(saq.modules.user.UserAnalysis) for o in observables}
+            observables = alert.find_observables(lambda o: o.get_analysis(ace.modules.user.UserAnalysis))
+            user_analysis |= {o.get_analysis(ace.modules.user.UserAnalysis) for o in observables}
 
         return user_analysis
 
     @property
     def showable_tags(self) -> Dict[str, list]:
-        special_tag_names = [tag for tag in saq.CONFIG['tags'] if saq.CONFIG['tags'][tag] in ['special', 'hidden']]
+        special_tag_names = [tag for tag in ace.CONFIG['tags'] if ace.CONFIG['tags'][tag] in ['special', 'hidden']]
 
         results = {}
         for alert in self.alert_objects:
@@ -1069,8 +1071,8 @@ class EventMapping(Base):
         primary_key=True,
         index=True)
 
-    alert = relationship('saq.database.Alert', backref='event_mapping')
-    event = relationship('saq.database.Event', backref='event_mapping')
+    alert = relationship('ace.database.Alert', backref='event_mapping')
+    event = relationship('ace.database.Event', backref='event_mapping')
 
 class Nodes(Base):
 
@@ -1182,7 +1184,7 @@ class Malware(Base):
         unique=True, 
         index=True)
 
-    threats = relationship("saq.database.MalwareThreatMapping", passive_deletes=True, passive_updates=True)
+    threats = relationship("ace.database.MalwareThreatMapping", passive_deletes=True, passive_updates=True)
 
 class MalwareMapping(Base):
 
@@ -1203,7 +1205,7 @@ class MalwareMapping(Base):
         primary_key=True,
         index=True)
 
-    malware = relationship("saq.database.Malware")
+    malware = relationship("ace.database.Malware")
 
     @property
     def threats(self):
@@ -1278,18 +1280,18 @@ class Alert(RootAnalysis, Base):
 
     def _initialize(self):
         # Create a businesstime object for SLA with the correct start and end hours converted to UTC
-        _bhours = saq.CONFIG['SLA']['business_hours'].split(',')
-        self._bh_tz = pytz.timezone(saq.CONFIG['SLA']['time_zone'])
+        _bhours = ace.CONFIG['SLA']['business_hours'].split(',')
+        self._bh_tz = pytz.timezone(ace.CONFIG['SLA']['time_zone'])
         self._start_hour = int(_bhours[0])
         self._end_hour = int(_bhours[1])
         self._bt = businesstime.BusinessTime(business_hours=(datetime.time(self._start_hour), datetime.time(self._end_hour)), holidays=SiteHolidays())
         # keep track of what Tag and Observable objects we add as we analyze
-        self._tracked_tags = [] # of saq.analysis.Tag
-        self._tracked_observables = [] # of saq.analysis.Observable
+        self._tracked_tags = [] # of ace.analysis.Tag
+        self._tracked_observables = [] # of ace.analysis.Observable
         self._synced_tags = set() # of Tag.name
         self._synced_observables = set() # of '{}:{}'.format(observable.type, observable.value)
-        self.add_event_listener(saq.constants.EVENT_GLOBAL_TAG_ADDED, self._handle_tag_added)
-        self.add_event_listener(saq.constants.EVENT_GLOBAL_OBSERVABLE_ADDED, self._handle_observable_added)
+        self.add_event_listener(ace.constants.EVENT_GLOBAL_TAG_ADDED, self._handle_tag_added)
+        self.add_event_listener(ace.constants.EVENT_GLOBAL_OBSERVABLE_ADDED, self._handle_observable_added)
 
         # when we lock the Alert this is the UUID we used to lock it with
         self.lock_uuid = str(uuid.uuid4())
@@ -1377,22 +1379,22 @@ class Alert(RootAnalysis, Base):
 
     disposition = Column(
         Enum(
-            saq.constants.DISPOSITION_FALSE_POSITIVE,
-            saq.constants.DISPOSITION_IGNORE,
-            saq.constants.DISPOSITION_UNKNOWN,
-            saq.constants.DISPOSITION_REVIEWED,
-            saq.constants.DISPOSITION_GRAYWARE,
-            saq.constants.DISPOSITION_POLICY_VIOLATION,
-            saq.constants.DISPOSITION_RECONNAISSANCE,
-            saq.constants.DISPOSITION_WEAPONIZATION,
-            saq.constants.DISPOSITION_DELIVERY,
-            saq.constants.DISPOSITION_EXPLOITATION,
-            saq.constants.DISPOSITION_INSTALLATION,
-            saq.constants.DISPOSITION_COMMAND_AND_CONTROL,
-            saq.constants.DISPOSITION_EXFIL,
-            saq.constants.DISPOSITION_DAMAGE,
-            saq.constants.DISPOSITION_INSIDER_DATA_CONTROL,
-            saq.constants.DISPOSITION_INSIDER_DATA_EXFIL),
+            ace.constants.DISPOSITION_FALSE_POSITIVE,
+            ace.constants.DISPOSITION_IGNORE,
+            ace.constants.DISPOSITION_UNKNOWN,
+            ace.constants.DISPOSITION_REVIEWED,
+            ace.constants.DISPOSITION_GRAYWARE,
+            ace.constants.DISPOSITION_POLICY_VIOLATION,
+            ace.constants.DISPOSITION_RECONNAISSANCE,
+            ace.constants.DISPOSITION_WEAPONIZATION,
+            ace.constants.DISPOSITION_DELIVERY,
+            ace.constants.DISPOSITION_EXPLOITATION,
+            ace.constants.DISPOSITION_INSTALLATION,
+            ace.constants.DISPOSITION_COMMAND_AND_CONTROL,
+            ace.constants.DISPOSITION_EXFIL,
+            ace.constants.DISPOSITION_DAMAGE,
+            ace.constants.DISPOSITION_INSIDER_DATA_CONTROL,
+            ace.constants.DISPOSITION_INSIDER_DATA_EXFIL),
         nullable=True,
         index=True)
 
@@ -1464,22 +1466,22 @@ class Alert(RootAnalysis, Base):
     queue = Column(
         String(64),
         nullable=False,
-        default=saq.constants.QUEUE_DEFAULT,
+        default=ace.constants.QUEUE_DEFAULT,
         index=True)
 
     #
     # relationships
     #
 
-    disposition_user = relationship('saq.database.User', foreign_keys=[disposition_user_id])
-    owner = relationship('saq.database.User', foreign_keys=[owner_id])
-    remover = relationship('saq.database.User', foreign_keys=[removal_user_id])
-    #observable_mapping = relationship('saq.database.ObservableMapping')
-    tag_mappings = relationship('saq.database.TagMapping', passive_deletes=True, passive_updates=True)
-    #delayed_analysis = relationship('saq.database.DelayedAnalysis')
+    disposition_user = relationship('ace.database.User', foreign_keys=[disposition_user_id])
+    owner = relationship('ace.database.User', foreign_keys=[owner_id])
+    remover = relationship('ace.database.User', foreign_keys=[removal_user_id])
+    #observable_mapping = relationship('ace.database.ObservableMapping')
+    tag_mappings = relationship('ace.database.TagMapping', passive_deletes=True, passive_updates=True)
+    #delayed_analysis = relationship('ace.database.DelayedAnalysis')
 
     def get_observables(self):
-        query = saq.db.query(Observable)
+        query = ace.db.query(Observable)
         query = query.join(ObservableMapping, Observable.id == ObservableMapping.observable_id)
         query = query.join(Alert, ObservableMapping.alert_id == Alert.id)
         query = query.filter(Alert.uuid == self.uuid)
@@ -1488,7 +1490,7 @@ class Alert(RootAnalysis, Base):
 
     def get_remediation_targets(self):
         # XXX hack to get around circular import - probably need to merge some modules into one
-        from saq.observables import create_observable
+        from ace.observables import create_observable
 
         # get observables for this alert
         observables = self.get_observables()
@@ -1558,13 +1560,13 @@ class Alert(RootAnalysis, Base):
         return indicators
 
     @property
-    def all_email_analysis(self) -> List['saq.modules.email.EmailAnalysis']:
-        observables = self.find_observables(lambda o: o.get_analysis(saq.modules.email.EmailAnalysis))
-        return [o.get_analysis(saq.modules.email.EmailAnalysis) for o in observables]
+    def all_email_analysis(self) -> List['ace.modules.email.EmailAnalysis']:
+        observables = self.find_observables(lambda o: o.get_analysis(ace.modules.email.EmailAnalysis))
+        return [o.get_analysis(ace.modules.email.EmailAnalysis) for o in observables]
 
     @property
     def has_email_analysis(self) -> bool:
-        return bool(self.find_observable(lambda o: o.get_analysis(saq.modules.email.EmailAnalysis)))
+        return bool(self.find_observable(lambda o: o.get_analysis(ace.modules.email.EmailAnalysis)))
 
     @property
     def has_renderer_screenshot(self) -> bool:
@@ -1596,7 +1598,7 @@ class Alert(RootAnalysis, Base):
 
         # find the SLA setting that matches this alert
         try:
-            for sla in saq.OTHER_SLA_SETTINGS:
+            for sla in ace.OTHER_SLA_SETTINGS:
                 #logging.info("MARKER: {} {} {}".format(self.uuid, getattr(self, sla._property), sla._value))
                 if str(getattr(self, sla._property)) == str(sla._value):
                     logging.debug("alert {} matches property {} value {} for SLA {}".format(
@@ -1607,7 +1609,7 @@ class Alert(RootAnalysis, Base):
             # if nothing matched then just use global sla
             if target_sla is None:
                 #logging.debug("alert {} uses global SLA settings".format(self))
-                target_sla = saq.GLOBAL_SLA_SETTINGS
+                target_sla = ace.GLOBAL_SLA_SETTINGS
 
         except Exception as e:
             logging.error("unable to get SLA: {}".format(e))
@@ -1664,7 +1666,7 @@ class Alert(RootAnalysis, Base):
             return None
 
         result = False
-        if self.disposition is None and self.sla.enabled and self.alert_type not in saq.EXCLUDED_SLA_ALERT_TYPES:
+        if self.disposition is None and self.sla.enabled and self.alert_type not in ace.EXCLUDED_SLA_ALERT_TYPES:
             result = self.business_time_seconds >= (self.sla.timeout - self.sla.warning) * 60 * 60
 
         setattr(self, '_is_approaching_sla', result)
@@ -1684,7 +1686,7 @@ class Alert(RootAnalysis, Base):
             return None
 
         result = False
-        if self.disposition is None and self.sla.enabled and self.alert_type not in saq.EXCLUDED_SLA_ALERT_TYPES:
+        if self.disposition is None and self.sla.enabled and self.alert_type not in ace.EXCLUDED_SLA_ALERT_TYPES:
             result = self.business_time_seconds >= self.sla.timeout * 60 * 60
 
         setattr(self, '_is_over_sla', result)
@@ -1697,7 +1699,7 @@ class Alert(RootAnalysis, Base):
         tool_tokens = {token.lower() for token in self.tool.split(' ')}
         type_tokens = {token.lower() for token in self.alert_type.split(' ')}
 
-        available_favicons = set(saq.CONFIG['gui']['alert_favicons'].split(','))
+        available_favicons = set(ace.CONFIG['gui']['alert_favicons'].split(','))
 
         result = available_favicons.intersection(description_tokens)
         if not result:
@@ -1834,7 +1836,7 @@ class Alert(RootAnalysis, Base):
 
     def _handle_tag_added(self, source, event_type, *args, **kwargs):
         assert args
-        assert isinstance(args[0], saq.analysis.Tag)
+        assert isinstance(args[0], ace.analysis.Tag)
         tag = args[0]
 
         try:
@@ -1888,7 +1890,7 @@ class Alert(RootAnalysis, Base):
 
     def _handle_observable_added(self, source, event_type, *args, **kwargs):
         assert args
-        assert isinstance(args[0], saq.analysis.Observable)
+        assert isinstance(args[0], ace.analysis.Observable)
         observable = args[0]
 
         try:
@@ -1899,12 +1901,12 @@ class Alert(RootAnalysis, Base):
 
     @retry
     def sync_observable_mapping(self, observable):
-        assert isinstance(observable, saq.analysis.Observable)
+        assert isinstance(observable, ace.analysis.Observable)
 
         existing_observable = sync_observable(observable)
         assert existing_observable.id is not None
-        saq.db.execute(ObservableMapping.__table__.insert().prefix_with('IGNORE').values(observable_id=existing_observable.id, alert_id=self.id))
-        saq.db.commit()
+        ace.db.execute(ObservableMapping.__table__.insert().prefix_with('IGNORE').values(observable_id=existing_observable.id, alert_id=self.id))
+        ace.db.commit()
 
     @retry
     def sync(self):
@@ -1918,7 +1920,7 @@ class Alert(RootAnalysis, Base):
         # save the alert to the database
         session = Session.object_session(self)
         if session is None:
-            session = saq.db()
+            session = ace.db()
         
         session.add(self)
         session.commit()
@@ -1944,7 +1946,7 @@ class Alert(RootAnalysis, Base):
     def is_locked(self, db, c):
         """Returns True if this Alert has already been locked."""
         c.execute("""SELECT uuid FROM locks WHERE uuid = %s AND TIMESTAMPDIFF(SECOND, lock_time, NOW()) < %s""", 
-                 (self.uuid, saq.LOCK_TIMEOUT_SECONDS))
+                 (self.uuid, ace.LOCK_TIMEOUT_SECONDS))
         row = c.fetchone()
         if row is None:
             return False
@@ -2161,16 +2163,16 @@ class Alert(RootAnalysis, Base):
         #pass
 
     # NOTE there is no database relationship between these tables
-    workload = relationship('saq.database.Workload', foreign_keys=[uuid],
-                            primaryjoin='saq.database.Workload.uuid == Alert.uuid')
+    workload = relationship('ace.database.Workload', foreign_keys=[uuid],
+                            primaryjoin='ace.database.Workload.uuid == Alert.uuid')
 
-    delayed_analysis = relationship('saq.database.DelayedAnalysis', foreign_keys=[uuid],
-                                    primaryjoin='saq.database.DelayedAnalysis.uuid == Alert.uuid')
+    delayed_analysis = relationship('ace.database.DelayedAnalysis', foreign_keys=[uuid],
+                                    primaryjoin='ace.database.DelayedAnalysis.uuid == Alert.uuid')
 
-    lock = relationship('saq.database.Lock', foreign_keys=[uuid],
-                        primaryjoin='saq.database.Lock.uuid == Alert.uuid')
+    lock = relationship('ace.database.Lock', foreign_keys=[uuid],
+                        primaryjoin='ace.database.Lock.uuid == Alert.uuid')
 
-    nodes = relationship('saq.database.Nodes', foreign_keys=[location], primaryjoin='saq.database.Nodes.name == Alert.location')
+    nodes = relationship('ace.database.Nodes', foreign_keys=[location], primaryjoin='ace.database.Nodes.name == Alert.location')
 
     @property
     def node_location(self):
@@ -2179,9 +2181,9 @@ class Alert(RootAnalysis, Base):
 @retry
 def sync_observable(observable):
     """Syncs the given observable to the database by inserting a row in the observables table if it does not currently exist.
-       Returns the existing or newly created saq.database.Observable entry for the corresponding row."""
-    existing_observable = saq.db.query(saq.database.Observable).filter(saq.database.Observable.type == observable.type, 
-                                                                       saq.database.Observable.md5 == func.UNHEX(observable.md5_hex)).first()
+       Returns the existing or newly created ace.database.Observable entry for the corresponding row."""
+    existing_observable = ace.db.query(ace.database.Observable).filter(ace.database.Observable.type == observable.type, 
+                                                                       ace.database.Observable.md5 == func.UNHEX(observable.md5_hex)).first()
     if existing_observable is None:
         # XXX assuming all observables are encodable in utf-8 is probably wrong
         # XXX we could have some kind of binary data, or an intentionally corrupt value
@@ -2189,8 +2191,8 @@ def sync_observable(observable):
         existing_observable = Observable(type=observable.type, 
                                          value=observable.value.encode('utf8', errors='ignore'), 
                                          md5=func.UNHEX(observable.md5_hex))
-        saq.db.add(existing_observable)
-        saq.db.flush()
+        ace.db.add(existing_observable)
+        ace.db.flush()
 
     return existing_observable
 
@@ -2235,7 +2237,7 @@ FROM
     alerts JOIN nodes ON alerts.location = nodes.name
 WHERE 
     uuid IN ( {uuid_placeholders} )"""
-        params = [ saq.constants.ANALYSIS_MODE_DISPOSITIONED ]
+        params = [ ace.constants.ANALYSIS_MODE_DISPOSITIONED ]
         params.extend(alert_uuids)
         c.execute(sql, tuple(params))
         db.commit()
@@ -2269,7 +2271,7 @@ class UserAlertMetrics(Base):
         TIMESTAMP, 
         nullable=True)
 
-    alert = relationship('saq.database.Alert', backref='user_alert_metrics')
+    alert = relationship('ace.database.Alert', backref='user_alert_metrics')
     user = relationship('User', backref='user_alert_metrics')
 
 class Comment(Base):
@@ -2341,7 +2343,7 @@ class Observable(Base):
     def display_value(self):
         return self.value.decode('utf8', errors='ignore')
 
-    tags = relationship('saq.database.ObservableTagMapping', passive_deletes=True, passive_updates=True)
+    tags = relationship('ace.database.ObservableTagMapping', passive_deletes=True, passive_updates=True)
 
 Index('ix_observable_type_md5', Observable.type, Observable.md5, unique=True)
 
@@ -2364,8 +2366,8 @@ class ObservableMapping(Base):
         primary_key=True,
         index=True)
 
-    alert = relationship('saq.database.Alert', backref='observable_mappings')
-    observable = relationship('saq.database.Observable', backref='observable_mappings')
+    alert = relationship('ace.database.Alert', backref='observable_mappings')
+    observable = relationship('ace.database.Observable', backref='observable_mappings')
 
 # this is used to automatically map tags to observables
 # same as the etc/site_tags.csv really, just in the database
@@ -2388,8 +2390,8 @@ class ObservableTagMapping(Base):
         ForeignKey('tags.id', ondelete='CASCADE', onupdate='CASCADE'),
         primary_key=True)
 
-    observable = relationship('saq.database.Observable', backref='observable_tag_mapping')
-    tag = relationship('saq.database.Tag', backref='observable_tag_mapping')
+    observable = relationship('ace.database.Observable', backref='observable_tag_mapping')
+    tag = relationship('ace.database.Tag', backref='observable_tag_mapping')
 
 def add_observable_tag_mapping(o_type, o_value, o_md5, tag):
     """Adds the given observable tag mapping specified by type, and md5 (hex string) and the tag you want to map.
@@ -2397,67 +2399,67 @@ def add_observable_tag_mapping(o_type, o_value, o_md5, tag):
        Returns True if the mapping was successful, False otherwise."""
 
     try:
-        tag = saq.db.query(saq.database.Tag).filter(saq.database.Tag.name == tag).one()
+        tag = ace.db.query(ace.database.Tag).filter(ace.database.Tag.name == tag).one()
     except NoResultFound as e:
-        saq.db.execute(saq.database.Tag.__table__.insert().values(name=tag))
-        saq.db.commit()
-        tag = saq.db.query(saq.database.Tag).filter(saq.database.Tag.name == tag).one()
+        ace.db.execute(ace.database.Tag.__table__.insert().values(name=tag))
+        ace.db.commit()
+        tag = ace.db.query(ace.database.Tag).filter(ace.database.Tag.name == tag).one()
 
     observable = None
 
     if o_md5 is not None:
         try:
-            observable = saq.db.query(saq.database.Observable).filter(saq.database.Observable.type==o_type, 
-                                                                      saq.database.Observable.md5==func.UNHEX(o_md5)).one()
+            observable = ace.db.query(ace.database.Observable).filter(ace.database.Observable.type==o_type, 
+                                                                      ace.database.Observable.md5==func.UNHEX(o_md5)).one()
         except NoResultFound as e:
             if o_value is None:
                 logging.warning(f"observable type {o_type} md5 {o_md5} cannot be found for mapping")
                 return False
 
     if observable is None:
-        from saq.observables import create_observable
+        from ace.observables import create_observable
         observable = sync_observable(create_observable(o_type, o_value))
-        saq.db.commit()
+        ace.db.commit()
 
     try:
-        mapping = saq.db.query(ObservableTagMapping).filter(ObservableTagMapping.observable_id == observable.id,
+        mapping = ace.db.query(ObservableTagMapping).filter(ObservableTagMapping.observable_id == observable.id,
                                                             ObservableTagMapping.tag_id == tag.id).one()
-        saq.db.commit()
+        ace.db.commit()
         return True
 
     except NoResultFound as e:
-        saq.db.execute(ObservableTagMapping.__table__.insert().values(observable_id=observable.id, tag_id=tag.id))
-        saq.db.commit()
+        ace.db.execute(ObservableTagMapping.__table__.insert().values(observable_id=observable.id, tag_id=tag.id))
+        ace.db.commit()
         return True
 
 def remove_observable_tag_mapping(o_type, o_value, o_md5, tag):
     """Removes the given observable tag mapping specified by type, and md5 (hex string) and the tag you want to remove.
        Returns True if the removal was successful, False otherwise."""
 
-    tag = saq.db.query(saq.database.Tag).filter(saq.database.Tag.name == tag).first()
+    tag = ace.db.query(ace.database.Tag).filter(ace.database.Tag.name == tag).first()
     if tag is None:
         return False
 
     observable = None
     if o_md5 is not None:
-        observable = saq.db.query(saq.database.Observable).filter(saq.database.Observable.type == o_type,
-                                                                  saq.database.Observable.md5 == func.UNHEX(o_md5)).first()
+        observable = ace.db.query(ace.database.Observable).filter(ace.database.Observable.type == o_type,
+                                                                  ace.database.Observable.md5 == func.UNHEX(o_md5)).first()
     
     if observable is None:
         if o_value is None:
             return False
 
-        from saq.observables import create_observable
+        from ace.observables import create_observable
         o = create_observable(o_type, o_value)
-        observable = saq.db.query(saq.database.Observable).filter(saq.database.Observable.type == o.type,
-                                                                  saq.database.Observable.md5 == func.UNHEX(o.md5_hex)).first()
+        observable = ace.db.query(ace.database.Observable).filter(ace.database.Observable.type == o.type,
+                                                                  ace.database.Observable.md5 == func.UNHEX(o.md5_hex)).first()
 
     if observable is None:
         return False
 
-    saq.db.execute(ObservableTagMapping.__table__.delete().where(and_(ObservableTagMapping.observable_id == observable.id,
+    ace.db.execute(ObservableTagMapping.__table__.delete().where(and_(ObservableTagMapping.observable_id == observable.id,
                                                                  ObservableTagMapping.tag_id == tag.id)))
-    saq.db.commit()
+    ace.db.commit()
     return True
 
 class PersistenceSource(Base):
@@ -2563,9 +2565,9 @@ class ObservableTagIndex(Base):
         primary_key=True,
         index=True)
 
-    observable = relationship('saq.database.Observable', backref='observable_tag_index')
-    tag = relationship('saq.database.Tag', backref='observable_tag_index')
-    alert = relationship('saq.database.Alert', backref='observable_tag_index')
+    observable = relationship('ace.database.Observable', backref='observable_tag_index')
+    tag = relationship('ace.database.Tag', backref='observable_tag_index')
+    alert = relationship('ace.database.Alert', backref='observable_tag_index')
 
 class Tag(Base):
     
@@ -2589,24 +2591,24 @@ class Tag(Base):
     @property
     def display(self):
         tag_name = self.name.split(':')[0]
-        if tag_name in saq.CONFIG['tags'] and saq.CONFIG['tags'][tag_name] == "special":
+        if tag_name in ace.CONFIG['tags'] and ace.CONFIG['tags'][tag_name] == "special":
             return False
         return True
 
     @property
     def style(self):
         tag_name = self.name.split(':')[0]
-        if tag_name in saq.CONFIG['tags']:
-            return saq.CONFIG['tag_css_class'][saq.CONFIG['tags'][tag_name]]
+        if tag_name in ace.CONFIG['tags']:
+            return ace.CONFIG['tag_css_class'][ace.CONFIG['tags'][tag_name]]
         else:
             return 'label-default'
 
     #def __init__(self, *args, **kwargs):
-        #super(saq.database.Tag, self).__init__(*args, **kwargs)
+        #super(ace.database.Tag, self).__init__(*args, **kwargs)
 
     @reconstructor
     def init_on_load(self, *args, **kwargs):
-        super(saq.database.Tag, self).__init__(*args, **kwargs)
+        super(ace.database.Tag, self).__init__(*args, **kwargs)
 
 class TagMapping(Base):
 
@@ -2627,8 +2629,8 @@ class TagMapping(Base):
         primary_key=True,
         index=True)
 
-    alert = relationship('saq.database.Alert', backref='tag_mapping')
-    tag = relationship('saq.database.Tag', backref='tag_mapping')
+    alert = relationship('ace.database.Alert', backref='tag_mapping')
+    tag = relationship('ace.database.Tag', backref='tag_mapping')
 
 class Remediation(Base):
 
@@ -2675,7 +2677,7 @@ class Remediation(Base):
         index=True,
         comment='The user who performed the action.')
 
-    user = relationship('saq.database.User', backref='remediations')
+    user = relationship('ace.database.User', backref='remediations')
 
     key = Column(
         String(512),
@@ -2809,7 +2811,7 @@ class MessageRouting(Base):
         ForeignKey('messages.id', ondelete='CASCADE', onupdate='CASCADE'),
         nullable=False)
 
-    message = relationship('saq.database.Message', foreign_keys=[message_id], backref='routing')
+    message = relationship('ace.database.Message', foreign_keys=[message_id], backref='routing')
 
     route = Column(
         String(64),
@@ -2893,11 +2895,11 @@ def add_workload(root, exclusive_uuid=None, db=None, c=None):
     # NOTE you should always specify an analysis mode
     if root.analysis_mode is None:
         logging.warning(f"missing analysis mode for call to add_workload({root}) - "
-                        f"using engine default {saq.CONFIG['service_engine']['default_analysis_mode']}")
-        root.analysis_mode = saq.CONFIG['service_engine']['default_analysis_mode']
+                        f"using engine default {ace.CONFIG['service_engine']['default_analysis_mode']}")
+        root.analysis_mode = ace.CONFIG['service_engine']['default_analysis_mode']
 
     # make sure we've initialized our node id
-    if saq.SAQ_NODE_ID is None:
+    if ace.SAQ_NODE_ID is None:
         initialize_node()
         
     execute_with_retry(db, c, """
@@ -2909,7 +2911,7 @@ INSERT INTO workload (
     storage_dir,
     insert_date )
 VALUES ( %s, %s, %s, %s, %s, %s, NOW() )
-ON DUPLICATE KEY UPDATE uuid=uuid""", (root.uuid, saq.SAQ_NODE_ID, root.analysis_mode, exclusive_uuid, root.storage_dir))
+ON DUPLICATE KEY UPDATE uuid=uuid""", (root.uuid, ace.SAQ_NODE_ID, root.analysis_mode, exclusive_uuid, root.storage_dir))
     db.commit()
     logging.info("added {} to workload with analysis mode {} exclusive_uuid {}".format(
                   root.uuid, root.analysis_mode, exclusive_uuid))
@@ -3055,7 +3057,7 @@ SET
 WHERE 
     uuid = %s 
     AND ( lock_uuid = %s OR TIMESTAMPDIFF(SECOND, lock_time, NOW()) >= %s )
-""", (lock_uuid, lock_owner, _uuid, lock_uuid, saq.LOCK_TIMEOUT_SECONDS))
+""", (lock_uuid, lock_owner, _uuid, lock_uuid, ace.LOCK_TIMEOUT_SECONDS))
             db.commit()
 
             c.execute("SELECT lock_uuid, lock_owner FROM locks WHERE uuid = %s", (_uuid,))
@@ -3124,9 +3126,9 @@ def force_release_lock(uuid, db, c):
 
 @use_db
 def clear_expired_locks(db, c):
-    """Clear any locks that have exceeded saq.LOCK_TIMEOUT_SECONDS."""
+    """Clear any locks that have exceeded ace.LOCK_TIMEOUT_SECONDS."""
     execute_with_retry(db, c, "DELETE FROM locks WHERE TIMESTAMPDIFF(SECOND, lock_time, NOW()) >= %s",
-                              (saq.LOCK_TIMEOUT_SECONDS,))
+                              (ace.LOCK_TIMEOUT_SECONDS,))
     db.commit()
     if c.rowcount:
         logging.debug("removed {} expired locks".format(c.rowcount))
@@ -3207,16 +3209,16 @@ Index('ix_delayed_analysis_node_delayed_until', DelayedAnalysis.node_id, Delayed
 def add_delayed_analysis_request(root, observable, analysis_module, next_analysis, exclusive_uuid=None, db=None, c=None):
     try:
         #logging.info("adding delayed analysis uuid {} observable_uuid {} analysis_module {} delayed_until {} node {} exclusive_uuid {} storage_dir {}".format(
-                     #root.uuid, observable.id, analysis_module.config_section, next_analysis, saq.SAQ_NODE_ID, exclusive_uuid, root.storage_dir))
+                     #root.uuid, observable.id, analysis_module.config_section, next_analysis, ace.SAQ_NODE_ID, exclusive_uuid, root.storage_dir))
 
         execute_with_retry(db, c, """
                            INSERT INTO delayed_analysis ( uuid, observable_uuid, analysis_module, delayed_until, node_id, exclusive_uuid, storage_dir, insert_date ) 
                            VALUES ( %s, %s, %s, %s, %s, %s, %s, NOW() )""", 
-                          ( root.uuid, observable.id, analysis_module.config_section, next_analysis, saq.SAQ_NODE_ID, exclusive_uuid, root.storage_dir ))
+                          ( root.uuid, observable.id, analysis_module.config_section, next_analysis, ace.SAQ_NODE_ID, exclusive_uuid, root.storage_dir ))
         db.commit()
 
         logging.info("added delayed analysis uuid {} observable_uuid {} analysis_module {} delayed_until {} node {} exclusive_uuid {} storage_dir {}".format(
-                     root.uuid, observable.id, analysis_module.config_section, next_analysis, saq.SAQ_NODE_ID, exclusive_uuid, root.storage_dir))
+                     root.uuid, observable.id, analysis_module.config_section, next_analysis, ace.SAQ_NODE_ID, exclusive_uuid, root.storage_dir))
 
     except pymysql.err.IntegrityError as ie:
         logging.warning(str(ie))
@@ -3263,7 +3265,7 @@ def initialize_database():
     # /usr/local/lib/python3.6/dist-packages/pymysql/cursors.py:170: Warning: (1300, "Invalid utf8mb4 character string: '800363'")
     warnings.filterwarnings(action='ignore', message='.*Invalid utf8mb4 character string.*')
 
-    import saq
+    import ace
     engine = create_engine(
         get_sqlalchemy_database_uri('ace'),
         **get_sqlalchemy_database_options('ace'))
@@ -3283,62 +3285,62 @@ def initialize_database():
             raise exc.DisconnectionError(message)
 
     DatabaseSession = sessionmaker(bind=engine)
-    saq.db = scoped_session(DatabaseSession)
+    ace.db = scoped_session(DatabaseSession)
 
 def initialize_automation_user():
     # get the id of the ace automation account
     try:
         #import pymysql
         #pymysql.connections.DEBUG = True
-        saq.AUTOMATION_USER_ID = saq.db.query(User).filter(User.username == 'ace').one().id
-        saq.db.remove()
+        ace.AUTOMATION_USER_ID = ace.db.query(User).filter(User.username == 'ace').one().id
+        ace.db.remove()
     except Exception as e:
         # if the account is missing go ahead and create it
         user = User(username='ace', email='ace@localhost', display_name='automation')
-        saq.db.add(user)
-        saq.db.commit()
+        ace.db.add(user)
+        ace.db.commit()
 
         try:
-            saq.AUTOMATION_USER_ID = saq.db.query(User).filter(User.username == 'ace').one().id
+            ace.AUTOMATION_USER_ID = ace.db.query(User).filter(User.username == 'ace').one().id
         except Exception as e:
             logging.critical(f"missing automation account and unable to create it: {e}")
             sys.exit(1)
         finally:
-            saq.db.remove()
+            ace.db.remove()
 
-    logging.debug(f"got id {saq.AUTOMATION_USER_ID} for automation user account")
+    logging.debug(f"got id {ace.AUTOMATION_USER_ID} for automation user account")
 
 @use_db
 def initialize_node(db, c):
-    """Populates saq.SAQ_NODE_ID with the node ID for saq.NODE. Optionally inserts the node into the database if it does not exist."""
+    """Populates ace.SAQ_NODE_ID with the node ID for ace.NODE. Optionally inserts the node into the database if it does not exist."""
 
     # have we already called this function?
-    if saq.SAQ_NODE_ID is not None:
+    if ace.SAQ_NODE_ID is not None:
         return
 
-    saq.SAQ_NODE_ID = None
+    ace.SAQ_NODE_ID = None
 
     # we always default to a local node so that it doesn't get used by remote nodes automatically
-    c.execute("SELECT id FROM nodes WHERE name = %s", (saq.SAQ_NODE,))
+    c.execute("SELECT id FROM nodes WHERE name = %s", (ace.SAQ_NODE,))
     row = c.fetchone()
     if row is not None:
-        saq.SAQ_NODE_ID = row[0]
-        logging.debug("got existing node id {} for {}".format(saq.SAQ_NODE_ID, saq.SAQ_NODE))
+        ace.SAQ_NODE_ID = row[0]
+        logging.debug("got existing node id {} for {}".format(ace.SAQ_NODE_ID, ace.SAQ_NODE))
 
-    if saq.SAQ_NODE_ID is None:
+    if ace.SAQ_NODE_ID is None:
         execute_with_retry(db, c, """INSERT INTO nodes ( name, location, is_local, last_update ) 
                                      VALUES ( %s, %s, %s, %s, NOW() )""", 
-                          (saq.SAQ_NODE, saq.API_PREFIX, saq.COMPANY_ID, True),
+                          (ace.SAQ_NODE, ace.API_PREFIX, ace.COMPANY_ID, True),
                           commit=True)
 
-        c.execute("SELECT id FROM nodes WHERE name = %s", (saq.SAQ_NODE,))
+        c.execute("SELECT id FROM nodes WHERE name = %s", (ace.SAQ_NODE,))
         row = c.fetchone()
         if row is None:
             logging.critical("unable to allocate a node_id from the database")
             sys.exit(1)
         else:
-            saq.SAQ_NODE_ID = row[0]
-            logging.info("allocated node id {} for {}".format(saq.SAQ_NODE_ID, saq.SAQ_NODE))
+            ace.SAQ_NODE_ID = row[0]
+            logging.info("allocated node id {} for {}".format(ace.SAQ_NODE_ID, ace.SAQ_NODE))
 
 @use_db
 def get_available_nodes(target_analysis_modes, db, c):

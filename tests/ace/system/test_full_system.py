@@ -10,13 +10,13 @@ import threading
 
 from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis, Observable
 from ace.constants import *
-from ace.system.constants import *
-from ace.system.analysis_module import register_analysis_module_type
+from ace.system.analysis_module import register_analysis_module_type, AnalysisModuleTypeVersionError
 from ace.system.analysis_request import AnalysisRequest, submit_analysis_request, get_analysis_request
 from ace.system.analysis_tracking import get_root_analysis, track_root_analysis
-from ace.system.locking import LockAcquireFailed
+from ace.system.constants import *
 from ace.system.inbound import process_analysis_request
-from ace.system.work_queue import get_next_analysis_request
+from ace.system.locking import LockAcquireFailed
+from ace.system.work_queue import get_next_analysis_request, get_work_queue
 
 import pytest
 
@@ -290,3 +290,32 @@ def test_process_analysis_request_locking():
 
     # now we should be able to submit the request
     root.submit()
+
+
+@pytest.mark.system
+def test_amt_version_upgrade():
+    # register an analysis module for a specific version of the "intel"
+    amt = register_analysis_module_type(AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"]))
+
+    # (assume amt goes offline)
+    # add something to be analyzed
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    # amt comes back on, re-register
+    amt = register_analysis_module_type(AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"]))
+    request = get_next_analysis_request("test", amt, 0)
+    request.result = request.create_result()
+    request.result.observable.add_analysis(type=amt).add_observable("test", "other")
+    process_analysis_request(request)
+
+    # amt gets upgraded from another process
+    amt_upgraded = register_analysis_module_type(AnalysisModuleType("test", "", additional_cache_keys=["intel:v2"]))
+
+    # but we're still using the old one so this should fail
+    with pytest.raises(AnalysisModuleTypeVersionError):
+        request = get_next_analysis_request("test", amt, 0)
+
+    # and the work queue should still have one entry
+    assert get_work_queue(amt_upgraded).size() == 1

@@ -14,6 +14,7 @@ class ThreadedInterface:
 
 
 from ace.system import ACESystem, set_system
+from ace.system.threaded.alerting import ThreadedAlertTrackingInterface
 from ace.system.threaded.analysis_module import ThreadedAnalysisModuleTrackingInterface
 from ace.system.threaded.analysis_request import ThreadedAnalysisRequestTrackingInterface
 from ace.system.threaded.analysis_tracking import ThreadedAnalysisTrackingInterface
@@ -35,6 +36,7 @@ class ThreadedACESystem(ACESystem):
     locking = ThreadedLockingInterface()
     observable = ThreadedObservableInterface()
     config = ThreadedConfigurationInterface()
+    alerting = ThreadedAlertTrackingInterface()
 
     def reset(self):
         self.work_queue.reset()
@@ -45,6 +47,7 @@ class ThreadedACESystem(ACESystem):
         self.storage.reset()
         self.locking.reset()
         self.config.reset()
+        self.alerting.reset()
 
 
 def initialize():

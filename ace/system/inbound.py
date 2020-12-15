@@ -4,6 +4,7 @@
 import logging
 
 from ace.system import ACESystemInterface, get_system
+from ace.system.alerting import track_alert
 from ace.system.analysis_tracking import (
     get_root_analysis,
     track_root_analysis,
@@ -83,6 +84,10 @@ def process_analysis_request(ar: AnalysisRequest):
             # this should never fire
             if target_root is None:
                 raise RuntimeError("target_root is None")
+
+            # did we generate an alert?
+            if target_root.has_detections():
+                track_alert(target_root)
 
             # for each observable that needs to be analyzed
             for observable in ar.observables:

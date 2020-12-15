@@ -7,9 +7,10 @@ from ace.analysis import RootAnalysis
 from ace.json import JSONEncoder
 from ace.system.alerting import AlertTrackingInterface
 
+
 class ThreadedAlertTrackingInterface(AlertTrackingInterface):
 
-    alerts = {} # key = uuid, value = RootAnalysis
+    alerts = {}  # key = uuid, value = RootAnalysis
 
     def track_alert(self, root: dict):
         assert isinstance(root, dict)

@@ -18,7 +18,7 @@ class ACESystem:
     storage = None
     locking = None
     config = None
-    alert_tracking = None
+    alerting = None
     event = None
     observable = None
 

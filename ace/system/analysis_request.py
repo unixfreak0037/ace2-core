@@ -34,9 +34,9 @@ class AnalysisResult():
     @staticmethod
     def from_dict(json_dict: dict) -> 'AnalysisResult':
         assert isinstance(json_dict, dict)
-        return AnalysisResult(
-            root=RootAnalysis.from_dict(json_dict['root']).load(),
-            observable=Observable.from_dict(json_dict['observable']).load())
+        root = RootAnalysis.from_dict(json_dict['root'])
+        observable = Observable.from_dict(json_dict['observable'], root)
+        return AnalysisResult(root, observable)
 
     @property
     def json(self):
@@ -119,12 +119,12 @@ class AnalysisRequest(Lockable):
     def from_dict(json_data: dict) -> 'AnalysisRequest':
         assert isinstance(json_data, dict)
 
-        root = RootAnalysis.from_dict(json_data['root']).load()
+        root = RootAnalysis.from_dict(json_data['root'])
 
         observable = None
         if json_data['observable']:
-            observable = Observable.from_dict(json_data['observable'])
-            observable = root.get_observable(observable).load()
+            observable = Observable.from_dict(json_data['observable'], root)
+            observable = root.get_observable(observable)
 
         type = None
         if json_data['type']:

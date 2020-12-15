@@ -72,7 +72,7 @@ def process_analysis_request(ar: AnalysisRequest):
                 # are we updating an existing root analysis?
                 target_root = get_root_analysis(ar.root)
                 if target_root:
-                    target_root.merge(ar.root)
+                    target_root.apply_merge(ar.root)
                 else:
                     # otherwise we just save the new one
                     target_root = ar.root

@@ -25,7 +25,8 @@ def test_encoding():
 
     test_data = {}
     class _test(object):
-        json = 'hello world'
+        def to_dict(self):
+            return 'hello world'
 
     test_data = {
         'datetime': datetime.datetime(2017, 11, 11, hour=7, minute=36, second=1, microsecond=1),
@@ -49,7 +50,7 @@ def test_encoding():
 @pytest.mark.unit
 def test_detection_point_serialization():
     dp = DetectionPoint('description', {})
-    dp == DetectionPoint.from_json(dp.json)
+    dp == DetectionPoint.from_dict(dp.to_dict())
 
 @pytest.mark.unit
 def test_detectable_object():
@@ -57,7 +58,7 @@ def test_detectable_object():
     assert not target.has_detection_points()
     assert not target.detections
 
-    target.add_detection_point('Somethign was detected.', { 'detection': 'details' })
+    target.add_detection_point('Something was detected.', { 'detection': 'details' })
     assert target.has_detection_points()
     assert target.detections
 
@@ -112,6 +113,12 @@ def test_apply_diff_merge_detetion_points():
 #
 # TaggableObject
 #
+
+@pytest.mark.unit
+def test_taggable_object_serialization():
+    taggable_object = TaggableObject()
+    taggable_object.add_tag('test')
+    assert taggable_object == TaggableObject.from_dict(taggable_object.to_dict())
 
 @pytest.mark.unit
 def test_taggable_object():
@@ -169,11 +176,59 @@ def test_apply_diff_merge_tags():
     target_observable.apply_diff_merge(original_observable, modified_observable)
     assert not target_observable.tags
 
+#
+# AnalysisModuleType
+#
+
+@pytest.mark.unit
+def test_analysis_module_type_serialization():
+    amt = AnalysisModuleType(
+        name='test',
+        description='test',
+        observable_types=['test1', 'test2'],
+        directives=['test1', 'test2'],
+        dependencies=['test1', 'test2'],
+        tags=['test1', 'test2'],
+        modes=['test1', 'test2'],
+        cache_ttl=60,
+        additional_cache_keys=['test1', 'test2'],
+        types=['test1', 'test2'])
+    assert amt == AnalysisModuleType.from_dict(amt.to_dict())
+
 # 
 # Analysis
 #
 
 TEST_DETAILS = { 'hello': 'world' }
+
+@pytest.mark.unit
+def test_root_analysis_serialization():
+    root = RootAnalysis(
+        tool='test',
+        tool_instance='test',
+        alert_type='test',
+        desc='test',
+        event_time=datetime.datetime.now(),
+        name='test',
+        analysis_mode='test',
+        queue='test',
+        instructions='test')
+
+    amt = AnalysisModuleType('test', '')
+    observable = root.add_observable('test', 'test')
+    analysis = observable.add_analysis(type=amt, details={'test': 'test'})
+
+    new_root = RootAnalysis.from_dict(root.to_dict())
+    assert root == new_root
+    assert root.tool == new_root.tool
+    assert root.tool_instance == new_root.tool
+    assert root.alert_type == new_root.alert_type
+    assert root.description == new_root.description
+    assert root.event_time == new_root.event_time
+    assert root.name == new_root.name
+    assert root.analysis_mode == new_root.analysis_mode
+    assert root.queue == new_root.queue
+    assert root.instructions == new_root.instructions
 
 @pytest.mark.integration
 def test_add_analysis():
@@ -351,7 +406,7 @@ def test_root_analysis_merge_with_observables():
     new_analysis = new_observable.add_analysis(type=amt)
 
     root = get_root_analysis(root)
-    root.merge(target_root)
+    root.apply_merge(target_root)
 
     # existing observable and analysis should be there
     assert root.get_observable(existing_observable) == existing_observable
@@ -369,7 +424,6 @@ def test_create_analysis_request():
     assert request.observable is None
     assert request.type is None
     assert request.is_root_analysis_request
-
 
 @pytest.mark.unit
 def test_deepcopy_root():

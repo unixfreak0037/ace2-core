@@ -43,7 +43,7 @@ def get_root_analysis(root: Union[RootAnalysis, str]) -> Union[RootAnalysis, Non
     if root_dict is None:
         return None
 
-    return RootAnalysis.from_dict(root_dict).load()
+    return RootAnalysis.from_dict(root_dict)
 
 def track_root_analysis(root: RootAnalysis):
     assert isinstance(root, RootAnalysis)
@@ -52,7 +52,7 @@ def track_root_analysis(root: RootAnalysis):
         raise ValueError(f"uuid property of {root} is None in track_root_analysis")
 
     logging.debug(f"tracking {root}")
-    get_system().analysis_tracking.track_root_analysis(root.uuid, root.json)
+    get_system().analysis_tracking.track_root_analysis(root.uuid, root.to_dict())
 
 def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:
     assert isinstance(root, RootAnalysis) or isinstance(root, str)

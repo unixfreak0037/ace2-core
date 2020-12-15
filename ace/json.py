@@ -12,8 +12,8 @@ class JSONEncoder(json.JSONEncoder):
             return obj.strftime(event_time_format_json_tz)
         elif isinstance(obj, bytes):
             return obj.decode('unicode_escape', 'replace')
-        elif hasattr(obj, 'json'):
-            return obj.json
+        elif hasattr(obj, 'to_dict'):
+            return obj.to_dict()
         else:
             return super(JSONEncoder, self).default(obj)
 

@@ -16,8 +16,7 @@ class Indicator:
         self.status = status
         self._tags = tags
 
-    @property
-    def json(self) -> dict:
+    def to_dict(self) -> dict:
         return {'type': self.type, 'value': self.value, 'status': self.status, 'tags': self.tags}
 
     @property
@@ -89,6 +88,5 @@ class IndicatorList(UserList):
             if split_url.fragment:
                 self.append(Indicator(I_URI_PATH, split_url.fragment, status=status, tags=tags))
 
-    @property
-    def json(self) -> List[dict]:
+    def to_dict(self) -> list[dict]:
         return [i.json for i in self]

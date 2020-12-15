@@ -39,27 +39,22 @@ class DetectionPoint():
         self.description = description
         self.details = details
 
-    @property
-    def json(self):
+    def to_dict(self) -> dict:
         return {
             DetectionPoint.KEY_DESCRIPTION: self.description,
             DetectionPoint.KEY_DETAILS: self.details, 
         }
 
-    @json.setter
-    def json(self, value):
-        assert isinstance(value, dict)
-        if DetectionPoint.KEY_DESCRIPTION in value:
-            self.description = value[DetectionPoint.KEY_DESCRIPTION]
-        if DetectionPoint.KEY_DETAILS in value:
-            self.details = value[DetectionPoint.KEY_DETAILS]
-
     @staticmethod
-    def from_json(dp_json):
-        """Loads a DetectionPoint from a JSON dict. Used by _materalize."""
-        dp = DetectionPoint()
-        dp.json = dp_json
-        return dp
+    def from_dict(value: dict, detection_point: Optional['DetectionPoint']=None):
+        assert isinstance(value, dict)
+        result = detection_point or DetectionPoint()
+        if DetectionPoint.KEY_DESCRIPTION in value:
+            result.description = value[DetectionPoint.KEY_DESCRIPTION]
+        if DetectionPoint.KEY_DETAILS in value:
+            result.details = value[DetectionPoint.KEY_DETAILS]
+
+        return result
 
     def __str__(self):
         return "DetectionPoint({})".format(self.description)
@@ -79,15 +74,17 @@ class DetectableObject(MergableObject):
         super().__init__(*args, **kwargs)
         self._detections = []
 
-    @property
-    def json(self):
-        return { DetectableObject.KEY_DETECTIONS: self._detections }
+    def to_dict(self) -> dict:
+        return { DetectableObject.KEY_DETECTIONS: [_.to_dict() for _ in self._detections] }
 
-    @json.setter
-    def json(self, value):
+    @staticmethod
+    def from_dict(value: dict, detectable_object: Optional['DetectableObject']=None) -> 'DetectableObject':
         assert isinstance(value, dict)
+        result = detectable_object or DetectableObject()
         if DetectableObject.KEY_DETECTIONS in value:
-            self._detections = value[DetectableObject.KEY_DETECTIONS]
+            result.detectables = [DetectionPoint.from_dict(_) for _ in value[DetectableObject.KEY_DETECTIONS]]
+
+        return result
 
     @property
     def detections(self):
@@ -149,17 +146,17 @@ class TaggableObject(MergableObject):
         # list of strings 
         self._tags = []
 
-    @property
-    def json(self):
-        return {
-            TaggableObject.KEY_TAGS: self.tags
-        }
+    def to_dict(self) -> dict:
+        return { TaggableObject.KEY_TAGS: self.tags }
 
-    @json.setter
-    def json(self, value):
+    @staticmethod
+    def from_dict(value: dict, taggable_object: Optional['TaggableObject']=None) -> 'TaggableObject':
         assert isinstance(value, dict)
+        result = taggable_object or TaggableObject()
         if TaggableObject.KEY_TAGS in value:
-            self.tags = value[TaggableObject.KEY_TAGS]
+            result.tags = value[TaggableObject.KEY_TAGS]
+
+        return result
 
     @property
     def tags(self):
@@ -204,6 +201,12 @@ class TaggableObject(MergableObject):
                 self.add_tag(tag)
 
         return self
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, TaggableObject):
+            return False
+
+        return sorted(self.tags) == sorted(other.tags)
 
 # forward declaraction
 class Observable:
@@ -250,7 +253,7 @@ class AnalysisModuleType():
                 sorted(self.additional_cache_keys) == sorted(amt.additional_cache_keys) )
         # XXX should probably check the other fields as well
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             'name': self.name,
             'description': self.name,
@@ -263,10 +266,11 @@ class AnalysisModuleType():
             'timeout': self.timeout,
             'cache_ttl': self.cache_ttl,
             'additional_cache_keys': self.additional_cache_keys,
+            'types': self.types,
         }
 
     @staticmethod
-    def from_dict(value: dict):
+    def from_dict(value: dict) -> 'AnalysisModuleType':
         return AnalysisModuleType(
             name = value['name'],
             description = value['description'],
@@ -279,7 +283,9 @@ class AnalysisModuleType():
             timeout = value['timeout'],
             cache_ttl = value['cache_ttl'],
             additional_cache_keys = value['additional_cache_keys'],
+            types = value['types'],
         )
+
 
     def accepts(self, observable: Observable) -> bool:
         from ace.system.analysis_module import get_analysis_module_type
@@ -337,6 +343,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
     # dictionary keys used by the Analysis class
     KEY_OBSERVABLES = 'observables'
+    KEY_OBSERVABLE = 'observable'
     KEY_DETAILS = 'details'
     KEY_SUMMARY = 'summary'
     KEY_TYPE = 'type'
@@ -468,53 +475,43 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             logging.error("unable to load analysis details {self.uuid}: {e}")
             raise e
 
-    @property
-    def json(self):
-        result = TaggableObject.json.fget(self)
-        result.update(DetectableObject.json.fget(self))
+    def to_dict(self):
+        result = TaggableObject.to_dict(self)
+        result.update(DetectableObject.to_dict(self))
         result.update({
             Analysis.KEY_TYPE: self.type.to_dict() if self.type else None,
-            Analysis.KEY_OBSERVABLES: [o.id for o in self.observables],
-            TaggableObject.KEY_TAGS: self.tags,
+            Analysis.KEY_OBSERVABLE: self.observable.id if self.observable else None,
+            Analysis.KEY_OBSERVABLES: [_.id for _ in self.observables],
             Analysis.KEY_SUMMARY: self.summary,
-            Analysis.KEY_IOCS: self.iocs.json,
+            Analysis.KEY_IOCS: self.iocs.to_dict(),
             Analysis.KEY_UUID: self.uuid,
         })
         return result
 
-    def to_dict(self) -> dict:
-        return self.json
-
-    @json.setter
-    def json(self, value):
-        assert isinstance(value, dict)
-        TaggableObject.json.fset(self, value)
-        DetectableObject.json.fset(self, value)
-
-        if Analysis.KEY_TYPE in value:
-            if value[Analysis.KEY_TYPE]:
-                self.type = AnalysisModuleType.from_dict(value[Analysis.KEY_TYPE])
-
-        if Analysis.KEY_OBSERVABLES in value:
-            # and then we un-serialize them back when we load from JSON
-            self.observables = value[Analysis.KEY_OBSERVABLES]
-
-        self.details = None
-
-        if Analysis.KEY_SUMMARY in value:
-            self.summary = value[Analysis.KEY_SUMMARY]
-
-        if Analysis.KEY_IOCS in value:
-            self.iocs = value[Analysis.KEY_IOCS]
-
-        if Analysis.KEY_UUID in value:
-            self.uuid = value[Analysis.KEY_UUID]
-
     @staticmethod
-    def from_dict(json_dict: dict) -> 'Analysis':
-        analysis = Analysis()
-        analysis.json = json_dict
-        return analysis
+    def from_dict(value: dict, root: 'RootAnalysis', analysis: Optional['Analysis']=None) -> 'Analysis':
+        assert isinstance(value, dict)
+        assert isinstance(root, RootAnalysis)
+        assert analysis is None or isinstance(analysis, Analysis)
+
+        result = analysis or Analysis(root=root)
+        result = TaggableObject.from_dict(value, result)
+        result = DetectableObject.from_dict(value, result)
+
+        if value[Analysis.KEY_TYPE]:
+            result.type = AnalysisModuleType.from_dict(value[Analysis.KEY_TYPE])
+
+        # NOTE this is just a list of the Observable.id values (see to_dict())
+        # we can't load them yet because the root would still be loading as all the observables expand
+        result.observables = value[Analysis.KEY_OBSERVABLES]
+        result.observable = value[Analysis.KEY_OBSERVABLE]
+
+        result._details = None
+        result.summary = value[Analysis.KEY_SUMMARY]
+        result.iocs = value[Analysis.KEY_IOCS]
+        result.uuid = value[Analysis.KEY_UUID]
+        result.root = root
+        return result
 
     @property
     def iocs(self):
@@ -557,15 +554,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     def _load_observable_references(self):
         """Utility function to replace uuid strings in Analysis.observables with references to Observable objects in Alert.observable_store."""
         assert isinstance(self.root, RootAnalysis)
-
-        _buffer = []
-        for uuid in self._observables:
-            if uuid not in self.root.observable_store:
-                logging.warning(f"missing observable with uuid {uuid} in {self.root}")
-            else:
-                _buffer.append(self.root.observable_store[uuid])
-
-        self._observables = _buffer
+        self._observables = [self.root.get_observable(_) for _ in self._observables]
+        if self.observable:
+            self.observable = self.root.get_observable(self.observable)
 
     @property
     def observable_types(self):
@@ -625,7 +616,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
     @observable.setter
     def observable(self, value):
-        assert value is None or isinstance(value, Observable)
+        assert value is None or isinstance(value, str) or isinstance(value, Observable)
         self._observable = value
 
     @property
@@ -652,7 +643,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         recurse_tree(self, _search)
         return result
 
-    def merge(self, target: 'Analysis') -> 'Analysis':
+    def apply_merge(self, target: 'Analysis') -> 'Analysis':
+        assert isinstance(target, Analysis)
+
         TaggableObject.apply_merge(self, target)
         DetectableObject.apply_merge(self, target)
 
@@ -664,6 +657,15 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             else:
                 # merge existing observables
                 existing_observable.apply_merge(observable)
+
+        # we don't need to merge this because it should already be merged
+        #if target.observable:
+            #existing_observable = self.root.get_observable(target.observable)
+            #if existing_observable:
+                # merge existing observables
+                #existing_observable.apply_merge(target.observable)
+
+            #self.observable = existing_observable
 
         return self
 
@@ -760,20 +762,18 @@ class Relationship(object):
         assert isinstance(value, str) or isinstance(value, Observable)
         self._target = value
 
-    @property
-    def json(self):
+    def to_dict(self) -> dict:
         return {
             Relationship.KEY_RELATIONSHIP_TYPE: self.r_type,
             Relationship.KEY_RELATIONSHIP_TARGET: self.target.id
         }
 
-    @json.setter
-    def json(self, value):
+    @staticmethod
+    def from_dict(self, value: dict) -> 'Relationship':
         assert isinstance(value, dict)
-        if Relationship.KEY_RELATIONSHIP_TYPE in value:
-            self.r_type = value[Relationship.KEY_RELATIONSHIP_TYPE]
-        if Relationship.KEY_RELATIONSHIP_TARGET in value:
-            self.target = value[Relationship.KEY_RELATIONSHIP_TARGET]
+        return Relationship(
+            r_type=value[Relationship.KEY_RELATIONSHIP_TYPE],
+            target=value[Relationship.KEY_RELATIONSHIP_TYPE])
 
 class Observable(TaggableObject, DetectableObject, MergableObject):
     """Represents a piece of information discovered in an analysis that can itself be analyzed."""
@@ -796,7 +796,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             type: str = None, 
             value: str = None, 
             time: Union[datetime.datetime, str, None] = None, 
-            json: Optional[dict] = None, 
+            root: Optional['RootAnalysis'] = None,
             directives: Optional[list[str]] = None, 
             redirection: Optional[Observable] = None, 
             links: Optional[list[str]] = None, 
@@ -807,34 +807,22 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
         super().__init__(*args, **kwargs)
 
-        self._directives = []
-        self._redirection = None
-        self._links = []
-        self._limited_analysis = []
-        self._excluded_analysis = []
-        self._relationships = []
+        self._id = str(uuid.uuid4())
+        self._type = type
+        self.value = value
+        self._time = time
+        self._analysis = {}
+        self._directives = directives or [] # of str
+        self._redirection = redirection or None # (str)
+        self._links = links or [] # [ str ]
+        self._limited_analysis = limited_analysis or [] # [ str ]
+        self._excluded_analysis = excluded_analysis or [] # [ str ]
+        self._relationships = relationships or [] # [ Relationship ]
         self._grouping_target = False
-        self._request_tracking = {}
-
-        if json is not None:
-            self.json = json
-        else:
-            self._id = str(uuid.uuid4())
-            self._type = type
-            self.value = value
-            self._time = time
-            self._analysis = {}
-            self._directives = directives or [] # of str
-            self._redirection = redirection or None # (str)
-            self._links = links or [] # [ str ]
-            self._limited_analysis = limited_analysis or [] # [ str ]
-            self._excluded_analysis = excluded_analysis or [] # [ str ]
-            self._relationships = relationships or [] # [ Relationship ]
-            self._grouping_target = False
-            self._request_tracking = {} # key = AnalysisModuleType.name, value = AnalysisRequest.id
+        self._request_tracking = {} # key = AnalysisModuleType.name, value = AnalysisRequest.id
 
         # reference to the RootAnalysis object
-        self.root = None
+        self.root = root
 
     def track_analysis_request(self, ar: 'ace.system.analysis_request.AnalysisRequest'):
         """Tracks the request for analyze this Observable for the given type of analysis."""
@@ -844,93 +832,54 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         logging.debug(f"tracking analysis request {ar} for {self}")
         self.request_tracking[ar.type.name] = ar.id
 
-    @staticmethod
-    def from_json(json_data):
-        """Returns an object inheriting from Observable built from the given json."""
-        from ace.system.observables import create_observable
-        result = create_observable(json_data[Observable.KEY_TYPE], json_data[Observable.KEY_VALUE])
-        if result:
-            result.json = json_data
-            return result
-
-        return None
-
+    # XXX not sure we use this
     def matches(self, value):
         """Returns True if the given value matches this value of this observable.  This can be overridden to provide more advanced matching such as CIDR for ipv4."""
         return self.value == value
 
-    @property
-    def json(self):
-        result = TaggableObject.json.fget(self)
-        result.update(DetectableObject.json.fget(self))
+    def to_dict(self) -> dict:
+        result = TaggableObject.to_dict(self)
+        result.update(DetectableObject.to_dict(self))
         result.update({
             Observable.KEY_ID: self.id,
             Observable.KEY_TYPE: self.type,
             Observable.KEY_TIME: self.time,
-            # TODO these should all probably save as the internal var
             Observable.KEY_VALUE: self._value,
-            Observable.KEY_ANALYSIS: self.analysis,
+            Observable.KEY_ANALYSIS: { key: analysis.to_dict() for key, analysis in self.analysis.items() },
             Observable.KEY_DIRECTIVES: self.directives,
             Observable.KEY_REDIRECTION: self._redirection,
             Observable.KEY_LINKS: self._links,
             Observable.KEY_LIMITED_ANALYSIS: self._limited_analysis,
             Observable.KEY_EXCLUDED_ANALYSIS: self._excluded_analysis,
-            Observable.KEY_RELATIONSHIPS: self._relationships,
+            Observable.KEY_RELATIONSHIPS: [_.to_dict() for _ in self._relationships],
             Observable.KEY_GROUPING_TARGET: self._grouping_target,
             Observable.KEY_REQUEST_TRACKING: self._request_tracking,
         })
         return result
 
-    def to_dict(self):
-        return self.json
-
-    @json.setter
-    def json(self, value):
-        assert isinstance(value, dict)
-        TaggableObject.json.fset(self, value)
-        DetectableObject.json.fset(self, value)
-
-        if Observable.KEY_ID in value:
-            self.id = value[Observable.KEY_ID]
-        if Observable.KEY_TYPE in value:
-            self.type = value[Observable.KEY_TYPE]
-        if Observable.KEY_TIME in value:
-            self.time = value[Observable.KEY_TIME]
-        if Observable.KEY_VALUE in value:
-            self._value = value[Observable.KEY_VALUE]
-        if Observable.KEY_ANALYSIS in value:
-            self.analysis = value[Observable.KEY_ANALYSIS]
-        if Observable.KEY_DIRECTIVES in value:
-            self.directives = value[Observable.KEY_DIRECTIVES]
-        if Observable.KEY_REDIRECTION in value:
-            self._redirection = value[Observable.KEY_REDIRECTION]
-        if Observable.KEY_LINKS in value:
-            self._links = value[Observable.KEY_LINKS]
-        if Observable.KEY_LIMITED_ANALYSIS in value:
-            self._limited_analysis = value[Observable.KEY_LIMITED_ANALYSIS]
-        if Observable.KEY_EXCLUDED_ANALYSIS in value:
-            self._excluded_analysis = value[Observable.KEY_EXCLUDED_ANALYSIS]
-        if Observable.KEY_RELATIONSHIPS in value:
-            self._relationships = value[Observable.KEY_RELATIONSHIPS]
-        if Observable.KEY_GROUPING_TARGET in value:
-            self._grouping_target = value[Observable.KEY_GROUPING_TARGET]
-        if Observable.KEY_REQUEST_TRACKING in value:
-            self._request_tracking = value[Observable.KEY_REQUEST_TRACKING]
-
-    def load(self) -> 'Observable':
-        new_analysis = {}
-        for amt, analysis in self.analysis.items():
-            if isinstance(analysis, dict):
-                new_analysis[amt] = Analysis.from_dict(analysis)
-            else:
-                new_analysis[amt] = analysis
-
-        self.analysis = new_analysis
-        return self
-
     @staticmethod
-    def from_dict(json_dict: dict) -> 'Observable':
-        return Observable.from_json(json_dict)
+    def from_dict(value: dict, root: 'RootAnalysis', observable: Optional['Observable']=None) -> 'Observable':
+        assert isinstance(value, dict)
+        from ace.system.observables import create_observable
+        observable = observable or create_observable(value[Observable.KEY_TYPE], value[Observable.KEY_VALUE], root=root)
+        observable = TaggableObject.from_dict(value, observable)
+        observable = DetectableObject.from_dict(value, observable)
+
+        observable.id = value[Observable.KEY_ID]
+        observable.type = value[Observable.KEY_TYPE]
+        observable.time = value[Observable.KEY_TIME]
+        observable._value = value[Observable.KEY_VALUE]
+        observable.analysis = { key: Analysis.from_dict(analysis, root=root) for key, analysis in value[Observable.KEY_ANALYSIS].items() }
+        observable.directives = value[Observable.KEY_DIRECTIVES]
+        observable._redirection = value[Observable.KEY_REDIRECTION]
+        observable._links = value[Observable.KEY_LINKS]
+        observable._limited_analysis = value[Observable.KEY_LIMITED_ANALYSIS]
+        observable._excluded_analysis = value[Observable.KEY_EXCLUDED_ANALYSIS]
+        observable._relationships = value[Observable.KEY_RELATIONSHIPS]
+        observable._grouping_target = value[Observable.KEY_GROUPING_TARGET]
+        observable._request_tracking = value[Observable.KEY_REQUEST_TRACKING]
+
+        return observable
 
     @property
     def id(self) -> str:
@@ -1634,7 +1583,7 @@ class RootAnalysis(Analysis, MergableObject):
     KEY_UUID = 'uuid'
     KEY_TOOL = 'tool'
     KEY_TOOL_INSTANCE = 'tool_instance'
-    KEY_TYPE = 'type'
+    KEY_TYPE = 'alert_type'
     KEY_DESCRIPTION = 'description'
     KEY_EVENT_TIME = 'event_time'
     KEY_DETAILS = 'details'
@@ -1644,18 +1593,8 @@ class RootAnalysis(Analysis, MergableObject):
     KEY_QUEUE = 'queue'
     KEY_INSTRUCTIONS = 'instructions'
 
-    def to_dict(self) -> dict:
-        return self.json
-
-    @staticmethod
-    def from_dict(root_dict: dict):
-        result = RootAnalysis()
-        result.json = root_dict
-        return result
-
-    @property
-    def json(self):
-        result = Analysis.json.fget(self)
+    def to_dict(self):
+        result = Analysis.to_dict(self)
         result.update({
             RootAnalysis.KEY_ANALYSIS_MODE: self.analysis_mode,
             RootAnalysis.KEY_UUID: self.uuid,
@@ -1665,47 +1604,40 @@ class RootAnalysis(Analysis, MergableObject):
             RootAnalysis.KEY_TYPE: self.alert_type,
             RootAnalysis.KEY_DESCRIPTION: self.description,
             RootAnalysis.KEY_EVENT_TIME: self.event_time,
-            #RootAnalysis.KEY_DETAILS: self.details, <-- this is saved externally
-            RootAnalysis.KEY_OBSERVABLE_STORE: self.observable_store,
+            RootAnalysis.KEY_OBSERVABLE_STORE: { id: observable.to_dict() for id, observable in self.observable_store.items() },
             RootAnalysis.KEY_NAME: self.name,
             RootAnalysis.KEY_QUEUE: self.queue,
             RootAnalysis.KEY_INSTRUCTIONS: self.instructions,
         })
         return result
 
-    @json.setter
-    def json(self, value):
+    @staticmethod
+    def from_dict(value: dict) -> 'RootAnalysis':
         assert isinstance(value, dict)
 
+        root = RootAnalysis()
+
         # this is important to do first before we load Observable references
-        if RootAnalysis.KEY_OBSERVABLE_STORE in value:
-            self.observable_store = value[RootAnalysis.KEY_OBSERVABLE_STORE]
+        root.observable_store = { id: Observable.from_dict(observable, root=root) for id, observable in value[RootAnalysis.KEY_OBSERVABLE_STORE].items() }
+        root = Analysis.from_dict(value, root, analysis=root)
 
-        Analysis.json.fset(self, value)
+        # at this point all the observables would be loaded
+        # so we go back and resolve all the Analysis.observable(s) properties
+        for analysis in root.all_analysis:
+            analysis._load_observable_references()
 
-        # load this alert from the given json data
-        if RootAnalysis.KEY_ANALYSIS_MODE in value:
-            self.analysis_mode = value[RootAnalysis.KEY_ANALYSIS_MODE]
-        if RootAnalysis.KEY_UUID in value:
-            self.uuid = value[RootAnalysis.KEY_UUID]
-        if RootAnalysis.KEY_VERSION in value:
-            self.version = value[RootAnalysis.KEY_VERSION]
-        if RootAnalysis.KEY_TOOL in value:
-            self.tool = value[RootAnalysis.KEY_TOOL]
-        if RootAnalysis.KEY_TOOL_INSTANCE in value:
-            self.tool_instance = value[RootAnalysis.KEY_TOOL_INSTANCE]
-        if RootAnalysis.KEY_TYPE in value:
-            self.alert_type = value[RootAnalysis.KEY_TYPE]
-        if RootAnalysis.KEY_DESCRIPTION in value:
-            self.description = value[RootAnalysis.KEY_DESCRIPTION]
-        if RootAnalysis.KEY_EVENT_TIME in value:
-            self.event_time = value[RootAnalysis.KEY_EVENT_TIME]
-        if RootAnalysis.KEY_NAME in value:
-            self.name = value[RootAnalysis.KEY_NAME]
-        if RootAnalysis.KEY_QUEUE in value:
-            self.queue = value[RootAnalysis.KEY_QUEUE]
-        if RootAnalysis.KEY_INSTRUCTIONS in value:
-            self.instructions = value[RootAnalysis.KEY_INSTRUCTIONS]
+        root.analysis_mode = value[RootAnalysis.KEY_ANALYSIS_MODE]
+        root.uuid = value[RootAnalysis.KEY_UUID]
+        root.version = value[RootAnalysis.KEY_VERSION]
+        root.tool = value[RootAnalysis.KEY_TOOL]
+        root.tool_instance = value[RootAnalysis.KEY_TOOL_INSTANCE]
+        root.alert_type = value[RootAnalysis.KEY_TYPE]
+        root.description = value[RootAnalysis.KEY_DESCRIPTION]
+        root.event_time = value[RootAnalysis.KEY_EVENT_TIME]
+        root.name = value[RootAnalysis.KEY_NAME]
+        root.queue = value[RootAnalysis.KEY_QUEUE]
+        root.instructions = value[RootAnalysis.KEY_INSTRUCTIONS]
+        return root
 
     @property
     def analysis_mode(self):
@@ -1831,11 +1763,6 @@ class RootAnalysis(Analysis, MergableObject):
             raise ValueError("event_time must be a datetime.datetime object or a string in the format "
                              "%Y-%m-%d %H:%M:%S %z but you passed {}".format(type(value).__name__))
 
-    @property
-    def event_time_datetime(self):
-        """This returns the same thing as event_time. It remains for backwards compatibility."""
-        return self._event_time
-
     # override the summary property of the Analysis object to reflect the description
     @property
     def summary(self):
@@ -1957,52 +1884,52 @@ class RootAnalysis(Analysis, MergableObject):
         freed_items = gc.collect()
         #logging.debug("{} items freed by gc".format(freed_items))
 
-    def load(self):
-        """Utility function to replace specific dict() in json with runtime object references."""
+    #def load(self):
+        #"""Utility function to replace specific dict() in json with runtime object references."""
         # in other words, load the JSON
-        self._load_observable_store()
+        #self._load_observable_store()
 
         # load the Analysis objects in the Observables
-        for observable in self.observable_store.values():
-            observable._load_analysis()
+        #for observable in self.observable_store.values():
+            #observable._load_analysis()
 
         # load the Observable references in the Analysis objects
-        for analysis in self.all_analysis:
-            analysis._load_observable_references()
+        #for analysis in self.all_analysis:
+            #analysis._load_observable_references()
 
         # load DetectionPoints
-        for analysis in self.all_analysis:
-            analysis.detections = [DetectionPoint.from_json(dp) for dp in analysis.detections]
+        #for analysis in self.all_analysis:
+            #analysis.detections = [DetectionPoint.from_json(dp) for dp in analysis.detections]
 
-        for observable in self.all_observables:
-            observable.detections = [DetectionPoint.from_json(dp) for dp in observable.detections]
+        #for observable in self.all_observables:
+            #observable.detections = [DetectionPoint.from_json(dp) for dp in observable.detections]
 
         # load Relationships
-        for observable in self.all_observables:
-            observable._load_relationships()
+        #for observable in self.all_observables:
+            #observable._load_relationships()
 
-        return self
+        #return self
         
-    def _load_observable_store(self):
-        from ace.system.observables import create_observable
-        invalid_uuids = [] # list of uuids that don't load for whatever reason
-        for uuid in self.observable_store.keys():
+    #def _load_observable_store(self):
+        #from ace.system.observables import create_observable
+        #invalid_uuids = [] # list of uuids that don't load for whatever reason
+        #for uuid in self.observable_store.keys():
             # get the JSON dict from the observable store for this uuid
-            value = self.observable_store[uuid]
+            #value = self.observable_store[uuid]
             # create the observable from the type and value
-            o = create_observable(value['type'], value['value'])
+            #o = create_observable(value['type'], value['value'])
             # basically this is backwards compatibility with old alerts that have invalid values for observables
-            if o:
-                o.root = self
-                o.json = value # this sets everything else
+            #if o:
+                #o.root = self
+                #o.json = value # this sets everything else
 
-                self.observable_store[uuid] = o
-            else:
-                logging.warning("invalid observable type {} value {}".format(value['type'], value['value']))
-                invalid_uuids.append(uuid)
+                #self.observable_store[uuid] = o
+            #else:
+                #logging.warning("invalid observable type {} value {}".format(value['type'], value['value']))
+                #invalid_uuids.append(uuid)
 
-        for uuid in invalid_uuids:
-            del self.observable_store[uuid]
+        #for uuid in invalid_uuids:
+            #del self.observable_store[uuid]
 
     # XXX reset
     def reset(self):

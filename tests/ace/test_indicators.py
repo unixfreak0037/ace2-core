@@ -12,7 +12,7 @@ def test_indicator_creation():
     assert indicator.value == 'test_value'
     assert indicator.status == 'test_status'
     assert indicator.tags == ['test_tag1', 'test_tag2']
-    assert indicator.json == {
+    assert indicator.to_dict() == {
         'type': 'test_type',
         'value': 'test_value',
         'status': 'test_status',

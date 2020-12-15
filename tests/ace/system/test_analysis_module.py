@@ -79,7 +79,6 @@ class TempAnalysisModuleType(AnalysisModuleType):
     def __init__(self, *args, **kwargs):
         super().__init__(name='test', description='test', *args, **kwargs)
 
-     
 @pytest.mark.parametrize('amt,observable,expected_result', [
     # no requirements at all
     (TempAnalysisModuleType(), RootAnalysis().add_observable(F_TEST, 'test'), True),

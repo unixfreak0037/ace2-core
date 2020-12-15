@@ -390,3 +390,85 @@ def test_self_dependency():
     amt_1 = AnalysisModuleType("test_1", "", dependencies=["test_1"])
     with pytest.raises(CircularDependencyError):
         assert register_analysis_module_type(amt_1)
+
+
+@pytest.mark.integration
+def test_cancel_analysis_from_result():
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+
+    request = root.create_analysis_request()
+    process_analysis_request(request)
+
+    # get the analysis request
+    request = get_next_analysis_request(OWNER_UUID, amt, 0)
+    request.result = request.create_result()
+    analysis = request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
+    new_observable = analysis.add_observable("new", "new")
+    request.result.root.cancel_analysis("test")
+    process_analysis_request(request)
+
+    # root analysis should be cancelled
+    root = get_root_analysis(root.uuid)
+    assert root.analysis_cancelled
+    assert root.analysis_cancelled_reason == "test"
+
+    # we should still have the analysis and the new observable we added in that result
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(amt)
+    assert analysis is not None
+    new_observable = root.get_observable(new_observable)
+    assert new_observable is not None
+
+    # we should not have any new work requests since the analysis was cancelled
+    assert get_work_queue(amt).size() == 0
+
+
+@pytest.mark.integration
+def test_cancel_analysis():
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+
+    request = root.create_analysis_request()
+    process_analysis_request(request)
+
+    # before we work the queue we update the root to cancel analysis
+    root = get_root_analysis(root)
+    root.cancel_analysis("test")
+    process_analysis_request(root.create_analysis_request())
+
+    root = get_root_analysis(root)
+    assert root.analysis_cancelled
+    assert root.analysis_cancelled_reason == "test"
+
+    # now work the queue
+    request = get_next_analysis_request(OWNER_UUID, amt, 0)
+    # now it doesn't say it's cancelled here because this was created before we cancelled it
+    assert not request.root.analysis_cancelled
+    # post our results
+    request.result = request.create_result()
+    analysis = request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
+    new_observable = analysis.add_observable("new", "new")
+    request.result.root.cancel_analysis("test")
+    process_analysis_request(request)
+
+    # root analysis should be cancelled here since this a fresh request
+    root = get_root_analysis(root.uuid)
+    assert root.analysis_cancelled
+    assert root.analysis_cancelled_reason == "test"
+
+    # we should still have the analysis and the new observable we added in that result
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(amt)
+    assert analysis is not None
+    new_observable = root.get_observable(new_observable)
+    assert new_observable is not None
+
+    # we should not have any new work requests since the analysis was cancelled
+    assert get_work_queue(amt).size() == 0

@@ -86,68 +86,69 @@ def process_analysis_request(ar: AnalysisRequest):
                 raise RuntimeError("target_root is None")
 
             # did we generate an alert?
-            if target_root.has_detections():
+            if not target_root.analysis_cancelled and target_root.has_detections():
                 track_alert(target_root)
 
             # for each observable that needs to be analyzed
-            for observable in ar.observables:
-                for amt in get_all_analysis_module_types():
-                    # does this analysis module accept this observable?
-                    if not amt.accepts(observable):
-                        continue
-
-                    # is this analysis request already completed?
-                    if target_root.analysis_completed(observable, amt):
-                        continue
-
-                    # is this analysis request for this RootAnalysis already being tracked?
-                    if target_root.analysis_tracked(observable, amt):
-                        continue
-
-                    # is this observable being analyzed by another root analysis?
-                    # NOTE if the analysis module does not support caching
-                    # then get_analysis_request_by_observable always returns None
-                    tracked_ar = get_analysis_request_by_observable(observable, amt)
-                    if tracked_ar and tracked_ar != ar:
-                        try:
-                            with tracked_ar.lock():
-                                if get_analysis_request(tracked_ar.id):
-                                    # if we can get the AR and lock it it means it's still in a queue waiting
-                                    # so we can tell that AR to update the details of this analysis as well when it's done
-                                    tracked_ar.append_root(target_root)
-                                    track_analysis_request(tracked_ar)
-                                    # now this observable is tracked to the analysis request for the other observable
-                                    observable.track_analysis_request(tracked_ar)
-                                    continue
-
-                            # the AR was completed before we could lock it
-                            # oh well -- it could be in the cache
-
-                        except Exception as e:  # TODO what can be thrown here?
-                            logging.fatal(f"unknown error: {e}")
+            if not target_root.analysis_cancelled:
+                for observable in ar.observables:
+                    for amt in get_all_analysis_module_types():
+                        # does this analysis module accept this observable?
+                        if not amt.accepts(observable):
                             continue
 
-                    # is this analysis in the cache?
-                    cached_result = get_cached_analysis_result(observable, amt)
-                    if cached_result:
-                        logging.debug(
-                            f"using cached result {cached_result} for {observable} type {amt} in {target_root}"
-                        )
-                        target_root.apply_diff_merge(cached_result.root, cached_result.result.root)
-                        target_observable = target_root.get_observable(observable).apply_diff_merge(
-                            cached_result.observable, cached_result.result.observable
-                        )
-                        target_root.save()
-                        continue
+                        # is this analysis request already completed?
+                        if target_root.analysis_completed(observable, amt):
+                            continue
 
-                    # otherwise we need to request it
-                    new_ar = observable.create_analysis_request(amt)
-                    # (we also track the request inside the RootAnalysis object)
-                    observable.track_analysis_request(new_ar)
-                    track_analysis_request(new_ar)
-                    target_root.save()
-                    submit_analysis_request(new_ar)
-                    continue
+                        # is this analysis request for this RootAnalysis already being tracked?
+                        if target_root.analysis_tracked(observable, amt):
+                            continue
+
+                        # is this observable being analyzed by another root analysis?
+                        # NOTE if the analysis module does not support caching
+                        # then get_analysis_request_by_observable always returns None
+                        tracked_ar = get_analysis_request_by_observable(observable, amt)
+                        if tracked_ar and tracked_ar != ar:
+                            try:
+                                with tracked_ar.lock():
+                                    if get_analysis_request(tracked_ar.id):
+                                        # if we can get the AR and lock it it means it's still in a queue waiting
+                                        # so we can tell that AR to update the details of this analysis as well when it's done
+                                        tracked_ar.append_root(target_root)
+                                        track_analysis_request(tracked_ar)
+                                        # now this observable is tracked to the analysis request for the other observable
+                                        observable.track_analysis_request(tracked_ar)
+                                        continue
+
+                                # the AR was completed before we could lock it
+                                # oh well -- it could be in the cache
+
+                            except Exception as e:  # TODO what can be thrown here?
+                                logging.fatal(f"unknown error: {e}")
+                                continue
+
+                        # is this analysis in the cache?
+                        cached_result = get_cached_analysis_result(observable, amt)
+                        if cached_result:
+                            logging.debug(
+                                f"using cached result {cached_result} for {observable} type {amt} in {target_root}"
+                            )
+                            target_root.apply_diff_merge(cached_result.root, cached_result.result.root)
+                            target_observable = target_root.get_observable(observable).apply_diff_merge(
+                                cached_result.observable, cached_result.result.observable
+                            )
+                            target_root.save()
+                            continue
+
+                        # otherwise we need to request it
+                        new_ar = observable.create_analysis_request(amt)
+                        # (we also track the request inside the RootAnalysis object)
+                        observable.track_analysis_request(new_ar)
+                        track_analysis_request(new_ar)
+                        target_root.save()
+                        submit_analysis_request(new_ar)
+                        continue
 
     finally:
         # at this point this AnalysisRequest is no longer needed

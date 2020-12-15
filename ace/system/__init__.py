@@ -10,17 +10,17 @@ class ACESystemInterface:
 
 
 class ACESystem:
-    work_queue = None
-    request_tracking = None
-    module_tracking = None
+    alerting = None
     analysis_tracking = None
     caching = None
-    storage = None
-    locking = None
     config = None
-    alerting = None
     events = None
+    locking = None
+    module_tracking = None
     observable = None
+    request_tracking = None
+    storage = None
+    work_queue = None
 
 
 # the global system object that contains references to all the interfaces

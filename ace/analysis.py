@@ -1609,6 +1609,12 @@ class RootAnalysis(Analysis, MergableObject):
         # set to True after load() is called
         self.is_loaded = False
 
+        # set to True to cancel any outstanding analysis for this root
+        self._analysis_cancelled = False
+
+        # the reason why the analysis was cancelled
+        self._analysis_cancelled_reason = None
+
     #
     # the json property is used for internal storage
     #
@@ -1629,6 +1635,8 @@ class RootAnalysis(Analysis, MergableObject):
     KEY_NETWORK = "network"
     KEY_QUEUE = "queue"
     KEY_INSTRUCTIONS = "instructions"
+    KEY_ANALYSIS_CANCELLED = "analysis_cancelled"
+    KEY_ANALYSIS_CANCELLED_REASON = "analysis_cancelled_reason"
 
     def to_dict(self):
         result = Analysis.to_dict(self)
@@ -1648,6 +1656,8 @@ class RootAnalysis(Analysis, MergableObject):
                 RootAnalysis.KEY_NAME: self.name,
                 RootAnalysis.KEY_QUEUE: self.queue,
                 RootAnalysis.KEY_INSTRUCTIONS: self.instructions,
+                RootAnalysis.KEY_ANALYSIS_CANCELLED: self.analysis_cancelled,
+                RootAnalysis.KEY_ANALYSIS_CANCELLED_REASON: self.analysis_cancelled_reason,
             }
         )
         return result
@@ -1681,6 +1691,8 @@ class RootAnalysis(Analysis, MergableObject):
         root.name = value[RootAnalysis.KEY_NAME]
         root.queue = value[RootAnalysis.KEY_QUEUE]
         root.instructions = value[RootAnalysis.KEY_INSTRUCTIONS]
+        root.analysis_cancelled = value[RootAnalysis.KEY_ANALYSIS_CANCELLED]
+        root.analysis_cancelled_reason = value[RootAnalysis.KEY_ANALYSIS_CANCELLED_REASON]
         return root
 
     @property
@@ -1864,6 +1876,32 @@ class RootAnalysis(Analysis, MergableObject):
     @name.setter
     def name(self, value):
         self._name = value
+
+    @property
+    def analysis_cancelled(self) -> bool:
+        """Returns True if analysis has been cancelled for this root."""
+        return self._analysis_cancelled
+
+    @analysis_cancelled.setter
+    def analysis_cancelled(self, value: bool):
+        assert isinstance(value, bool)
+        self._analysis_cancelled = value
+
+    @property
+    def analysis_cancelled_reason(self) -> Union[str, None]:
+        """Optional short description explaining why the cancellation was made."""
+        return self._analysis_cancelled_reason
+
+    @analysis_cancelled_reason.setter
+    def analysis_cancelled_reason(self, value: Union[str, None]):
+        assert value is None or isinstance(value, str)
+        self._analysis_cancelled_reason = value
+
+    def cancel_analysis(self, reason: Optional[str] = None):
+        """Cancels any further analysis on this root. An optional reason can be supplied to document the action."""
+        self.analysis_cancelled = True
+        if reason:
+            self.analysis_cancelled_reason = reason
 
     # XXX one of these should go away
     def record_observable(self, observable):
@@ -2328,6 +2366,8 @@ class RootAnalysis(Analysis, MergableObject):
         self.analysis_mode = target.analysis_mode
         self.queue = target.queue
         self.description = target.description
+        self.analysis_cancelled = target.analysis_cancelled
+        self.analysis_cancelled_reason = target.analysis_cancelled_reason
         return self
 
     def apply_diff_merge(self, before: "RootAnalysis", after: "RootAnalysis") -> "RootAnalysis":
@@ -2349,6 +2389,12 @@ class RootAnalysis(Analysis, MergableObject):
 
         if before.description != after.description:
             self.description = after.description
+
+        if before.analysis_cancelled != after.analysis_cancelled:
+            self.analysis_cancelled = after.analysis_cancelled
+
+        if before.analysis_cancelled_reason != after.analysis_cancelled_reason:
+            self.analysis_cancelled_reason = after.analysis_cancelled_reason
 
         return self
 

@@ -396,6 +396,10 @@ TAG_LEVEL_CRITICAL = "critical"
 TAG_LEVEL_HIDDEN = "hidden"
 
 # --- EVENTS
+# fired when a new alert is generated
+EVENT_ALERTED = "new_root"
+# fired when all analysis has completed for a root
+EVENT_COMPLETED = "completed"
 # fired when we add a tag to something
 EVENT_TAG_ADDED = "tag_added"
 # called when an Observable is added to the Analysis
@@ -408,22 +412,13 @@ EVENT_DIRECTIVE_ADDED = "directive_added"
 EVENT_ANALYSIS_ADDED = "analysis_added"
 # fired when we add a DetectionPoint ot an Analysis or Observable
 EVENT_DETECTION_ADDED = "detection_added"
-# fired when an analysis is marked as completed manually
-EVENT_ANALYSIS_MARKED_COMPLETED = "analysis_marked_completed"
 # fired when a relationship is added to an observable
 EVENT_RELATIONSHIP_ADDED = "relationship_added"
 
-# these next two events are intended to be used with the RootAnalysis object
-# fired when we add a tag to any taggable object
-EVENT_GLOBAL_TAG_ADDED = "global_tag_added"
-# fired when we add an observable to any analysis object
-EVENT_GLOBAL_OBSERVABLE_ADDED = "global_observable_added"
-# fired when we add an analysis to any observable object
-EVENT_GLOBAL_ANALYSIS_ADDED = "global_analysis_added"
-
 # list of all valid events
 VALID_EVENTS = [
-    EVENT_ANALYSIS_MARKED_COMPLETED,
+    EVENT_ALERTED,
+    EVENT_COMPLETED,
     EVENT_TAG_ADDED,
     EVENT_OBSERVABLE_ADDED,
     EVENT_ANALYSIS_ADDED,
@@ -431,9 +426,6 @@ VALID_EVENTS = [
     EVENT_DIRECTIVE_ADDED,
     EVENT_RELATIONSHIP_ADDED,
     EVENT_DETAILS_UPDATED,
-    EVENT_GLOBAL_TAG_ADDED,
-    EVENT_GLOBAL_OBSERVABLE_ADDED,
-    EVENT_GLOBAL_ANALYSIS_ADDED,
 ]
 
 # available actions for observables

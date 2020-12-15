@@ -19,7 +19,7 @@ class ACESystem:
     locking = None
     config = None
     alerting = None
-    event = None
+    events = None
     observable = None
 
 

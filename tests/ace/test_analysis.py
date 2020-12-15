@@ -318,12 +318,6 @@ def test_find_observables():
     # search by lambda, multi observable
     assert sorted(root.find_observables(lambda o: o.type == F_TEST)) == o_all
 
-@pytest.mark.unit
-def test_observable_md5():
-    root = RootAnalysis()
-    observable = root.add_observable(F_TEST, 'test_1')
-    observable.md5_hex == '4e70ffa82fbe886e3c4ac00ac374c29b'
-
 @pytest.mark.integration
 def test_root_analysis_apply_merge():
     amt = AnalysisModuleType('test', '')

@@ -61,14 +61,6 @@ class DetectionPoint():
         dp.json = dp_json
         return dp
 
-    # XXX move to gui code
-    @property
-    def display_description(self):
-        if isinstance(self.description, str):
-            return self.description.encode('unicode_escape').decode()
-        else:
-            return self.description
-
     def __str__(self):
         return "DetectionPoint({})".format(self.description)
 
@@ -968,18 +960,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         assert isinstance(value, str)
         self._value = value
 
-    # XXX what is this used for?
-    @property
-    def md5_hex(self):
-        """Returns the hexidecimal MD5 hash of the value of this observable."""
-        md5_hasher = hashlib.md5()
-        if isinstance(self.value, str):
-            md5_hasher.update(self.value.encode('utf8', errors='ignore'))
-        else:
-            md5_hasher.update(self.value)
-
-        return md5_hasher.hexdigest()
-
     @property
     def time(self) -> Union[datetime.datetime, None]:
         return self._time
@@ -1007,11 +987,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
     def directives(self, value: list[str]):
         assert isinstance(value, list)
         self._directives = value
-
-    @property
-    def remediation_targets(self):
-        """Returns a list of remediation targets for the observable, by default this is an empty list."""
-        return []
 
     def add_directive(self, directive: str):
         """Adds a directive that analysis modules might use to change their behavior."""
@@ -1131,15 +1106,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             amt = amt.name
 
         return amt in self.excluded_analysis
-
-    # XXX this needs to come out
-    def remove_analysis_exclusion(self, amt: Union[AnalysisModuleType, str]):
-        """Removes AnalysisModule exclusion added to this observable."""
-        assert isinstance(amt, str) or isinstance(amt, AnalysisModuleType)
-        if isinstance(amt, AnalysisModuleType):
-            amt = amt.name
-
-        self.excluded_analysis.remove(amt)
 
     @property
     def relationships(self):

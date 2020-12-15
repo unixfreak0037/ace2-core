@@ -28,8 +28,6 @@ def test_add_excluded_analysis():
     assert observable.excluded_analysis
     assert 'test' in observable.excluded_analysis
     assert observable.is_excluded('test')
-    observable.remove_analysis_exclusion('test')
-    assert not observable.is_excluded('test')
 
     observable.exclude_analysis(AnalysisModuleType('other', ''))
     assert 'other' in observable.excluded_analysis

@@ -1,6 +1,5 @@
 python-dateutil
 pytest
-pycryptodome
-psutil
 pytz
 tzlocal
+tld

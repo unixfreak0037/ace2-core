@@ -18,7 +18,6 @@ from typing import List, Union, Optional, Any
 import ace
 from ace.json import JSONEncoder
 from ace.constants import *
-from ace.error import report_exception
 from ace.indicators import Indicator, IndicatorList
 from ace.system.locking import Lockable
 
@@ -475,7 +474,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
         except Exception as e:
             logging.error("unable to load analysis details {self.uuid}: {e}")
-            report_exception()
+            raise e
 
     @property
     def json(self):
@@ -2168,7 +2167,6 @@ class RootAnalysis(Analysis, MergableObject):
                     os.remove(file_path)
                 except Exception as e:
                     logging.error("unable to remove {}: {}".format(file_path, e))
-                    report_exception()
 
         # remove any empty directories left behind
         logging.debug("removing empty directories inside {}".format(self.storage_dir))

@@ -9,9 +9,10 @@ from ace.constants import *
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.analysis_request import (
     AnalysisRequest,
-    track_analysis_request,
+    get_analysis_request_by_request_id,
     process_expired_analysis_requests,
     submit_analysis_request,
+    track_analysis_request,
 )
 from ace.system.constants import *
 from ace.system.work_queue import (
@@ -67,9 +68,10 @@ def test_get_next_analysis_request():
     request = AnalysisRequest(root, observable, amt_1)
     submit_analysis_request(request)
 
-    assert get_next_analysis_request(TEST_OWNER, amt_1, None) is request
-    assert request.status == TRACKING_STATUS_ANALYZING
-    assert request.owner == TEST_OWNER
+    next_ar = get_next_analysis_request(TEST_OWNER, amt_1, None)
+    assert next_ar == request
+    assert next_ar.status == TRACKING_STATUS_ANALYZING
+    assert next_ar.owner == TEST_OWNER
     assert get_next_analysis_request(TEST_OWNER, amt_1, 0) is None
 
 
@@ -86,20 +88,24 @@ def test_get_next_analysis_request_expired():
     request = AnalysisRequest(root, observable, amt)
     submit_analysis_request(request)
 
-    assert get_next_analysis_request(TEST_OWNER, amt, 0) is request
-    assert request.status == TRACKING_STATUS_ANALYZING
-    assert request.owner == TEST_OWNER
+    next_ar = get_next_analysis_request(TEST_OWNER, amt, 0)
+    assert next_ar == request
+    assert next_ar.status == TRACKING_STATUS_ANALYZING
+    assert next_ar.owner == TEST_OWNER
 
     # this next call should trigger the move of the expired analysis request
     # and since it expires right away we should see the same request again
-    assert get_next_analysis_request(TEST_OWNER, amt, 0) is request
+    next_ar = get_next_analysis_request(TEST_OWNER, amt, 0)
+    assert next_ar == request
 
     # execute this manually
     process_expired_analysis_requests()
 
     # should be back in the queue
+    request = get_analysis_request_by_request_id(request.id)
     assert request.status == TRACKING_STATUS_QUEUED
     assert request.owner is None
 
     # and then we should get it again
-    assert get_next_analysis_request(TEST_OWNER, amt, None) is request
+    next_ar = get_next_analysis_request(TEST_OWNER, amt, 0)
+    assert next_ar == request

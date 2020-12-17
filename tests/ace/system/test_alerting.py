@@ -12,9 +12,7 @@ from ace.system.work_queue import get_next_analysis_request
 @pytest.mark.unit
 def test_alert_tracking():
     root = RootAnalysis()
-    track_alert(root)
-    assert root == get_alert(root)
-    assert root == get_alert(root.uuid)
+    assert track_alert(RootAnalysis())
 
 
 @pytest.mark.integration

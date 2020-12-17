@@ -266,7 +266,7 @@ class AnalysisModuleType:
     def to_dict(self) -> dict:
         return {
             "name": self.name,
-            "description": self.name,
+            "description": self.description,
             "observable_types": self.observable_types,
             "directives": self.directives,
             "dependencies": self.dependencies,
@@ -1518,6 +1518,12 @@ class CaselessObservable(Observable):
 class RootAnalysis(Analysis, MergableObject):
     """Root analysis object."""
 
+    DEFAULT_TOOL = 'unknown'
+    DEFAULT_TOOL_INSTANCE = 'unknown'
+    DEFAULT_ALERT_TYPE = 'default'
+    DEFAULT_QUEUE = 'default'
+    DEFAULT_DESCRIPTION = 'ACE Analysis'
+
     def __init__(
         self,
         tool=None,
@@ -1558,23 +1564,23 @@ class RootAnalysis(Analysis, MergableObject):
         if version is not None:
             self.version = version
 
-        self._tool = None
+        self._tool = RootAnalysis.DEFAULT_TOOL
         if tool:
             self.tool = tool
 
-        self._tool_instance = None
+        self._tool_instance = RootAnalysis.DEFAULT_TOOL_INSTANCE
         if tool_instance:
             self.tool_instance = tool_instance
 
-        self._alert_type = None
+        self._alert_type = RootAnalysis.DEFAULT_ALERT_TYPE
         if alert_type:
             self.alert_type = alert_type
 
-        self._queue = QUEUE_DEFAULT
+        self._queue = RootAnalysis.DEFAULT_QUEUE
         if queue:
             self.queue = queue
 
-        self._description = None
+        self._description = RootAnalysis.DEFAULT_DESCRIPTION
         if desc:
             self.description = desc
 

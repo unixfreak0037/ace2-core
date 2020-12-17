@@ -44,27 +44,27 @@ def test_version_matches(left, right, expected):
 
 @pytest.mark.integration
 def test_register_new_analysis_module_type():
-    assert register_analysis_module_type(amt_1) is amt_1
-    assert get_analysis_module_type(amt_1.name) is amt_1
+    assert register_analysis_module_type(amt_1) == amt_1
+    assert get_analysis_module_type(amt_1.name) == amt_1
     assert get_work_queue(amt_1)
 
 
 @pytest.mark.integration
 def test_register_existing_analysis_module_type():
-    assert register_analysis_module_type(amt_1) is amt_1
-    assert get_analysis_module_type(amt_1.name) is amt_1
+    assert register_analysis_module_type(amt_1) == amt_1
+    assert get_analysis_module_type(amt_1.name) == amt_1
     wq = get_work_queue(amt_1)
 
     # amt_1 is the same as amt so only the amt record changes
-    assert register_analysis_module_type(amt_1_same) is amt_1_same
-    assert get_analysis_module_type(amt_1_same.name) is amt_1_same
+    assert register_analysis_module_type(amt_1_same) == amt_1_same
+    assert get_analysis_module_type(amt_1_same.name) == amt_1_same
     assert get_work_queue(amt_1) is wq  # work queue should still be the same
 
     # now the version changes with an upgraded version
-    assert register_analysis_module_type(amt_1_upgraded_version) is amt_1_upgraded_version
-    assert get_analysis_module_type(amt_1_same.name) is amt_1_upgraded_version
+    assert register_analysis_module_type(amt_1_upgraded_version) == amt_1_upgraded_version
+    assert get_analysis_module_type(amt_1_same.name) == amt_1_upgraded_version
     with pytest.raises(AnalysisModuleTypeVersionError):
-        get_work_queue(amt_1) is wq  # now this request is invalid because am1 is an older version
+        get_work_queue(amt_1) == wq  # now this request is invalid because am1 is an older version
     assert get_work_queue(amt_1_upgraded_version)  # but this works
 
 

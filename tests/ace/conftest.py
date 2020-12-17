@@ -1,12 +1,20 @@
-import pytest
+import logging
+
+import ace.system.threaded
+import ace.system.database
 
 from ace.system import get_system
-import ace.system.threaded
+
+import pytest
 
 
-@pytest.fixture(autouse=True, scope="session")
-def initialize_ace_system():
-    ace.system.threaded.initialize()
+@pytest.fixture(autouse=True, scope="session", params=[
+    ace.system.threaded.initialize,
+    ace.system.database.initialize
+])
+def initialize_ace_system(request):
+    request.param()
+    logging.getLogger().setLevel(logging.DEBUG)
 
 
 @pytest.fixture(autouse=True, scope="function")

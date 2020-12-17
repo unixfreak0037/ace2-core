@@ -226,6 +226,7 @@ def acquire(
 
     # and now the lock is held
     track_lock_acquire(lock_id, owner_id, lock_timeout)
+    logging.debug(f"ACQUIRE owner {owner_id} lock {lock_id} timeout {lock_timeout}")
 
     # and we are no longer waiting
     clear_wait_target(owner_id)
@@ -239,6 +240,7 @@ def release(lock_id: str, owner_id: Optional[str] = None) -> bool:
         owner_id = default_owner_id()
 
     # actually release the lock
+    logging.debug(f"RELEASE owner {owner_id} lock {lock_id}")
     return get_system().locking.release(lock_id, owner_id)
 
 

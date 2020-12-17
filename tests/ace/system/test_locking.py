@@ -116,7 +116,7 @@ def test_deadlock():
     def _t1():
         nonlocal deadlock_count
         acquire(LOCK_1)
-        step_1.wait()
+        step_1.wait(3)
         try:
             acquire(LOCK_2, timeout=1)
         except DeadlockException:

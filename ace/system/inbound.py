@@ -8,6 +8,7 @@ from ace.system.alerting import track_alert
 from ace.system.analysis_tracking import (
     get_root_analysis,
     track_root_analysis,
+    UnknownRootAnalysisError,
 )
 from ace.system.analysis_request import (
     AnalysisRequest,
@@ -23,7 +24,6 @@ from ace.system.exceptions import (
     UnknownAnalysisRequest,
     ExpiredAnalysisRequest,
     UnknownObservableError,
-    UnknownRootAnalysisError,
 )
 
 
@@ -35,7 +35,7 @@ def process_analysis_request(ar: AnalysisRequest):
     # while we're processing it
     try:
         # TODO how long do we wait?
-        with ar.lock():  # NOTE since AnalysisRequest.lock_id returns RootAnalysis.uuid this also locks the root obj
+        with ar.root.lock():
             target_root = None
             # did we complete a request?
             if ar.is_observable_analysis_result:

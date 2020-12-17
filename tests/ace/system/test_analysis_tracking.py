@@ -16,9 +16,8 @@ from ace.system.analysis_tracking import (
     track_analysis_details,
     get_analysis_details,
     delete_analysis_details,
+    UnknownRootAnalysisError,
 )
-
-from ace.system.exceptions import UnknownRootAnalysisError
 
 TEST_DETAILS = {"hello": "world"}
 OBSERVABLE_VALUE = "observable value"
@@ -78,6 +77,7 @@ def test_analysis_details_deleted_with_root():
 
     # delete the root
     assert delete_root_analysis(root.uuid)
+    assert get_root_analysis(root) is None
     # root details should be gone
     assert get_analysis_details(root.uuid) is None
     # and analysis details should be gone

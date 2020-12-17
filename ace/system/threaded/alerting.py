@@ -12,9 +12,10 @@ class ThreadedAlertTrackingInterface(AlertTrackingInterface):
 
     alerts = {}  # key = uuid, value = RootAnalysis
 
-    def track_alert(self, root: dict):
-        assert isinstance(root, dict)
-        self.alerts[root[RootAnalysis.KEY_UUID]] = json.dumps(root, cls=JSONEncoder)
+    def track_alert(self, root: RootAnalysis) -> Any:
+        assert isinstance(root, RootAnalysis)
+        self.alerts[root.uuid] = json.dumps(root.to_dict(), cls=JSONEncoder)
+        return root.uuid
 
     def get_alert(self, id: str) -> Union[Any, None]:
         assert isinstance(id, str)

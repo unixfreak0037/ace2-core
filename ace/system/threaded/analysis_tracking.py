@@ -7,7 +7,7 @@ from typing import Union, List, Optional, Any
 
 from ace.analysis import RootAnalysis, Observable, Analysis
 from ace.json import JSONEncoder
-from ace.system.analysis_tracking import AnalysisTrackingInterface, get_root_analysis
+from ace.system.analysis_tracking import AnalysisTrackingInterface, get_root_analysis, UnknownRootAnalysisError
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.exceptions import *
 

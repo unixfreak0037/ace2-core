@@ -15,7 +15,7 @@ class ThreadedAnalysisModuleTrackingInterface(AnalysisModuleTrackingInterface):
     def get_analysis_module_type(self, name: str) -> Union[AnalysisModuleType, None]:
         return self.amt_tracking.get(name)
 
-    def get_all_analysis_module_types(self) -> List[str]:
+    def get_all_analysis_module_types(self) -> list[AnalysisModuleType]:
         return self.amt_tracking.values()
 
     def reset(self):

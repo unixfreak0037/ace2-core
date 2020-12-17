@@ -18,15 +18,15 @@ from ace.system.storage import (
     ContentMetadata,
 )
 
-TEST_STRING = "hello world"
-TEST_BYTES = b"hello world"
-TEST_IO = io.BytesIO(b"hello world")
+TEST_STRING = lambda: "hello world"
+TEST_BYTES = lambda: b"hello world"
+TEST_IO = lambda: io.BytesIO(b"hello world")
 
 TEST_NAME = "test.txt"
 
 
 @pytest.mark.parametrize(
-    "input_data,name,meta",
+    "generate_input_data,name,meta",
     [
         (TEST_STRING, TEST_NAME, ContentMetadata(TEST_NAME)),
         (TEST_BYTES, TEST_NAME, ContentMetadata(TEST_NAME)),
@@ -34,7 +34,8 @@ TEST_NAME = "test.txt"
     ],
 )
 @pytest.mark.integration
-def test_get_store_delete_content(input_data, name, meta, tmpdir):
+def test_get_store_delete_content(generate_input_data, name, meta, tmpdir):
+    input_data = generate_input_data()
     sha256 = store_content(input_data, meta)
     meta = get_content_meta(sha256)
     data = get_content_bytes(sha256)

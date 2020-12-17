@@ -11,20 +11,20 @@ from ace.system.analysis_tracking import get_root_analysis
 class AlertTrackingInterface(ACESystemInterface):
     """Tracks alerts as they are detected during the processing of analysis requests."""
 
-    def track_alert(self, root: dict):
+    def track_alert(self, root: RootAnalysis) -> Any:
         raise NotImplementedError()
 
     def get_alert(self, id: str) -> Union[Any, None]:
         raise NotImplementedError()
 
 
-def track_alert(root: Union[RootAnalysis, str]):
+def track_alert(root: Union[RootAnalysis, str]) -> Any:
     """Tracks the given root analysis object as an alert."""
     assert isinstance(root, str) or isinstance(root, RootAnalysis)
     if isinstance(root, str):
         root = get_root_analysis(root)
 
-    get_system().alerting.track_alert(root.to_dict())
+    return get_system().alerting.track_alert(root)
 
 
 def get_alert(root: Union[RootAnalysis, str]) -> Union[Any, None]:

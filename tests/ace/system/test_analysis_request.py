@@ -102,7 +102,7 @@ def test_track_analysis_request():
     root = RootAnalysis()
     request = root.create_analysis_request()
     track_analysis_request(request)
-    assert get_analysis_request_by_request_id(request.id) is request
+    assert get_analysis_request_by_request_id(request.id) == request
     assert delete_analysis_request(request.id)
     assert get_analysis_request_by_request_id(request.id) is None
 
@@ -113,7 +113,7 @@ def test_get_analysis_request_by_observable():
     observable = root.add_observable(F_TEST, TEST_1)
     request = observable.create_analysis_request(amt)
     track_analysis_request(request)
-    assert get_analysis_request_by_observable(observable, amt) is request
+    assert get_analysis_request_by_observable(observable, amt) == request
     assert delete_analysis_request(request.id)
     assert get_analysis_request_by_observable(observable, amt) is None
 
@@ -144,6 +144,7 @@ def test_process_expired_analysis_request():
     assert get_expired_analysis_requests() == [request]
     add_work_queue(amt.name)
     process_expired_analysis_requests()
+    request = get_analysis_request_by_request_id(request.id)
     assert request.status == TRACKING_STATUS_QUEUED
     assert not get_expired_analysis_requests()
 

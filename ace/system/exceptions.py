@@ -19,13 +19,6 @@ class ExpiredAnalysisRequest(AnalysisRequestError):
     pass
 
 
-class UnknownRootAnalysisError(ValueError):
-    """Raised when there is an attempt to modify an unknown RootAnalysis object."""
-
-    def __init__(self, uuid: str):
-        super().__init__(f"unknown RootAnalysis {uuid}")
-
-
 class UnknownObservableError(ValueError):
     """Raised when there is an attempt to modify an unknown Observable object."""
 

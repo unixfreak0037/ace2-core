@@ -22,6 +22,9 @@ class ACESystem:
     storage = None
     work_queue = None
 
+    def reset(self):
+        pass
+
 
 # the global system object that contains references to all the interfaces
 ace = ACESystem()

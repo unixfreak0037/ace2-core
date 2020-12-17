@@ -10,7 +10,7 @@ from ace.system.analysis_module import (
     track_analysis_module_type,
     get_analysis_module_type,
 )
-from ace.system.analysis_request import AnalysisRequest, process_expired_analysis_requests, track_analysis_request
+from ace.system.analysis_request import AnalysisRequest, process_expired_analysis_requests, track_analysis_request, get_analysis_request_by_request_id
 from ace.system.locking import LockAcquireFailed
 
 
@@ -106,6 +106,9 @@ def get_next_analysis_request(owner_uuid: str, amt: AnalysisModuleType, timeout:
         # so there's an assumption here that this AnalysisRequest will not be grabbed by another process
         try:
             with next_ar.lock():
+                # get the most recent copy of the analysis request
+                next_ar = get_analysis_request_by_request_id(next_ar.id)
+                # set the owner, status then update
                 next_ar.owner = owner_uuid
                 next_ar.status = TRACKING_STATUS_ANALYZING
                 track_analysis_request(next_ar)

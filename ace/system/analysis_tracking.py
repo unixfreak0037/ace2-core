@@ -9,6 +9,12 @@ from ace.analysis import RootAnalysis, Observable, Analysis
 from ace.system import get_system, ACESystemInterface
 from ace.system.locking import lock
 
+class UnknownRootAnalysisError(ValueError):
+    """Raised when there is an attempt to modify an unknown RootAnalysis object."""
+
+    def __init__(self, uuid: str):
+        super().__init__(f"unknown RootAnalysis {uuid}")
+
 
 class AnalysisTrackingInterface(ACESystemInterface):
     def get_root_analysis(self, uuid: str) -> Union[dict, None]:

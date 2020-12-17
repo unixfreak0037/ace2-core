@@ -162,8 +162,7 @@ class AnalysisRequest(Lockable):
 
     @property
     def lock_id(self):
-        # we always want to lock on the RootAnalysis which is required for every analysis request
-        return self.root.uuid
+        return self.id
 
     #
     # utility functions
@@ -280,7 +279,11 @@ def get_analysis_request(key: str) -> Union[AnalysisRequest, None]:
 def get_analysis_request_by_observable(observable: Observable, amt: AnalysisModuleType) -> Union[AnalysisRequest, None]:
     from ace.system.caching import generate_cache_key
 
-    return get_analysis_request_by_cache_key(generate_cache_key(observable, amt))
+    cache_key = generate_cache_key(observable, amt)
+    if cache_key is None:
+        return None
+
+    return get_analysis_request_by_cache_key(cache_key)
 
 
 def delete_analysis_request(target: Union[AnalysisRequest, str]) -> bool:

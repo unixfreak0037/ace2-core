@@ -5,7 +5,6 @@ import uuid
 import ace
 from ace.system.analysis_tracking import track_root_analysis, get_root_analysis
 from ace.database import initialize_database, get_db_connection, execute_with_retry
-from ace.database.schema import Alert
 
 import pytest
 
@@ -16,6 +15,9 @@ def initialize():
     from ace.database import Base, engine
     Base.metadata.bind = engine
     Base.metadata.create_all()
+
+    ace.db.execute("""CREATE TABLE test ( key TEXT PRIMARY KEY, value TEXT )""")
+    ace.db.commit()
 
 @pytest.mark.integration
 def test_get_db_connection():
@@ -41,9 +43,9 @@ def test_execute_with_retry():
 
         # multi statement transaction
         execute_with_retry(db, c, [ 
-            "INSERT INTO `config` ( `key`, `value` ) VALUES ( ?, ? )",
-            'UPDATE `config` SET `value` = ? WHERE `key` = ?',
-            'DELETE FROM `config` WHERE `key` = ?',
+            "INSERT INTO `test` ( `key`, `value` ) VALUES ( ?, ? )",
+            'UPDATE `test` SET `value` = ? WHERE `key` = ?',
+            'DELETE FROM `test` WHERE `key` = ?',
         ], [ 
             ("key", "value"),
             ("key", "value"),
@@ -57,20 +59,20 @@ def test_execute_with_retry_commit():
     # simple insert statement with commit option
     with get_db_connection() as db:
         c = db.cursor()
-        execute_with_retry(db, c, "INSERT INTO `config` ( `key`, `value` ) VALUES ( ?, ? )", ('key', 'value'), commit=True)
+        execute_with_retry(db, c, "INSERT INTO `test` ( `key`, `value` ) VALUES ( ?, ? )", ('key', 'value'), commit=True)
 
     # check it on another connection
     with get_db_connection() as db:
         c = db.cursor()
-        c.execute("SELECT `value` FROM `config` WHERE `key` = ?", ("key",))
+        c.execute("SELECT `value` FROM `test` WHERE `key` = ?", ("key",))
         assert c.fetchone()
 
     # and then this one should fail since we did not commit it
     with get_db_connection() as db:
         c = db.cursor()
-        execute_with_retry(db, c, "INSERT INTO `config` ( `key`, `value` ) VALUES ( ?, ? )", ("other", "value"), commit=False)
+        execute_with_retry(db, c, "INSERT INTO `test` ( `key`, `value` ) VALUES ( ?, ? )", ("other", "value"), commit=False)
 
     with get_db_connection() as db:
         c = db.cursor()
-        c.execute("SELECT `value` FROM `config` WHERE `key` = ?", ("other",))
+        c.execute("SELECT `value` FROM `test` WHERE `key` = ?", ("other",))
         assert c.fetchone() is None

@@ -1,7 +1,7 @@
 # vim: sw=4:ts=4:et:cc=120
 
 from ace.system import ACESystem, set_system
-from ace.system.database.alerting import DatabaseAlertTrackingInterface
+from ace.system.threaded.alerting import ThreadedAlertTrackingInterface
 from ace.system.database.analysis_module import DatabaseAnalysisModuleTrackingInterface
 from ace.system.database.analysis_request import DatabaseAnalysisRequestTrackingInterface
 from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterface
@@ -15,7 +15,7 @@ from ace.system.threaded.work_queue import ThreadedWorkQueueManagerInterface
 
 
 class DatabaseACESystem(ACESystem):
-    alerting = DatabaseAlertTrackingInterface()
+    alerting = ThreadedAlertTrackingInterface()
     analysis_tracking = DatabaseAnalysisTrackingInterface()
     caching = DatabaseCachingInterface()
     config = ThreadedConfigurationInterface()
@@ -28,6 +28,7 @@ class DatabaseACESystem(ACESystem):
     work_queue = ThreadedWorkQueueManagerInterface()
 
     def reset(self):
+        self.alerting.reset()
         self.config.reset()
         self.events.reset()
         self.locking.reset()

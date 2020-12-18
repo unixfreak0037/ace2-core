@@ -8,10 +8,14 @@ from ace.system import get_system
 import pytest
 
 
-@pytest.fixture(autouse=True, scope="session", params=[
-    ace.system.threaded.initialize,
-    ace.system.database.initialize,
-])
+@pytest.fixture(
+    autouse=True,
+    scope="session",
+    params=[
+        ace.system.threaded.initialize,
+        ace.system.database.initialize,
+    ],
+)
 def initialize_ace_system(request):
     request.param()
     logging.getLogger().setLevel(logging.DEBUG)

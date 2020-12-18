@@ -63,8 +63,8 @@ def test_register_existing_analysis_module_type():
     assert register_analysis_module_type(amt_1_upgraded_version) == amt_1_upgraded_version
     assert get_analysis_module_type(amt_1_same.name) == amt_1_upgraded_version
     with pytest.raises(AnalysisModuleTypeVersionError):
-        get_next_analysis_request('test', amt_1, 0)  # now this request is invalid because am1 is an older version
-    assert get_next_analysis_request('test', amt_1_upgraded_version, 0) is None  # but this works
+        get_next_analysis_request("test", amt_1, 0)  # now this request is invalid because am1 is an older version
+    assert get_next_analysis_request("test", amt_1_upgraded_version, 0) is None  # but this works
 
 
 class TempAnalysisModuleType(AnalysisModuleType):

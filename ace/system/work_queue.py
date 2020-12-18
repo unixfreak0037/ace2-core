@@ -10,8 +10,14 @@ from ace.system.analysis_module import (
     track_analysis_module_type,
     get_analysis_module_type,
 )
-from ace.system.analysis_request import AnalysisRequest, process_expired_analysis_requests, track_analysis_request, get_analysis_request_by_request_id
+from ace.system.analysis_request import (
+    AnalysisRequest,
+    process_expired_analysis_requests,
+    track_analysis_request,
+    get_analysis_request_by_request_id,
+)
 from ace.system.locking import LockAcquireFailed
+
 
 class WorkQueueManagerInterface(ACESystemInterface):
     def delete_work_queue(self, name: str) -> bool:
@@ -41,6 +47,7 @@ class WorkQueueManagerInterface(ACESystemInterface):
         """Returns the current size of the work queue for the given type."""
         raise NotImplementedError()
 
+
 def get_work(amt: Union[AnalysisModuleType, str], timeout: int) -> Union[AnalysisRequest, None]:
     assert isinstance(amt, AnalysisModuleType) or isinstance(amt, str)
     assert isinstance(timeout, int)
@@ -49,6 +56,7 @@ def get_work(amt: Union[AnalysisModuleType, str], timeout: int) -> Union[Analysi
         amt = amt.name
 
     return get_system().work_queue.get_work(amt, timeout)
+
 
 def put_work(amt: Union[AnalysisModuleType, str], analysis_request: AnalysisRequest):
     assert isinstance(amt, AnalysisModuleType) or isinstance(amt, str)
@@ -59,6 +67,7 @@ def put_work(amt: Union[AnalysisModuleType, str], analysis_request: AnalysisRequ
 
     return get_system().work_queue.put_work(amt, analysis_request)
 
+
 def get_queue_size(amt: Union[AnalysisModuleType, str]) -> int:
     assert isinstance(amt, AnalysisModuleType) or isinstance(amt, str)
 
@@ -66,6 +75,7 @@ def get_queue_size(amt: Union[AnalysisModuleType, str]) -> int:
         amt = amt.name
 
     return get_system().work_queue.get_queue_size(amt)
+
 
 def delete_work_queue(amt: Union[AnalysisModuleType, str]) -> bool:
     assert isinstance(amt, AnalysisModuleType) or isinstance(amt, str)
@@ -83,7 +93,10 @@ def add_work_queue(amt: Union[AnalysisModuleType, str]):
 
     get_system().work_queue.add_work_queue(amt)
 
-def get_next_analysis_request(owner_uuid: str, amt: Union[AnalysisModuleType, str], timeout: Optional[int]=0) -> Union[AnalysisRequest, None]:
+
+def get_next_analysis_request(
+    owner_uuid: str, amt: Union[AnalysisModuleType, str], timeout: Optional[int] = 0
+) -> Union[AnalysisRequest, None]:
     """Returns the next AnalysisRequest for the given AnalysisModuleType, or None if nothing is available.
     This function is called by the analysis modules to get the next work item.
 

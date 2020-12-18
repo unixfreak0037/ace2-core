@@ -35,5 +35,6 @@ class DatabaseACESystem(ACESystem):
         self.storage.reset()
         self.work_queue.reset()
 
+
 def initialize():
     set_system(DatabaseACESystem())

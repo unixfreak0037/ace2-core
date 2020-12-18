@@ -20,7 +20,6 @@ class DatabaseWorkQueue(WorkQueue):
 
 
 class DatabaseWorkQueueManagerInterface(WorkQueueManagerInterface):
-
     def invalidate_work_queue(self, analysis_module_name: str) -> bool:
         raise NotImplementedError()
 

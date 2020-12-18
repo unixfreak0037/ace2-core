@@ -30,7 +30,8 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             expiration_date=expiration_date,
             analysis_module_type=request.type.name if request.type else None,
             cache_key=request.cache_key,
-            json_data=json.dumps(request, cls=JSONEncoder, sort_keys=True))
+            json_data=json.dumps(request, cls=JSONEncoder, sort_keys=True),
+        )
 
         ace.db.merge(db_request)
         ace.db.commit()
@@ -42,7 +43,11 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         return True
 
     def get_expired_analysis_requests(self) -> list[AnalysisRequest]:
-        result = ace.db.query(AnalysisRequestTracking).filter(datetime.datetime.now() > AnalysisRequestTracking.expiration_date).all()
+        result = (
+            ace.db.query(AnalysisRequestTracking)
+            .filter(datetime.datetime.now() > AnalysisRequestTracking.expiration_date)
+            .all()
+        )
         return [AnalysisRequest.from_dict(json.loads(_.json_data)) for _ in result]
 
     # this is called when an analysis module type is removed (or expired)

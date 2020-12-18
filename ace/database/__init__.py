@@ -23,7 +23,8 @@ import ace.constants
 
 from ace.analysis import RootAnalysis, Indicator, IndicatorList
 from ace.constants import *
-#from ace.error import report_exception
+
+# from ace.error import report_exception
 
 from sqlalchemy import (
     BigInteger,
@@ -63,8 +64,10 @@ DatabaseSession = None
 Base = declarative_base()
 engine = None
 
+
 def get_session():
     return DatabaseSession
+
 
 @contextmanager
 def get_db_connection():
@@ -75,10 +78,11 @@ def get_db_connection():
     finally:
         connection.close()
 
+
 def use_db(method=None):
     """Utility decorator to pass an opened database connection and cursor object as keyword
-       parameters db and c respectively. Execute is wrapped in a try/catch for database errors.
-       Returns None on error and logs error message and stack trace."""
+    parameters db and c respectively. Execute is wrapped in a try/catch for database errors.
+    Returns None on error and logs error message and stack trace."""
 
     if method is None:
         return functools.partial(use_db, name=name)
@@ -97,41 +101,48 @@ def use_db(method=None):
 
     return wrapper
 
+
 def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=False):
     """Executes the given SQL or function (and params) against the given cursor with
-       re-attempts up to N times (defaults to 2) on deadlock detection.
+    re-attempts up to N times (defaults to 2) on deadlock detection.
 
-       If sql_or_func is a callable then the function will be called as 
-       sql_or_func(db, cursor, *params).
-       
-       To execute a single statement, sql is the parameterized SQL statement
-       and params is the tuple of parameter values.  params is optional and defaults
-       to an empty tuple.
-    
-       To execute multi-statement transactions, sql is a list of parameterized
-       SQL statements, and params is a matching list of tuples of parameters.
-       
-       Returns the rowcount for a single statement, or a list of rowcount for multiple statements,
-       or the result of the function call."""
+    If sql_or_func is a callable then the function will be called as
+    sql_or_func(db, cursor, *params).
+
+    To execute a single statement, sql is the parameterized SQL statement
+    and params is the tuple of parameter values.  params is optional and defaults
+    to an empty tuple.
+
+    To execute multi-statement transactions, sql is a list of parameterized
+    SQL statements, and params is a matching list of tuples of parameters.
+
+    Returns the rowcount for a single statement, or a list of rowcount for multiple statements,
+    or the result of the function call."""
 
     assert callable(sql_or_func) or isinstance(sql_or_func, str) or isinstance(sql_or_func, list)
-    assert params is None or isinstance(params, tuple) or ( 
-        isinstance(params, list) and all([isinstance(_, tuple) for _ in params]) )
+    assert (
+        params is None
+        or isinstance(params, tuple)
+        or (isinstance(params, list) and all([isinstance(_, tuple) for _ in params]))
+    )
 
     # if we are executing sql then make sure we have a list of SQL statements and a matching list
     # of tuple parameters
     if not callable(sql_or_func):
         if isinstance(sql_or_func, str):
-            sql_or_func = [ sql_or_func ]
+            sql_or_func = [sql_or_func]
 
         if isinstance(params, tuple):
-            params = [ params ]
+            params = [params]
         elif params is None:
-            params = [ () for _ in sql_or_func ]
+            params = [() for _ in sql_or_func]
 
         if len(sql_or_func) != len(params):
-            raise ValueError("the length of sql statements does not match the length of parameter tuples: {} {}".format(
-                             sql_or_func, params))
+            raise ValueError(
+                "the length of sql statements does not match the length of parameter tuples: {} {}".format(
+                    sql_or_func, params
+                )
+            )
     count = 1
     while True:
         try:
@@ -140,8 +151,8 @@ def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=Fa
                 results.append(sql_or_func(db, cursor, *params))
             else:
                 for (_sql, _params) in zip(sql_or_func, params):
-                    #if ace.CONFIG['global'].getboolean('log_sql'):
-                        #logging.debug(f"executing with retry (attempt #{count}) sql {_sql} with paramters {_params}")
+                    # if ace.CONFIG['global'].getboolean('log_sql'):
+                    # logging.debug(f"executing with retry (attempt #{count}) sql {_sql} with paramters {_params}")
                     cursor.execute(_sql, _params)
                     results.append(cursor.rowcount)
 
@@ -150,7 +161,7 @@ def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=Fa
 
             if len(results) == 1:
                 return results[0]
-            
+
             return results
 
         except DBAPIError as e:
@@ -171,44 +182,50 @@ def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=Fa
                 if not callable(sql_or_func):
                     i = 0
                     for _sql, _params in zip(sql_or_func, params):
-                        logging.warning("DEADLOCK STATEMENT #{} SQL {} PARAMS {}".format(i, _sql, ','.join([str(_) for _ in _params])))
+                        logging.warning(
+                            "DEADLOCK STATEMENT #{} SQL {} PARAMS {}".format(
+                                i, _sql, ",".join([str(_) for _ in _params])
+                            )
+                        )
                         i += 1
 
                     # TODO log innodb lock status
                     raise e
 
+
 # new school database connections
-#from flask_login import UserMixin
-#from werkzeug.security import generate_password_hash, check_password_hash
+# from flask_login import UserMixin
+# from werkzeug.security import generate_password_hash, check_password_hash
 
 # if target is an executable, then *args is to session.execute function
 # if target is a callable, then *args is to the callable function (whatever that is)
 
+
 def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
     """Executes the given targets, in order. If a deadlock condition is detected, the database session
-       is rolled back and the targets are executed in order, again. This can happen up to :param:attempts times
-       before the failure is raised as an exception.
+    is rolled back and the targets are executed in order, again. This can happen up to :param:attempts times
+    before the failure is raised as an exception.
 
-       :param targets Can be any of the following
-       * A callable.
-       * A list of callables.
-       * A sqlalchemy.sql.expression.Executable object.
-       * A list of sqlalchemy.sql.expression.Executable objects.
-       :param int attempts The maximum number of times the operations are tried before passing the exception on.
-       :param bool commit If set to True then the ``commit`` function is called on the session object before returning
-       from the function. If a deadlock occurs during the commit then further attempts are made.
+    :param targets Can be any of the following
+    * A callable.
+    * A list of callables.
+    * A sqlalchemy.sql.expression.Executable object.
+    * A list of sqlalchemy.sql.expression.Executable objects.
+    :param int attempts The maximum number of times the operations are tried before passing the exception on.
+    :param bool commit If set to True then the ``commit`` function is called on the session object before returning
+    from the function. If a deadlock occurs during the commit then further attempts are made.
 
-       In the case where targets are functions, session can be omitted, in which case :meth:ace.db is used to 
-       acquire a Session to use. When this is the case, the acquired Session object is passed as a keyword parameter
-       to the functions.
+    In the case where targets are functions, session can be omitted, in which case :meth:ace.db is used to
+    acquire a Session to use. When this is the case, the acquired Session object is passed as a keyword parameter
+    to the functions.
 
-       In the case where targets are executables, session cannot be omitted. The executables are passed to the
-       ``execute`` function of the Session object as if you had called ``session.execute(target)``.
+    In the case where targets are executables, session cannot be omitted. The executables are passed to the
+    ``execute`` function of the Session object as if you had called ``session.execute(target)``.
 
-       :return This function returns the last operation in the list of targets."""
+    :return This function returns the last operation in the list of targets."""
 
     if not isinstance(targets, list):
-        targets = [ targets ]
+        targets = [targets]
 
     current_attempt = 0
     while True:
@@ -232,7 +249,7 @@ def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
                 logging.debug(f"DEADLOCK STATEMENT attempt #{current_attempt + 1} SQL {e.statement} PARAMS {e.params}")
 
                 try:
-                    ace.db.rollback() # rolls back to the begin_nested()
+                    ace.db.rollback()  # rolls back to the begin_nested()
                 except Exception as e:
                     logging.error(f"unable to roll back transaction: {e}")
                     report_exception()
@@ -240,8 +257,8 @@ def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
                     et, ei, tb = sys.exc_info()
                     raise e.with_traceback(tb)
 
-                # ... and try again 
-                time.sleep(0.1) # ... after a bit
+                # ... and try again
+                time.sleep(0.1)  # ... after a bit
                 current_attempt += 1
                 continue
 
@@ -249,84 +266,94 @@ def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
             et, ei, tb = sys.exc_info()
             raise e.with_traceback(tb)
 
+
 def retry_function_on_deadlock(function, *args, **kwargs):
     assert callable(function)
     return retry_on_deadlock(function, *args, **kwargs)
 
+
 def retry_sql_on_deadlock(executable, *args, **kwargs):
     assert isinstance(executable, Executable)
     return retry_on_deadlock(executable, *args, **kwargs)
+
 
 def retry_multi_sql_on_deadlock(executables, *args, **kwargs):
     assert isinstance(executables, list)
     assert all([isinstance(_, Executable) for _ in executables])
     return retry_on_deadlock(executables, *args, **kwargs)
 
+
 def retry(func, *args, **kwargs):
     """Executes the wrapped function with retry_on_deadlock."""
+
     @functools.wraps(func)
     def wrapper(*w_args, **w_kwargs):
         w_kwargs.update(kwargs)
         return retry_function_on_deadlock(func, *w_args, **w_kwargs)
 
     return wrapper
-    
+
+
 def initialize_database():
     """Initializes database connections by creating the SQLAlchemy engine and session objects."""
 
     global DatabaseSession, engine
-    #from config import config, get_sqlalchemy_database_uri, get_sqlalchemy_database_options
+    # from config import config, get_sqlalchemy_database_uri, get_sqlalchemy_database_options
 
     # see https://github.com/PyMySQL/PyMySQL/issues/644
     # /usr/local/lib/python3.6/dist-packages/pymysql/cursors.py:170: Warning: (1300, "Invalid utf8mb4 character string: '800363'")
-    warnings.filterwarnings(action='ignore', message='.*Invalid utf8mb4 character string.*')
+    warnings.filterwarnings(action="ignore", message=".*Invalid utf8mb4 character string.*")
 
     import ace
-    #engine = create_engine(
-        #get_sqlalchemy_database_uri('ace'),
-        #**get_sqlalchemy_database_options('ace'))
+
+    # engine = create_engine(
+    # get_sqlalchemy_database_uri('ace'),
+    # **get_sqlalchemy_database_options('ace'))
 
     # TODO get this from configuration?
-    #engine = create_engine('sqlite:///ace.db')
-    engine = create_engine('sqlite://')
+    # engine = create_engine('sqlite:///ace.db')
+    engine = create_engine("sqlite://")
 
-    @event.listens_for(engine, 'connect')
+    @event.listens_for(engine, "connect")
     def connect(dbapi_connection, connection_record):
         pid = os.getpid()
-        connection_record.info['pid'] = pid
+        connection_record.info["pid"] = pid
 
         # XXX check for sqlite
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
 
-    @event.listens_for(engine, 'checkout')
+    @event.listens_for(engine, "checkout")
     def checkout(dbapi_connection, connection_record, connection_proxy):
         pid = os.getpid()
-        if connection_record.info['pid'] != pid:
+        if connection_record.info["pid"] != pid:
             connection_record.connection = connection_proxy.connection = None
-            message = f"connection record belongs to pid {connection_record.info['pid']} attempting to check out in pid {pid}"
+            message = (
+                f"connection record belongs to pid {connection_record.info['pid']} attempting to check out in pid {pid}"
+            )
             logging.debug(message)
             raise exc.DisconnectionError(message)
 
     DatabaseSession = sessionmaker(bind=engine)
     ace.db = scoped_session(DatabaseSession)
 
+
 def initialize_automation_user():
     # get the id of the ace automation account
     try:
-        #import pymysql
-        #pymysql.connections.DEBUG = True
-        ace.AUTOMATION_USER_ID = ace.db.query(User).filter(User.username == 'ace').one().id
+        # import pymysql
+        # pymysql.connections.DEBUG = True
+        ace.AUTOMATION_USER_ID = ace.db.query(User).filter(User.username == "ace").one().id
         ace.db.remove()
     except Exception as e:
         # if the account is missing go ahead and create it
-        user = User(username='ace', email='ace@localhost', display_name='automation')
+        user = User(username="ace", email="ace@localhost", display_name="automation")
         ace.db.add(user)
         ace.db.commit()
 
         try:
-            ace.AUTOMATION_USER_ID = ace.db.query(User).filter(User.username == 'ace').one().id
+            ace.AUTOMATION_USER_ID = ace.db.query(User).filter(User.username == "ace").one().id
         except Exception as e:
             logging.critical(f"missing automation account and unable to create it: {e}")
             sys.exit(1)
@@ -334,4 +361,3 @@ def initialize_automation_user():
             ace.db.remove()
 
     logging.debug(f"got id {ace.AUTOMATION_USER_ID} for automation user account")
-

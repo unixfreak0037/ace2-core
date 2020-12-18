@@ -12,6 +12,7 @@ from ace.system.analysis_tracking import AnalysisTrackingInterface, UnknownRootA
 
 import sqlalchemy.exc
 
+
 class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
     def get_root_analysis(self, uuid: str) -> Union[dict, None]:
         """Returns the root for the given uuid or None if it does not exist.."""
@@ -23,9 +24,7 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
 
     def track_root_analysis(self, uuid: str, root: dict):
         """Tracks the given root to the given RootAnalysis uuid."""
-        tracking = RootAnalysisTracking(
-            uuid=uuid,
-            json_data=json.dumps(root, cls=JSONEncoder, sort_keys=True))
+        tracking = RootAnalysisTracking(uuid=uuid, json_data=json.dumps(root, cls=JSONEncoder, sort_keys=True))
 
         ace.db.merge(tracking)
         ace.db.commit()
@@ -48,10 +47,9 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
         """Tracks the details for the given Analysis object (uuid) in the given root (root_uuid)."""
         try:
             tracking = AnalysisDetailsTracking(
-                uuid=uuid, 
-                root_uuid=root_uuid, 
-                json_data=json.dumps(value, cls=JSONEncoder, sort_keys=True))
-            
+                uuid=uuid, root_uuid=root_uuid, json_data=json.dumps(value, cls=JSONEncoder, sort_keys=True)
+            )
+
             ace.db.merge(tracking)
             ace.db.commit()
         except sqlalchemy.exc.IntegrityError as e:

@@ -7,6 +7,7 @@ from ace.system.analysis_request import AnalysisRequest
 from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
 from ace.system.work_queue import WorkQueueManagerInterface
 
+
 class ThreadedWorkQueueManagerInterface(WorkQueueManagerInterface):
 
     work_queues = {}  # key = amt.name, value = queue.Queue

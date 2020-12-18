@@ -1518,11 +1518,11 @@ class CaselessObservable(Observable):
 class RootAnalysis(Analysis, MergableObject):
     """Root analysis object."""
 
-    DEFAULT_TOOL = 'unknown'
-    DEFAULT_TOOL_INSTANCE = 'unknown'
-    DEFAULT_ALERT_TYPE = 'default'
-    DEFAULT_QUEUE = 'default'
-    DEFAULT_DESCRIPTION = 'ACE Analysis'
+    DEFAULT_TOOL = "unknown"
+    DEFAULT_TOOL_INSTANCE = "unknown"
+    DEFAULT_ALERT_TYPE = "default"
+    DEFAULT_QUEUE = "default"
+    DEFAULT_DESCRIPTION = "ACE Analysis"
 
     def __init__(
         self,

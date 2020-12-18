@@ -14,12 +14,11 @@ from ace.system.analysis_module import AnalysisModuleTrackingInterface
 
 
 class DatabaseAnalysisModuleTrackingInterface(AnalysisModuleTrackingInterface):
-
     def track_analysis_module_type(self, amt: AnalysisModuleType):
         assert isinstance(amt, AnalysisModuleType)
         db_amt = AnalysisModuleTracking(
-            name = amt.name,
-            json_data = json.dumps(amt.to_dict(), cls=JSONEncoder, sort_keys=True))
+            name=amt.name, json_data=json.dumps(amt.to_dict(), cls=JSONEncoder, sort_keys=True)
+        )
 
         ace.db.merge(db_amt)
         ace.db.commit()
@@ -33,4 +32,6 @@ class DatabaseAnalysisModuleTrackingInterface(AnalysisModuleTrackingInterface):
         return AnalysisModuleType.from_dict(json.loads(db_amt.json_data))
 
     def get_all_analysis_module_types(self) -> list[AnalysisModuleType]:
-        return [AnalysisModuleType.from_dict(json.loads(_.json_data)) for _ in ace.db.query(AnalysisModuleTracking).all()]
+        return [
+            AnalysisModuleType.from_dict(json.loads(_.json_data)) for _ in ace.db.query(AnalysisModuleTracking).all()
+        ]

@@ -6,15 +6,15 @@ import json
 from dataclasses import dataclass
 from typing import Union, Optional
 
-import ace 
+import ace
 
 from ace.json import JSONEncoder
 from ace.database.schema import AnalysisResultCache
 from ace.system.caching import CachingInterface
 from ace.system.analysis_request import AnalysisRequest
 
-class DatabaseCachingInterface(CachingInterface):
 
+class DatabaseCachingInterface(CachingInterface):
     def get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
         result = ace.db.query(AnalysisResultCache).filter(AnalysisResultCache.cache_key == cache_key).one_or_none()
         if result is None:
@@ -32,9 +32,10 @@ class DatabaseCachingInterface(CachingInterface):
             expiration_date = datetime.datetime.now() + datetime.timedelta(seconds=expiration)
 
         cache_result = AnalysisResultCache(
-            cache_key=cache_key, 
+            cache_key=cache_key,
             expiration_date=expiration_date,
-            json_data=json.dumps(request.to_dict(), cls=JSONEncoder, sort_keys=True))
+            json_data=json.dumps(request.to_dict(), cls=JSONEncoder, sort_keys=True),
+        )
 
         ace.db.merge(cache_result)
         ace.db.commit()

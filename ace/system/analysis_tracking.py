@@ -9,6 +9,7 @@ from ace.analysis import RootAnalysis, Observable, Analysis
 from ace.system import get_system, ACESystemInterface
 from ace.system.locking import lock
 
+
 class UnknownRootAnalysisError(ValueError):
     """Raised when there is an attempt to modify an unknown RootAnalysis object."""
 

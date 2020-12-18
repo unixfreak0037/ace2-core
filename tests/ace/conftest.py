@@ -10,7 +10,7 @@ import pytest
 
 @pytest.fixture(autouse=True, scope="session", params=[
     ace.system.threaded.initialize,
-    ace.system.database.initialize
+    ace.system.database.initialize,
 ])
 def initialize_ace_system(request):
     request.param()

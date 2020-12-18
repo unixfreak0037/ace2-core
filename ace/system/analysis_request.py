@@ -8,9 +8,8 @@ from typing import Union, List, Optional, Any
 from ace.analysis import RootAnalysis, Observable
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_tracking import get_root_analysis
-from ace.system.analysis_module import AnalysisModuleType
+from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
 from ace.system.constants import TRACKING_STATUS_NEW, TRACKING_STATUS_QUEUED, SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS
-from ace.system.exceptions import InvalidWorkQueueError
 from ace.system.locking import Lockable, acquire, release
 
 
@@ -307,6 +306,7 @@ def clear_tracking_by_analysis_module_type(amt: AnalysisModuleType):
 def submit_analysis_request(ar: AnalysisRequest):
     """Submits the given AnalysisRequest to the appropriate queue for analysis."""
     from ace.system.inbound import process_analysis_request
+    from ace.system.work_queue import put_work
 
     assert isinstance(ar, AnalysisRequest)
     assert isinstance(ar.root, RootAnalysis)
@@ -320,12 +320,7 @@ def submit_analysis_request(ar: AnalysisRequest):
         return process_analysis_request(ar)
 
     # otherwise we assign this request to the appropriate work queue based on the amt
-    # NOTE that we bypass the get_work_queue call since that checks the module version
-    work_queue = get_system().work_queue.get_work_queue(ar.type)
-    if work_queue is None:
-        raise InvalidWorkQueueError()
-
-    work_queue.put(ar)
+    put_work(ar.type, ar)
 
 
 def process_expired_analysis_requests():
@@ -342,7 +337,7 @@ def process_expired_analysis_requests():
                     # re-submit the analysis request
                     # this changes the status and thus takes it out of expiration
                     submit_analysis_request(request)
-                except InvalidWorkQueueError:
+                except UnknownAnalysisModuleTypeError:
                     delete_analysis_request(request.id)
     finally:
         release(SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS)

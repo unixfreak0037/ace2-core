@@ -6,7 +6,7 @@ import pytest
 
 from ace.analysis import RootAnalysis
 from ace.constants import *
-from ace.system.analysis_module import AnalysisModuleType
+from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
 from ace.system.analysis_request import (
     AnalysisRequest,
     get_analysis_request_by_request_id,
@@ -16,11 +16,10 @@ from ace.system.analysis_request import (
 )
 from ace.system.constants import *
 from ace.system.work_queue import (
-    WorkQueue,
+    add_work_queue,
+    delete_work_queue,
     get_next_analysis_request,
-    get_work_queue,
-    invalidate_work_queue,
-    register_work_queue,
+    get_queue_size,
 )
 
 amt_1 = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600)
@@ -32,43 +31,38 @@ TEST_OWNER = str(uuid.uuid4())
 
 
 @pytest.mark.integration
-def test_register_work_queue():
-    wq = register_work_queue(amt_1)
-    assert get_work_queue(amt_1) is wq
+def test_add_work_queue():
+    add_work_queue(amt_1)
+    assert get_queue_size(amt_1) == 0
+
+    # add an existing work queue
+    add_work_queue(amt_1)
+    assert get_queue_size(amt_1) == 0
 
 
 @pytest.mark.integration
-def test_register_existing_work_queue():
-    wq_1 = register_work_queue(amt_1)
-    assert get_work_queue(amt_1) is wq_1
-
-    # should still have the same work queue
-    wq_2 = register_work_queue(amt_2)
-    assert get_work_queue(amt_2) is wq_1
+def test_delete_work_queue():
+    add_work_queue(amt_1)
+    assert delete_work_queue(amt_1.name)
+    with pytest.raises(UnknownAnalysisModuleTypeError):
+        get_queue_size(amt_1)
 
 
 @pytest.mark.integration
-def test_invalidate_work_queue():
-    wq_1 = register_work_queue(amt_1)
-    assert get_work_queue(amt_1) is wq_1
-    assert invalidate_work_queue(amt_1.name)
-    assert get_work_queue(amt_1) is None
-
-
-@pytest.mark.integration
-def test_get_invalid_work_queue():
-    assert get_work_queue(amt_1) is None
+def test_reference_invalid_work_queue():
+    with pytest.raises(UnknownAnalysisModuleTypeError):
+        get_queue_size(amt_1)
 
 
 @pytest.mark.integration
 def test_get_next_analysis_request():
-    register_work_queue(amt_1)
+    add_work_queue(amt_1)
     root = RootAnalysis()
     observable = root.add_observable(F_TEST, TEST_1)
     request = AnalysisRequest(root, observable, amt_1)
     submit_analysis_request(request)
 
-    next_ar = get_next_analysis_request(TEST_OWNER, amt_1, None)
+    next_ar = get_next_analysis_request(TEST_OWNER, amt_1, 0)
     assert next_ar == request
     assert next_ar.status == TRACKING_STATUS_ANALYZING
     assert next_ar.owner == TEST_OWNER
@@ -82,7 +76,7 @@ def test_get_next_analysis_request_expired():
         name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600  # immediately expire
     )
 
-    register_work_queue(amt)
+    add_work_queue(amt)
     root = RootAnalysis()
     observable = root.add_observable(F_TEST, TEST_1)
     request = AnalysisRequest(root, observable, amt)

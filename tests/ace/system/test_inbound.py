@@ -12,7 +12,7 @@ from ace.system.analysis_tracking import get_root_analysis
 from ace.system.caching import get_cached_analysis_result
 from ace.system.constants import TRACKING_STATUS_ANALYZING
 from ace.system.inbound import process_analysis_request
-from ace.system.work_queue import get_next_analysis_request, get_work_queue
+from ace.system.work_queue import get_next_analysis_request, get_queue_size
 
 import pytest
 
@@ -39,7 +39,7 @@ def test_process_root_analysis_request():
     assert not root.is_locked()
 
     # the test observable should be in the queue
-    assert get_work_queue(amt).size() == 1
+    assert get_queue_size(amt) == 1
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
     assert isinstance(request, AnalysisRequest)
     assert request.observable == test_observable
@@ -65,14 +65,14 @@ def test_process_duplicate_root_analysis_request():
     process_analysis_request(root_request)
 
     # we should have a single work entry in the work queue
-    assert get_work_queue(amt).size() == 1
+    assert get_queue_size(amt) == 1
 
     # make the exact same request again
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
     # should still only have one request
-    assert get_work_queue(amt).size() == 1
+    assert get_queue_size(amt) == 1
 
 
 @pytest.mark.parametrize(
@@ -94,7 +94,7 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
     process_analysis_request(root_request)
 
     # we should have a single work entry in the work queue
-    assert get_work_queue(amt).size() == 1
+    assert get_queue_size(amt) == 1
 
     # make another request for the same observable but from a different root analysis
     root = RootAnalysis()
@@ -105,7 +105,7 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
     if cache_ttl is not None:
         # if the analysis type can be cached then there should only be one request
         # since there is already a request to analyze it
-        assert get_work_queue(amt).size() == 1
+        assert get_queue_size(amt) == 1
 
         # now the existing analysis request should have a reference to the new root analysis
         request = get_next_analysis_request(OWNER_UUID, amt, 0)
@@ -127,7 +127,7 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
 
     else:
         # otherwise there should be two requests
-        assert get_work_queue(amt).size() == 2
+        assert get_queue_size(amt) == 2
 
 
 @pytest.mark.parametrize(
@@ -192,7 +192,7 @@ def test_cached_analysis_result():
     process_analysis_request(root_request)
 
     # we should have a single work entry in the work queue
-    assert get_work_queue(amt).size() == 1
+    assert get_queue_size(amt) == 1
 
     # request should be deleted
     assert get_analysis_request(root_request.id) is None
@@ -209,7 +209,7 @@ def test_cached_analysis_result():
     assert get_analysis_request(request.id) is None
 
     # work queue should be empty
-    assert get_work_queue(amt).size() == 0
+    assert get_queue_size(amt) == 0
 
     # make another request for the same observable
     root = RootAnalysis()
@@ -222,7 +222,7 @@ def test_cached_analysis_result():
     assert get_analysis_request(root_request.id) is None
 
     # work queue should be empty since the result was pulled from cache
-    assert get_work_queue(amt).size() == 0
+    assert get_queue_size(amt) == 0
 
     # get the root analysis and ensure this observable has the analysis now
     root = get_root_analysis(root.uuid)
@@ -295,10 +295,10 @@ def test_known_dependency():
     process_analysis_request(root_request)
 
     # this should have one entry
-    assert get_work_queue(amt).size() == 1
+    assert get_queue_size(amt) == 1
 
     # but not this one (yet) due to the dependency
-    assert get_work_queue(amt_dep).size() == 0
+    assert get_queue_size(amt_dep) == 0
 
     # process the amt request
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
@@ -307,7 +307,7 @@ def test_known_dependency():
     process_analysis_request(request)
 
     # now we should have a request for the dependency
-    assert get_work_queue(amt_dep).size() == 1
+    assert get_queue_size(amt_dep) == 1
 
 
 @pytest.mark.integration
@@ -330,11 +330,11 @@ def test_chained_dependency():
     process_analysis_request(root_request)
 
     # this should have one entry for amt_1
-    assert get_work_queue(amt_1).size() == 1
+    assert get_queue_size(amt_1) == 1
 
     # but not this one the others
-    assert get_work_queue(amt_2).size() == 0
-    assert get_work_queue(amt_3).size() == 0
+    assert get_queue_size(amt_2) == 0
+    assert get_queue_size(amt_3) == 0
 
     # process the amt request
     request = get_next_analysis_request(OWNER_UUID, amt_1, 0)
@@ -343,9 +343,9 @@ def test_chained_dependency():
     process_analysis_request(request)
 
     # now amt_2 should be ready but still not amt_3
-    assert get_work_queue(amt_1).size() == 0
-    assert get_work_queue(amt_2).size() == 1
-    assert get_work_queue(amt_3).size() == 0
+    assert get_queue_size(amt_1) == 0
+    assert get_queue_size(amt_2) == 1
+    assert get_queue_size(amt_3) == 0
 
     # process the amt request
     request = get_next_analysis_request(OWNER_UUID, amt_2, 0)
@@ -354,9 +354,9 @@ def test_chained_dependency():
     process_analysis_request(request)
 
     # now amt_3 should be ready
-    assert get_work_queue(amt_1).size() == 0
-    assert get_work_queue(amt_2).size() == 0
-    assert get_work_queue(amt_3).size() == 1
+    assert get_queue_size(amt_1) == 0
+    assert get_queue_size(amt_2) == 0
+    assert get_queue_size(amt_3) == 1
 
 
 @pytest.mark.integration
@@ -424,7 +424,7 @@ def test_cancel_analysis_from_result():
     assert new_observable is not None
 
     # we should not have any new work requests since the analysis was cancelled
-    assert get_work_queue(amt).size() == 0
+    assert get_queue_size(amt) == 0
 
 
 @pytest.mark.integration
@@ -471,4 +471,4 @@ def test_cancel_analysis():
     assert new_observable is not None
 
     # we should not have any new work requests since the analysis was cancelled
-    assert get_work_queue(amt).size() == 0
+    assert get_queue_size(amt) == 0

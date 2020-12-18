@@ -10,7 +10,7 @@ from ace.system.analysis_module import (
     register_analysis_module_type,
     get_analysis_module_type,
 )
-from ace.system.work_queue import get_work_queue
+from ace.system.work_queue import get_queue_size, get_next_analysis_request
 
 amt_1 = AnalysisModuleType(
     name="test", description="test", version=1, timeout=30, cache_ttl=600, additional_cache_keys=["key1"]
@@ -46,26 +46,25 @@ def test_version_matches(left, right, expected):
 def test_register_new_analysis_module_type():
     assert register_analysis_module_type(amt_1) == amt_1
     assert get_analysis_module_type(amt_1.name) == amt_1
-    assert get_work_queue(amt_1)
+    assert get_queue_size(amt_1) == 0
 
 
 @pytest.mark.integration
 def test_register_existing_analysis_module_type():
     assert register_analysis_module_type(amt_1) == amt_1
     assert get_analysis_module_type(amt_1.name) == amt_1
-    wq = get_work_queue(amt_1)
+    wq = get_queue_size(amt_1) == 0
 
     # amt_1 is the same as amt so only the amt record changes
     assert register_analysis_module_type(amt_1_same) == amt_1_same
     assert get_analysis_module_type(amt_1_same.name) == amt_1_same
-    assert get_work_queue(amt_1) is wq  # work queue should still be the same
 
     # now the version changes with an upgraded version
     assert register_analysis_module_type(amt_1_upgraded_version) == amt_1_upgraded_version
     assert get_analysis_module_type(amt_1_same.name) == amt_1_upgraded_version
     with pytest.raises(AnalysisModuleTypeVersionError):
-        get_work_queue(amt_1) == wq  # now this request is invalid because am1 is an older version
-    assert get_work_queue(amt_1_upgraded_version)  # but this works
+        get_next_analysis_request('test', amt_1, 0)  # now this request is invalid because am1 is an older version
+    assert get_next_analysis_request('test', amt_1_upgraded_version, 0) is None  # but this works
 
 
 class TempAnalysisModuleType(AnalysisModuleType):

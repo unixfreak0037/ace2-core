@@ -16,7 +16,7 @@ from ace.system.analysis_tracking import get_root_analysis, track_root_analysis
 from ace.system.constants import *
 from ace.system.inbound import process_analysis_request
 from ace.system.locking import LockAcquireFailed
-from ace.system.work_queue import get_next_analysis_request, get_work_queue
+from ace.system.work_queue import get_next_analysis_request, get_queue_size
 
 import pytest
 
@@ -318,4 +318,4 @@ def test_amt_version_upgrade():
         request = get_next_analysis_request("test", amt, 0)
 
     # and the work queue should still have one entry
-    assert get_work_queue(amt_upgraded).size() == 1
+    assert get_queue_size(amt_upgraded) == 1

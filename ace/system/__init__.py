@@ -23,7 +23,16 @@ class ACESystem:
     work_queue = None
 
     def reset(self):
-        pass
+        self.alerting.reset()
+        self.analysis_tracking.reset()
+        self.caching.reset()
+        self.config.reset()
+        self.events.reset()
+        self.locking.reset()
+        self.module_tracking.reset()
+        self.request_tracking.reset()
+        self.storage.reset()
+        self.work_queue.reset()
 
 
 # the global system object that contains references to all the interfaces

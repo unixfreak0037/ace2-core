@@ -74,7 +74,7 @@ def test_get_lock_owner(owner_id, expected):
     assert acquire(LOCK_1, owner_id)
     # owner of the lock should be default since we didn't specify one
     assert get_lock_owner(LOCK_1) == expected
-    release(LOCK_1)
+    release(LOCK_1, owner_id)
 
 
 @pytest.mark.integration
@@ -150,11 +150,15 @@ def test_lock_timeout():
     step_1 = threading.Event()
     step_2 = threading.Event()
 
+    release_result = None
+
     def _t1():
+        nonlocal release_result
         acquire(LOCK_1, lock_timeout=0)
         step_1.set()
         step_2.wait()
-        release(LOCK_1)
+        # this should return False since we don't own the lock here
+        release_result = release(LOCK_1)
 
     t1 = threading.Thread(target=_t1)
     t1.start()
@@ -167,6 +171,8 @@ def test_lock_timeout():
     # let the thread finish
     step_2.set()
     t1.join()
+
+    assert release_result is False
 
 
 @pytest.mark.integration
@@ -203,11 +209,11 @@ def test_release_expired_reacquired_lock():
         (1, 0, lambda hit, miss, dl: dl == 0),
         # with one lock and a wait we should still never see a deadlock because there is only one lock
         # a deadlock requires two or more locks
-        (1, 1, lambda hit, miss, dl: dl == 0),
+        (1, 0.01, lambda hit, miss, dl: dl == 0),
         # with 10 locks and no wait we should never see a deadlock
         (10, 0, lambda hit, miss, dl: dl == 0),
         # finally with 10 locks we *should* see at least one deadlock (but maybe not if we're lucky)
-        (10, 1, lambda hit, miss, dl: dl >= 0),  # 10 locks with 1 second wait time
+        (10, 0.01, lambda hit, miss, dl: dl >= 0),  # 10 locks with 1 second wait time
     ],
 )
 @pytest.mark.system
@@ -224,7 +230,7 @@ def test_locking_contest(lock_count, timeout, verify_result):
         miss = 0
         deadlock_count = 0
 
-        for i in range(1000):
+        for i in range(10):
             random.shuffle(locks)
             stack = locks[:]
             acquired_locks = []

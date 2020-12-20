@@ -40,18 +40,6 @@ class ThreadedACESystem(ACESystem):
     alerting = ThreadedAlertTrackingInterface()
     events = ThreadedEventInterafce()
 
-    def reset(self):
-        self.work_queue.reset()
-        self.request_tracking.reset()
-        self.module_tracking.reset()
-        self.analysis_tracking.reset()
-        self.caching.reset()
-        self.storage.reset()
-        self.locking.reset()
-        self.config.reset()
-        self.alerting.reset()
-        self.events.reset()
-
 
 def initialize():
     set_system(ThreadedACESystem())

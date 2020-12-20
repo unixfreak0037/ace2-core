@@ -70,7 +70,7 @@ class Lockable:
             if lock_result:
                 release(self.lock_id, self.lock_owner_id)
 
-    def acquire(self, timeout: Optional[int] = None, lock_timeout: Optional[int] = None) -> bool:
+    def acquire(self, timeout: Union[int, float, None] = None, lock_timeout: Optional[int] = None) -> bool:
         return acquire(self.lock_id, self.lock_owner_id, timeout, lock_timeout)
 
     def release(self) -> bool:
@@ -139,7 +139,7 @@ class LockingInterface(ACESystemInterface):
 
     # lock must be re-entrant
     def acquire(
-        self, lock_id: str, owner_id: str, timeout: Optional[int] = None, lock_timeout: Optional[int] = None
+        self, lock_id: str, owner_id: str, timeout: Union[int, float, None] = None, lock_timeout: Optional[int] = None
     ) -> bool:
         raise NotImplementedError()
 
@@ -194,11 +194,14 @@ def default_owner_id():
 
 
 def acquire(
-    lock_id: str, owner_id: Optional[str] = None, timeout: Optional[int] = None, lock_timeout: Optional[int] = None
+    lock_id: str,
+    owner_id: Optional[str] = None,
+    timeout: Union[int, float, None] = None,
+    lock_timeout: Optional[int] = None,
 ) -> bool:
     assert isinstance(lock_id, str)
     assert owner_id is None or isinstance(owner_id, str)
-    assert timeout is None or isinstance(timeout, int)
+    assert timeout is None or isinstance(timeout, int) or isinstance(timeout, float)
     assert lock_timeout is None or isinstance(lock_timeout, int)
 
     # if we don't pass in an owner_id then we use a default which is based on hostname, process id and thread id

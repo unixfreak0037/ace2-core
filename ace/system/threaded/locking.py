@@ -19,9 +19,24 @@ class TimeoutRLock:
         # what everything waits for
         self.condition = threading.Condition()
         # what is used for the lock
-        self.lock = threading.RLock()
+        self.lock = threading.Lock()
+        # re-entrant locking count
+        self.count = 0
+        # who currently owns the lock
+        self.owner = None
 
-    def acquire(self, blocking=True, timeout=0, lock_timeout=None):
+        self.sync_lock = threading.Lock()
+
+    def acquire(self, *args, **kwargs):
+        with self.sync_lock:
+            return self._acquire(*args, **kwargs)
+
+    def _acquire(self, owner, blocking=True, timeout=0, lock_timeout=None):
+        if self.owner == owner:
+            # XXX restart the clock
+            self.count += 1
+            return True
+
         wait_timeout = None
         if blocking:
             # the time this request will expire if the lock is not granted
@@ -57,35 +72,62 @@ class TimeoutRLock:
 
         # lock has been acquired, did we specify a lock timeout?
         if lock_timeout is not None:
-            # if we specified 0 then we don't even need to wait
+            # if we specified 0 then we don't even need to wait, it just expires right away
             if lock_timeout == 0:
                 with self.condition:
-                    self.lock = threading.RLock()
+                    logging.debug(f"lock id({self}) timeout expired")
+                    self.lock = threading.Lock()
+                    self.owner = None
+                    self.count = 0
                     self.condition.notify_all()
+                    return True  # but we still locked it
             else:
                 self.start_timeout(lock_timeout)
 
+        self.owner = owner
+        self.count = 1
         return True
 
     def start_timeout(self, lock_timeout: int):
+        logging.debug(f"starting lock id({self}) timeout for {lock_timeout} seconds")
+        # XXX should this be a daemon thread?
         self.timeout_monitor = threading.Thread(target=self.monitor_timeout, args=(lock_timeout,))
         self.timeout_monitor.start()
 
     def monitor_timeout(self, lock_timeout: int):
         with self.condition:
             # wait until this many seconds have expired OR the lock is released
+            # XXX use short times to check for changes
             if not self.condition.wait(lock_timeout):
+                logging.debug(f"lock id({self}) timeout expired")
                 # if the lock was not released then we make a new lock and notify everyone
-                self.lock = threading.RLock()
+                self.lock = threading.Lock()
+                self.owner = None
+                self.count = 0
                 self.condition.notify_all()
 
-    def release(self):
+    def release(self, *args, **kwargs):
+        with self.sync_lock:
+            return self._release(*args, **kwargs)
+
+    def _release(self, owner):
+        if self.owner != owner:
+            logging.debug(f"failed to release lock {self} ({self.lock}): invalid owner")
+            return False
+
+        self.count -= 1
+        if self.count:
+            return True
+
+        self.owner = None
+
         try:
             self.lock.release()
         except RuntimeError as e:
             # if we attempt to release after expire then this will fail because
             # we'll either not own it or it will not be locked yet
             # because the locks were switched out
+            logging.debug(f"failed to release lock {id(self)} req owner {owner} cur owner {self.owner}: {e}")
             return False
 
         with self.condition:
@@ -105,7 +147,7 @@ def synchronized(func):
 
 class ThreadedLockingInterface(ThreadedInterface, LockingInterface):
 
-    locks = {}  # key = lock_id, value = threading.RLock
+    locks = {}  # key = lock_id, value = threading.Lock
     lock_ownership = {}  # key = lock_id, value = str (owner_id)
     owner_wait_targets = {}  # key = owner_id, value = str (lock_id)
     lock_timeouts = {}  # key = lock_id, value = datetime.datetime when lock expires
@@ -146,11 +188,13 @@ class ThreadedLockingInterface(ThreadedInterface, LockingInterface):
             arg_blocking = True
             arg_timeout = timeout
 
-        success = lock.acquire(arg_blocking, arg_timeout, lock_timeout)
+        success = lock.acquire(owner_id, arg_blocking, arg_timeout, lock_timeout)
         if success:
             # if we were able to lock it keep track of that so we can implement is_locked()
+            # XXX
             self.current_locks.add(lock_id)
 
+        # logging.debug(f"{success} lock.acquire({lock_id}, {owner_id}, {timeout}, {lock_timeout} lock = {id(lock)} cur owner = {lock.owner} count = {lock.count}")
         return success
 
     def release(self, lock_id: str, owner_id: str) -> bool:
@@ -159,22 +203,20 @@ class ThreadedLockingInterface(ThreadedInterface, LockingInterface):
             logging.debug(f"attempt to release unknown lock {lock_id} by {owner_id}")
             return False
 
-        if self.get_lock_owner(lock_id) != owner_id:
-            logging.debug(f"attempt to release unowned lock {lock_id} by {owner_id}")
-            return False
-
-        result = lock.release()
+        result = lock.release(owner_id)
         if result:
-            self.current_locks.remove(lock_id)
+            if lock.count == 0:
+                self.current_locks.remove(lock_id)
         else:
             logging.debug(f"failed to release {lock_id} by {owner_id}")
 
+        # logging.debug(f"{result} lock.release({lock_id}, {owner_id} lock = {id(lock)} cur_owner = {lock.owner} count = {lock.count}")
         return result
 
     def is_locked(self, lock_id: str) -> bool:
         return lock_id in self.current_locks
 
     def reset(self):
-        self.locks = {}  # key = lock_id, value = threading.RLock
+        self.locks = {}  # key = lock_id, value = threading.Lock
         self.lock_ownership = {}  # key = lock_id, value = str (owner_id)
         self.owner_wait_targets = {}  # key = owner_id, value = str (lock_id)

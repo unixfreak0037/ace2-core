@@ -242,7 +242,7 @@ def test_get_next_analysis_request_locking():
     t.join(3)
 
     # now we should be able to get the request
-    work_request = get_next_analysis_request(owner_uuid, amt, 0)
+    work_request = get_next_analysis_request(owner_uuid, amt, 3)
     assert work_request
 
 

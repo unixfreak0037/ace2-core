@@ -1,6 +1,6 @@
 # Analysis Module Tracking
 
-Analysis modules are tracked as [analysis module types]() through the interface `ace.system.analysis_module_tracking.AnalysisModuleTrackingInterface`. 
+Analysis modules are tracked as [analysis module types](analysis_module_type.md) through the interface `ace.system.analysis_module_tracking.AnalysisModuleTrackingInterface`. 
 
 Analysis modules start by registering with the system. Multiple instances of the same analysis module can register as long as the version of the module remains the same. The keeps track of what analysis modules have been registered and have not expired or been invalidated.
 

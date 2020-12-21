@@ -1,6 +1,6 @@
 # Analysis Module Type
 
-An `ace.analysis.AnalysisModuleType` represents a type of analysis module type that can be registered and used to analyze observables. The specification of the type dictates things like 
+An **analysis module type** represents a *type* of analysis module that can be registered and used to analyze [observables](../design/observable.md). The specification of the type determines 
 
 - what observables it is interested in analyzing.
 - what other analysis modules it depends on.

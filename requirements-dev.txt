@@ -1,3 +1,4 @@
 black
 mkdocs
 mkdocs-awesome-pages-plugin
+pytest

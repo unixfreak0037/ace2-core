@@ -88,13 +88,13 @@ class TimeoutRLock:
         self.count = 1
         return True
 
-    def start_timeout(self, lock_timeout: int):
+    def start_timeout(self, lock_timeout: float):
         logging.debug(f"starting lock id({self}) timeout for {lock_timeout} seconds")
         # XXX should this be a daemon thread?
         self.timeout_monitor = threading.Thread(target=self.monitor_timeout, args=(lock_timeout,))
         self.timeout_monitor.start()
 
-    def monitor_timeout(self, lock_timeout: int):
+    def monitor_timeout(self, lock_timeout: float):
         with self.condition:
             # wait until this many seconds have expired OR the lock is released
             # XXX use short times to check for changes
@@ -162,14 +162,14 @@ class ThreadedLockingInterface(ThreadedInterface, LockingInterface):
     def track_wait_target(self, lock_id: str, owner_id: str):
         self.owner_wait_targets[owner_id] = lock_id
 
-    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[int] = None):
+    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[float] = None):
         self.lock_ownership[lock_id] = owner_id
         if lock_timeout:
             lock_timeout = datetime.datetime.now() + datetime.timedelta(seconds=lock_timeout)
         self.lock_timeouts[lock_id] = lock_timeout
 
     def acquire(
-        self, lock_id: str, owner_id: str, timeout: Optional[int] = None, lock_timeout: Optional[int] = None
+        self, lock_id: str, owner_id: str, timeout: Optional[float] = None, lock_timeout: Optional[float] = None
     ) -> bool:
         lock = self.locks.get(lock_id)
         if not lock:

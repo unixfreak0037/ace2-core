@@ -1,7 +1,6 @@
 SQLAlchemy
-pytest
 python-dateutil
 pytz
-rpyc
 tld
 tzlocal
+fastapi[all]

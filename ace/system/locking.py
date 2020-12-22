@@ -134,12 +134,12 @@ class LockingInterface(ACESystemInterface):
     def track_wait_target(self, lock_id: str, owner_id: str):
         raise NotImplementedError()
 
-    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[int] = None):
+    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[float] = None):
         raise NotImplementedError()
 
     # lock must be re-entrant
     def acquire(
-        self, lock_id: str, owner_id: str, timeout: Union[int, float, None] = None, lock_timeout: Optional[int] = None
+        self, lock_id: str, owner_id: str, timeout: Optional[float] = None, lock_timeout: Optional[float] = None
     ) -> bool:
         raise NotImplementedError()
 
@@ -171,7 +171,7 @@ def clear_wait_target(owner_id: str):
     track_wait_target(None, owner_id)
 
 
-def track_lock_acquire(lock_id: str, owner_id: str, lock_timeout: Optional[int] = None):
+def track_lock_acquire(lock_id: str, owner_id: str, lock_timeout: Optional[float] = None):
     assert isinstance(lock_id, str)
     assert isinstance(owner_id, str)
     get_system().locking.track_lock_acquire(lock_id, owner_id, lock_timeout)
@@ -197,12 +197,18 @@ def acquire(
     lock_id: str,
     owner_id: Optional[str] = None,
     timeout: Union[int, float, None] = None,
-    lock_timeout: Optional[int] = None,
+    lock_timeout: Union[int, float, None] = None,
 ) -> bool:
     assert isinstance(lock_id, str)
     assert owner_id is None or isinstance(owner_id, str)
-    assert timeout is None or isinstance(timeout, int) or isinstance(timeout, float)
-    assert lock_timeout is None or isinstance(lock_timeout, int)
+    assert timeout is None or isinstance(timeout, float) or isinstance(timeout, int)
+    assert lock_timeout is None or isinstance(lock_timeout, float) or isinstance(lock_timeout, int)
+
+    if isinstance(timeout, int):
+        timeout = float(timeout)
+
+    if isinstance(lock_timeout, int):
+        lock_timeout = float(lock_timeout)
 
     # if we don't pass in an owner_id then we use a default which is based on hostname, process id and thread id
     if owner_id is None:
@@ -246,7 +252,7 @@ def release(lock_id: str, owner_id: Optional[str] = None) -> bool:
 
 
 @contextmanager
-def lock(lock_id: str, timeout: Optional[int] = None, lock_timeout: Optional[int] = None):
+def lock(lock_id: str, timeout: Optional[float] = None, lock_timeout: Optional[float] = None):
     try:
         lock_result = acquire(lock_id, timeout=timeout, lock_timeout=lock_timeout)
 

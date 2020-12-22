@@ -6,75 +6,116 @@ import threading
 
 from typing import Union, Optional
 
-from ace.system.distributed import get_distributed_connection
+from ace.system import get_system
 from ace.system.locking import LockingInterface
 from ace.system.threaded import ThreadedLockingInterface
 
-import rpyc
+from fastapi import FastAPI
+import requests
 
-# XXX
-logging.getLogger("DISTRIBUTEDLOCKINGINTERFACE/12345").setLevel(logging.ERROR)
+app = FastAPI()
+distributed_interface = None
 
 
-class DistributedLockingInterfaceService(ThreadedLockingInterface, rpyc.Service):
-    def exposed_get_lock_owner(self, lock_id: str) -> Union[str, None]:
-        return self.get_lock_owner(lock_id)
+@app.get("/get_lock_owner/{lock_id}")
+def get_lock_owner(lock_id: str):
+    return {"result": distributed_interface.get_lock_owner(lock_id)}
 
-    def exposed_get_owner_wait_target(self, owner_id: str) -> Union[str, None]:
-        return self.get_owner_wait_target(owner_id)
 
-    def exposed_track_wait_target(self, lock_id: str, owner_id: str):
-        self.track_wait_target(lock_id, owner_id)
+@app.get("/get_owner_wait_target/{owner_id}")
+def get_owner_wait_target(owner_id: str):
+    return {"result": distributed_interface.get_owner_wait_target(owner_id)}
 
-    def exposed_track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[int] = None):
-        self.track_lock_acquire(lock_id, owner_id, lock_timeout)
 
-    def exposed_acquire(
-        self, lock_id: str, owner_id: str, timeout: Optional[int] = None, lock_timeout: Optional[int] = None
-    ) -> bool:
-        return self.acquire(lock_id, owner_id, timeout, lock_timeout)
+@app.put("/track_wait_target/{lock_id}/{owner_id}")
+def track_wait_target(lock_id: str, owner_id: str):
+    distributed_interface.track_wait_target(lock_id, owner_id)
 
-    def exposed_release(self, lock_id: str, owner_id: str) -> bool:
-        return self.release(lock_id, owner_id)
 
-    def exposed_is_locked(self, lock_id: str) -> bool:
-        return self.is_locked(lock_id)
+@app.put("/track_lock_acquire/{lock_id}/{owner_id}")
+def track_lock_acquire(lock_id: str, owner_id: str, lock_timeout: Optional[float] = None):
+    return {"result": distributed_interface.track_lock_acquire(lock_id, owner_id, lock_timeout)}
 
-    def exposed_reset(self):
-        self.reset()
+
+@app.get("/acquire/{lock_id}/{owner_id}")
+def acquire(lock_id: str, owner_id: str, timeout: Optional[float] = None, lock_timeout: Optional[float] = None):
+    return {"result": distributed_interface.acquire(lock_id, owner_id, timeout, lock_timeout)}
+
+
+@app.put("/release/{lock_id}/{owner_id}")
+def release(lock_id: str, owner_id: str):
+    return {"result": distributed_interface.release(lock_id, owner_id)}
+
+
+@app.get("/is_locked/{lock_id}")
+def is_locked(lock_id: str):
+    return {"result": distributed_interface.is_locked(lock_id)}
+
+
+@app.post("/reset")
+def reset():
+    return distributed_interface.reset()
+
+
+@app.on_event("startup")
+def startup_event():
+    global distributed_threading
+    distributed_threading = ThreadedLockingInterface()
 
 
 class DistributedLockingInterfaceClient(LockingInterface):
+
+    client = requests
+
     def get_lock_owner(self, lock_id: str) -> Union[str, None]:
-        with get_distributed_connection() as connection:
-            return connection.root.get_lock_owner(lock_id)
+        result = self.client.get(f"/get_lock_owner/{lock_id}")
+        result.raise_for_status()
+        return result.json()["result"]
 
     def get_owner_wait_target(self, owner_id: str) -> Union[str, None]:
-        with get_distributed_connection() as connection:
-            return connection.root.get_owner_wait_target(owner_id)
+        result = self.client.get(f"/get_owner_wait_target/{owner_id}")
+        result.raise_for_status()
+        return result.json()["result"]
 
     def track_wait_target(self, lock_id: str, owner_id: str):
-        with get_distributed_connection() as connection:
-            connection.root.track_wait_target(lock_id, owner_id)
+        result = self.client.put(f"/track_wait_target/{lock_id}/{owner_id}")
+        result.raise_for_status()
 
-    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[int] = None):
-        with get_distributed_connection() as connection:
-            connection.root.track_lock_acquire(lock_id, owner_id, lock_timeout)
+    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[float] = None):
+        params = None
+        if lock_timeout is not None:
+            params = {"lock_timeout": lock_timeout}
+
+        result = self.client.put(f"/track_lock_acquire/{lock_id}/{owner_id}", params=params)
+        result.raise_for_status()
 
     def acquire(
-        self, lock_id: str, owner_id: str, timeout: Optional[int] = None, lock_timeout: Optional[int] = None
+        self, lock_id: str, owner_id: str, timeout: Optional[float] = None, lock_timeout: Optional[float] = None
     ) -> bool:
-        with get_distributed_connection() as connection:
-            return connection.root.acquire(lock_id, owner_id, timeout, lock_timeout)
+        params = {}
+        if timeout is not None:
+            params["timeout"] = timeout
+        if lock_timeout is not None:
+            params["lock_timeout"] = lock_timeout
+
+        result = self.client.get(f"/acquire/{lock_id}/{owner_id}", params=params)
+        try:
+            result.raise_for_status()
+        except:
+            breakpoint()
+
+        return result.json()["result"]
 
     def release(self, lock_id: str, owner_id: str) -> bool:
-        with get_distributed_connection() as connection:
-            return connection.root.release(lock_id, owner_id)
+        result = self.client.put(f"/release/{lock_id}/{owner_id}")
+        result.raise_for_status()
+        return result.json()["result"]
 
     def is_locked(self, lock_id: str) -> bool:
-        with get_distributed_connection() as connection:
-            return connection.root.is_locked(lock_id)
+        result = self.client.get(f"/is_locked/{lock_id}")
+        result.raise_for_status()
+        return result.json()["result"]
 
     def reset(self):
-        with get_distributed_connection() as connection:
-            connection.root.reset()
+        result = self.client.post(f"/reset")
+        result.raise_for_status()

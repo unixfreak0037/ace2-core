@@ -1,7 +1,5 @@
 # Analysis Requests
 
-All requests to perform analysis are made through [analysis request]() objects and tracked by the `ace.system.analysis_request.AnalysisRequestTrackingInterface`
-
 There are three types of analysis requests.
 
 ## Root Analysis Requests

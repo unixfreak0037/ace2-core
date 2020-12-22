@@ -8,7 +8,7 @@ from typing import Union, Optional
 
 from ace.system import get_system
 from ace.system.locking import LockingInterface
-from ace.system.threaded import ThreadedLockingInterface
+from ace.system.threaded.locking import ThreadedLockingInterface
 
 from fastapi import FastAPI
 import requests

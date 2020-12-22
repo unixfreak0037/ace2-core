@@ -6,7 +6,8 @@
 class ACESystemInterface:
     """The base class that all system interfaces inherit from."""
 
-    pass
+    def reset(self):
+        pass
 
 
 class ACESystem:
@@ -33,6 +34,12 @@ class ACESystem:
         self.request_tracking.reset()
         self.storage.reset()
         self.work_queue.reset()
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
 
 
 # the global system object that contains references to all the interfaces

@@ -11,35 +11,3 @@ class ThreadedInterface:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sync_lock = threading.RLock()
-
-
-from ace.system import ACESystem, set_system
-from ace.system.threaded.alerting import ThreadedAlertTrackingInterface
-from ace.system.threaded.analysis_module import ThreadedAnalysisModuleTrackingInterface
-from ace.system.threaded.analysis_request import ThreadedAnalysisRequestTrackingInterface
-from ace.system.threaded.analysis_tracking import ThreadedAnalysisTrackingInterface
-from ace.system.threaded.events import ThreadedEventInterafce
-from ace.system.threaded.config import ThreadedConfigurationInterface
-from ace.system.threaded.caching import ThreadedCachingInterface
-from ace.system.threaded.locking import ThreadedLockingInterface
-from ace.system.threaded.observables import ThreadedObservableInterface
-from ace.system.threaded.storage import ThreadedStorageInterface
-from ace.system.threaded.work_queue import ThreadedWorkQueueManagerInterface
-
-
-class ThreadedACESystem(ACESystem):
-    work_queue = ThreadedWorkQueueManagerInterface()
-    request_tracking = ThreadedAnalysisRequestTrackingInterface()
-    module_tracking = ThreadedAnalysisModuleTrackingInterface()
-    analysis_tracking = ThreadedAnalysisTrackingInterface()
-    caching = ThreadedCachingInterface()
-    storage = ThreadedStorageInterface()
-    locking = ThreadedLockingInterface()
-    observable = ThreadedObservableInterface()
-    config = ThreadedConfigurationInterface()
-    alerting = ThreadedAlertTrackingInterface()
-    events = ThreadedEventInterafce()
-
-
-def initialize():
-    set_system(ThreadedACESystem())

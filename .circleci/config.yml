@@ -1,0 +1,70 @@
+version: 2.1
+
+jobs:
+  lint_and_format_checks:
+    docker:
+      - image circleci/python:3.9.1
+    steps:
+      - checkout
+      - run:
+          name: Install Requirements
+          command: |
+            pip install -r requirements.txt
+            pip install -r requirements-dev.txt
+      - run:
+          name: Black Format Check
+          command: black --check ace/
+  unit_tests:
+    docker:
+      - image circleci/python:3.9.1
+    steps:
+      - checkout
+      - run:
+          name: Install Requirements
+          command: |
+            pip install -r requirements.txt
+            pip install -r requirements-dev.txt
+      - run:
+          name: Run unit tests
+          command: pytest -v -m unit
+  integration_tests:
+    docker:
+      - image circleci/python:3.9.1
+    steps:
+      - checkout
+      - run:
+          name: Install Requirements
+          command: |
+            pip install -r requirements.txt
+            pip install -r requirements-dev.txt
+      - run:
+          name: Run Integration Tests
+          command: pytest -v -m integration
+  system_tests:
+    docker:
+      - image circleci/python:3.9.1
+    steps:
+      - checkout
+      - run:
+          name: Install Requirements
+          command: |
+            pip install -r requirements.txt
+            pip install -r requirements-dev.txt
+      - run:
+          name: Run Integration Tests
+          command: pytest -v -m system
+
+workflows:
+  version: 2.1
+  lint_and_test:
+    jobs:
+      - lint_and_format_checks
+      - unit_tests
+      - integration_tests
+          requires:
+            - lint_and_format_checks
+            - unit_tests
+      - system_tests
+          requires:
+            - lint_and_format_checks
+            - unit_tests

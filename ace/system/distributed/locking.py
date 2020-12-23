@@ -56,6 +56,7 @@ def release(lock_id: str, owner_id: str):
 def is_locked(lock_id: str):
     return {"result": distributed_interface.is_locked(lock_id)}
 
+
 @app.get("/get_lock_count")
 def get_lock_count():
     return {"result": distributed_interface.get_lock_count()}

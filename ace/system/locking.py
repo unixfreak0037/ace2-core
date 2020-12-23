@@ -134,10 +134,9 @@ class LockingInterface(ACESystemInterface):
     def track_wait_target(self, lock_id: str, owner_id: str):
         raise NotImplementedError()
 
-    def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[float] = None):
+    def clear_wait_target(self, owner_id: str):
         raise NotImplementedError()
 
-    # lock must be re-entrant
     def acquire(
         self, lock_id: str, owner_id: str, timeout: Optional[float] = None, lock_timeout: Optional[float] = None
     ) -> bool:
@@ -147,6 +146,14 @@ class LockingInterface(ACESystemInterface):
         raise NotImplementedError()
 
     def is_locked(self, lock_id: str) -> bool:
+        raise NotImplementedError()
+
+    #
+    # instrumentation
+    #
+
+    def get_lock_count(self) -> int:
+        """Returns the total number of locks currently managed."""
         raise NotImplementedError()
 
 
@@ -168,13 +175,7 @@ def track_wait_target(lock_id: Union[str, None], owner_id: str):
 
 def clear_wait_target(owner_id: str):
     assert isinstance(owner_id, str)
-    track_wait_target(None, owner_id)
-
-
-def track_lock_acquire(lock_id: str, owner_id: str, lock_timeout: Optional[float] = None):
-    assert isinstance(lock_id, str)
-    assert isinstance(owner_id, str)
-    get_system().locking.track_lock_acquire(lock_id, owner_id, lock_timeout)
+    get_system().locking.clear_wait_target(owner_id)
 
 
 def is_locked(lock_id: str) -> bool:
@@ -186,6 +187,9 @@ def default_owner_id():
     import socket, os, threading
 
     return f"{socket.gethostname()}-{os.getpid()}-{threading.get_ident()}"
+
+def get_lock_count() -> int:
+    return get_system().locking.get_lock_count()
 
 
 # timeout > 0 --> wait for timeout seconds
@@ -232,9 +236,6 @@ def acquire(
             # still didn't get it after the wait period
             clear_wait_target(owner_id)
             return False
-
-    # and now the lock is held
-    track_lock_acquire(lock_id, owner_id, lock_timeout)
 
     # and we are no longer waiting
     clear_wait_target(owner_id)

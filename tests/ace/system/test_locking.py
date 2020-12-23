@@ -8,6 +8,7 @@ from ace.system.locking import (
     Lockable,
     acquire,
     default_owner_id,
+    get_lock_count,
     get_lock_owner,
     is_locked,
     lock,
@@ -47,6 +48,14 @@ def test_lockable():
 def test_acquire_release():
     assert acquire(LOCK_1)
     release(LOCK_1)
+
+@pytest.mark.integration
+def test_lock_delete():
+    assert get_lock_count() == 0
+    assert acquire(LOCK_1)
+    assert get_lock_count() == 1
+    release(LOCK_1)
+    assert get_lock_count() == 0
 
 
 @pytest.mark.integration
@@ -112,11 +121,14 @@ def test_deadlock():
     deadlock_count = 0
 
     step_1 = threading.Event()
+    lock_1_acquired = threading.Event()
 
     def _t1():
         nonlocal deadlock_count
         acquire(LOCK_1)
-        step_1.wait(3)
+        lock_1_acquired.set()
+        step_1.wait(10)
+        # at this point both LOCK_1 and LOCK_2 are locked
         try:
             acquire(LOCK_2, timeout=1)
         except DeadlockException:
@@ -128,8 +140,12 @@ def test_deadlock():
     def _t2():
         nonlocal deadlock_count
         acquire(LOCK_2)
+        # wait until lock 1 is acquired
+        lock_1_acquired.wait(3)
+        # at this point both locks are locked, now release both threads
         step_1.set()
         try:
+            # one of these should deadlock on the other
             acquire(LOCK_1, timeout=1)
         except DeadlockException:
             deadlock_count += 1
@@ -145,7 +161,7 @@ def test_deadlock():
 
 
 @pytest.mark.integration
-def test_lock_timeout():
+def test_lock_immediate_timeout():
     # first we acquire a lock on another thread that times out immediately
     step_1 = threading.Event()
     step_2 = threading.Event()
@@ -156,13 +172,13 @@ def test_lock_timeout():
         nonlocal release_result
         acquire(LOCK_1, lock_timeout=0)
         step_1.set()
-        step_2.wait()
+        step_2.wait(3)
         # this should return False since we don't own the lock here
         release_result = release(LOCK_1)
 
     t1 = threading.Thread(target=_t1)
     t1.start()
-    step_1.wait()
+    step_1.wait(3)
 
     # now we should be able to immediately acquire lock_1
     assert acquire(LOCK_1, timeout=1)
@@ -170,7 +186,37 @@ def test_lock_timeout():
 
     # let the thread finish
     step_2.set()
-    t1.join()
+    t1.join(3)
+
+    assert release_result is False
+
+@pytest.mark.integration
+def test_lock_eventual_timeout():
+    # first we acquire a lock on another thread that times out
+    step_1 = threading.Event()
+    step_2 = threading.Event()
+
+    release_result = None
+
+    def _t1():
+        nonlocal release_result
+        acquire(LOCK_1, lock_timeout=0.01)
+        step_1.set()
+        step_2.wait(3)
+        # this should return False since we don't own the lock here
+        release_result = release(LOCK_1)
+
+    t1 = threading.Thread(target=_t1)
+    t1.start()
+    step_1.wait(3)
+
+    # now we should be able to immediately acquire lock_1
+    assert acquire(LOCK_1, timeout=1)
+    release(LOCK_1)
+
+    # let the thread finish
+    step_2.set()
+    t1.join(3)
 
     assert release_result is False
 
@@ -179,6 +225,12 @@ def test_lock_timeout():
 def test_release_expired_lock():
     acquire(LOCK_1, lock_timeout=0)
     assert not release(LOCK_1)
+
+@pytest.mark.integration
+def test_delete_expired_lock():
+    assert get_lock_count() == 0
+    acquire(LOCK_1, lock_timeout=0)
+    assert get_lock_count() == 0
 
 
 @pytest.mark.integration
@@ -243,7 +295,8 @@ def test_locking_contest(lock_count, timeout, verify_result):
                         hit += 1
                     else:
                         miss += 1
-                except DeadlockException:
+                except DeadlockException as e:
+                    logging.info(str(e))
                     deadlock_count += 1
 
             for lock in acquired_locks:

@@ -9,6 +9,7 @@ import os.path
 import random
 import re
 import sys
+import threading
 import time
 import uuid
 import warnings
@@ -311,13 +312,21 @@ def initialize_database():
     # **get_sqlalchemy_database_options('ace'))
 
     # TODO get this from configuration?
-    # engine = create_engine('sqlite:///ace.db')
-    engine = create_engine("sqlite://")
+    if os.path.exists("ace.db"):
+        os.remove("ace.db")
+    engine = create_engine("sqlite:///ace.db")
+
+    # running this out of memory does not work due to the multithreading
+    # each connection gets its own thread (thanks to session scoping)
+    # and this in-memory db only exists for the connection its on
+    # engine = create_engine("sqlite://")
 
     @event.listens_for(engine, "connect")
     def connect(dbapi_connection, connection_record):
         pid = os.getpid()
+        tid = threading.get_ident()
         connection_record.info["pid"] = pid
+        connection_record.info["tid"] = tid
 
         # XXX check for sqlite
         cursor = dbapi_connection.cursor()
@@ -331,6 +340,15 @@ def initialize_database():
             connection_record.connection = connection_proxy.connection = None
             message = (
                 f"connection record belongs to pid {connection_record.info['pid']} attempting to check out in pid {pid}"
+            )
+            logging.debug(message)
+            raise exc.DisconnectionError(message)
+
+        tid = threading.get_ident()
+        if connection_record.info["tid"] != tid:
+            connection_record.connection = connection_proxy.connection = None
+            message = (
+                f"connection record belongs to tid {connection_record.info['tid']} attempting to check out in tid {tid}"
             )
             logging.debug(message)
             raise exc.DisconnectionError(message)

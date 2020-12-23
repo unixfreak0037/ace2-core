@@ -221,9 +221,14 @@ def test_get_next_analysis_request_locking():
     # a root analysis with a observable has been submitted and we've got a reference to the request
 
     def _lock(request, event, lock_acquired_event):
-        with request.lock():
-            lock_acquired_event.set()
-            event.wait(3)
+        try:
+            with request.lock():
+                lock_acquired_event.set()
+                event.wait(3)
+        except Exception as e:
+            logging.error(str(e))
+            breakpoint()
+            pass
 
     # lock the request on another thread
     event = threading.Event()

@@ -32,6 +32,11 @@ def track_wait_target(lock_id: str, owner_id: str):
     distributed_interface.track_wait_target(lock_id, owner_id)
 
 
+@app.put("/clear_wait_target/{owner_id}")
+def clear_wait_target(owner_id: str):
+    distributed_interface.clear_wait_target(owner_id)
+
+
 @app.put("/track_lock_acquire/{lock_id}/{owner_id}")
 def track_lock_acquire(lock_id: str, owner_id: str, lock_timeout: Optional[float] = None):
     return {"result": distributed_interface.track_lock_acquire(lock_id, owner_id, lock_timeout)}
@@ -50,6 +55,10 @@ def release(lock_id: str, owner_id: str):
 @app.get("/is_locked/{lock_id}")
 def is_locked(lock_id: str):
     return {"result": distributed_interface.is_locked(lock_id)}
+
+@app.get("/get_lock_count")
+def get_lock_count():
+    return {"result": distributed_interface.get_lock_count()}
 
 
 @app.post("/reset")
@@ -81,6 +90,10 @@ class DistributedLockingInterfaceClient(LockingInterface):
         result = self.client.put(f"/track_wait_target/{lock_id}/{owner_id}")
         result.raise_for_status()
 
+    def clear_wait_target(self, owner_id):
+        result = self.client.put(f"/clear_wait_target/{owner_id}")
+        result.raise_for_status
+
     def track_lock_acquire(self, lock_id: str, owner_id: str, lock_timeout: Optional[float] = None):
         params = None
         if lock_timeout is not None:
@@ -99,11 +112,7 @@ class DistributedLockingInterfaceClient(LockingInterface):
             params["lock_timeout"] = lock_timeout
 
         result = self.client.get(f"/acquire/{lock_id}/{owner_id}", params=params)
-        try:
-            result.raise_for_status()
-        except:
-            breakpoint()
-
+        result.raise_for_status()
         return result.json()["result"]
 
     def release(self, lock_id: str, owner_id: str) -> bool:
@@ -113,6 +122,11 @@ class DistributedLockingInterfaceClient(LockingInterface):
 
     def is_locked(self, lock_id: str) -> bool:
         result = self.client.get(f"/is_locked/{lock_id}")
+        result.raise_for_status()
+        return result.json()["result"]
+
+    def get_lock_count(self) -> int:
+        result = self.client.get(f"/get_lock_count")
         result.raise_for_status()
         return result.json()["result"]
 

@@ -7,6 +7,7 @@ from ace.system.database.analysis_module import DatabaseAnalysisModuleTrackingIn
 from ace.system.database.analysis_request import DatabaseAnalysisRequestTrackingInterface
 from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterface
 from ace.system.database.caching import DatabaseCachingInterface
+from ace.system.database.locking import DatabaseLockingInterface
 from ace.system.database.observables import DatabaseObservableInterface
 from ace.system.distributed.locking import DistributedLockingInterfaceClient
 from ace.system.threaded.alerting import ThreadedAlertTrackingInterface
@@ -43,7 +44,7 @@ class DatabaseACESystem(ACESystem):
     caching = DatabaseCachingInterface()
     config = ThreadedConfigurationInterface()
     events = ThreadedEventInterafce()
-    locking = ThreadedLockingInterface()
+    locking = DatabaseLockingInterface()
     module_tracking = DatabaseAnalysisModuleTrackingInterface()
     observable = DatabaseObservableInterface()
     request_tracking = DatabaseAnalysisRequestTrackingInterface()
@@ -59,8 +60,8 @@ class DatabaseACESystem(ACESystem):
         self._rebuild_database()
 
     def reset(self):
-        super().reset()
         self._rebuild_database()
+        super().reset()
 
 class DistributedACESystem(ACESystem):
     alerting = ThreadedAlertTrackingInterface()

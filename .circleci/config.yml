@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   lint_and_format_checks:
     docker:
-      - image circleci/python:3.9.1
+      - image: circleci/python:3.9.1
     steps:
       - checkout
       - run:
@@ -16,7 +16,7 @@ jobs:
           command: black --check ace/
   unit_tests:
     docker:
-      - image circleci/python:3.9.1
+      - image: circleci/python:3.9.1
     steps:
       - checkout
       - run:
@@ -29,7 +29,7 @@ jobs:
           command: pytest -v -m unit
   integration_tests:
     docker:
-      - image circleci/python:3.9.1
+      - image: circleci/python:3.9.1
     steps:
       - checkout
       - run:
@@ -42,7 +42,7 @@ jobs:
           command: pytest -v -m integration
   system_tests:
     docker:
-      - image circleci/python:3.9.1
+      - image: circleci/python:3.9.1
     steps:
       - checkout
       - run:

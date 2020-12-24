@@ -145,7 +145,7 @@ def process_analysis_request(ar: AnalysisRequest):
                                     #
                                     # if we can get the AR and lock it it means it's still in a queue waiting
                                     # so we can tell that AR to update the details of this analysis as well when it's done
-                                    
+
                                     # we create a new analysis request
                                     new_ar = observable.create_analysis_request(amt)
                                     track_analysis_request(new_ar)
@@ -162,9 +162,9 @@ def process_analysis_request(ar: AnalysisRequest):
 
                         except Exception as e:  # TODO what can be thrown here?
                             raise e
-                            #logging.fatal(f"unknown error: {e}")
-                            #breakpoint()  # XXX if debug
-                            #continue
+                            # logging.fatal(f"unknown error: {e}")
+                            # breakpoint()  # XXX if debug
+                            # continue
 
                     # is this analysis in the cache?
                     cached_result = get_cached_analysis_result(observable, amt)

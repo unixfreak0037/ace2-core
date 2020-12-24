@@ -25,6 +25,7 @@ from ace.system.threaded.work_queue import ThreadedWorkQueueManagerInterface
 import fastapi.testclient
 import pytest
 
+
 class ThreadedACESystem(ACESystem):
     work_queue = ThreadedWorkQueueManagerInterface()
     request_tracking = ThreadedAnalysisRequestTrackingInterface()
@@ -37,6 +38,7 @@ class ThreadedACESystem(ACESystem):
     config = ThreadedConfigurationInterface()
     alerting = ThreadedAlertTrackingInterface()
     events = ThreadedEventInterafce()
+
 
 class DatabaseACESystem(ACESystem):
     alerting = ThreadedAlertTrackingInterface()
@@ -63,6 +65,7 @@ class DatabaseACESystem(ACESystem):
         self._rebuild_database()
         super().reset()
 
+
 class DistributedACESystem(ACESystem):
     alerting = ThreadedAlertTrackingInterface()
     analysis_tracking = ThreadedAnalysisTrackingInterface()
@@ -77,7 +80,9 @@ class DistributedACESystem(ACESystem):
     work_queue = ThreadedWorkQueueManagerInterface()
     locking.client = fastapi.testclient.TestClient(ace.system.distributed.locking.app)
 
+
 ace.system.distributed.locking.distributed_interface = ThreadedLockingInterface()
+
 
 @pytest.fixture(
     autouse=True,

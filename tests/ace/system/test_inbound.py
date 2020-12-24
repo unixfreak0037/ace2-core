@@ -471,11 +471,13 @@ def test_cancel_analysis():
     # we should not have any new work requests since the analysis was cancelled
     assert get_queue_size(amt) == 0
 
+
 @pytest.mark.integration
 def test_root_analysis_default_expiration():
     # by default a root should not expire
     root = RootAnalysis()
     assert not root.is_expired()
+
 
 @pytest.mark.integration
 def test_root_analysis_explicit_expiration():
@@ -483,12 +485,14 @@ def test_root_analysis_explicit_expiration():
     root = RootAnalysis(expires=True)
     assert root.is_expired()
 
+
 @pytest.mark.integration
 def test_root_analysis_expiration_detection_points():
     # but a root will not expire if it has a detection point
     root = RootAnalysis(expires=True)
-    root.add_detection_point('test')
+    root.add_detection_point("test")
     assert not root.is_expired()
+
 
 @pytest.mark.integration
 def test_root_analysis_expiration_processing():
@@ -497,53 +501,55 @@ def test_root_analysis_expiration_processing():
     root.submit()
     assert not get_root_analysis(root.uuid)
 
+
 @pytest.mark.integration
 def test_root_analysis_expiration_processing_detection_points():
     # but not if it has a detection point
     root = RootAnalysis(expires=True)
-    root.add_detection_point('test')
+    root.add_detection_point("test")
     root.submit()
     assert get_root_analysis(root.uuid)
+
 
 @pytest.mark.integration
 def test_root_analysis_expiration_processing_outstanding_requests():
     # and not if it has any outstanding analysis requests
-    amt = register_analysis_module_type(AnalysisModuleType('test', ''))
+    amt = register_analysis_module_type(AnalysisModuleType("test", ""))
     root = RootAnalysis(expires=True)
-    observable = root.add_observable('test', 'test')
+    observable = root.add_observable("test", "test")
     root.submit()
     assert get_root_analysis(root.uuid)
-    request = get_next_analysis_request('test', amt, 0)
+    request = get_next_analysis_request("test", amt, 0)
     # analysis requests have still not completed yet...
     assert get_root_analysis(root.uuid)
     request.initialize_result()
-    request.modified_observable.add_analysis(type=amt, details={'hello': "world"})
+    request.modified_observable.add_analysis(type=amt, details={"hello": "world"})
     request.submit()
     # should be gone now because the analysis requests have completed
     assert not get_root_analysis(root.uuid)
 
+
 @pytest.mark.integration
 def test_root_analysis_expiration_processing_outstanding_root_dependency():
     # and then in this case we have one root that depends on the analysis of another root
-    amt = register_analysis_module_type(AnalysisModuleType(name='test', description='', cache_ttl=300))
+    amt = register_analysis_module_type(AnalysisModuleType(name="test", description="", cache_ttl=300))
     root = RootAnalysis(expires=True)
-    observable = root.add_observable('test', 'test')
+    observable = root.add_observable("test", "test")
     root.submit()
     assert get_root_analysis(root.uuid)
     root_2 = RootAnalysis(expires=True)
-    observable_2 = root_2.add_observable('test', 'test')
+    observable_2 = root_2.add_observable("test", "test")
     root_2.submit()
     # at this point root_2 has piggy-backed on root
     assert get_root_analysis(root_2.uuid)
     # complete the first root
-    request = get_next_analysis_request('test', amt, 0)
+    request = get_next_analysis_request("test", amt, 0)
     # analysis requests have still not completed yet...
     assert get_root_analysis(root.uuid)
     assert get_root_analysis(root_2.uuid)
     request.initialize_result()
-    request.modified_observable.add_analysis(type=amt, details={'hello': "world"})
+    request.modified_observable.add_analysis(type=amt, details={"hello": "world"})
     request.submit()
     # now they should both be gone because they were both set to expire
     assert not get_root_analysis(root.uuid)
     assert not get_root_analysis(root_2.uuid)
-

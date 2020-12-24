@@ -12,6 +12,7 @@ from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModule
 from ace.system.constants import TRACKING_STATUS_NEW, TRACKING_STATUS_QUEUED, SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS
 from ace.system.locking import Lockable, acquire, release
 
+
 class AnalysisRequest(Lockable):
     """Represents a request to analyze a single observable or a new analysis."""
 
@@ -65,7 +66,6 @@ class AnalysisRequest(Lockable):
         # the result of the analysis
         self.original_root = None
         self.modified_root = None
-
 
     def __eq__(self, other):
         if not isinstance(other, AnalysisRequest):

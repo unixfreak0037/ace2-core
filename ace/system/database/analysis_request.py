@@ -38,7 +38,9 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         ace.db.commit()
 
     def link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest):
-        source_request = ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
+        source_request = (
+            ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
+        )
         if source_request is None:
             return
 
@@ -50,7 +52,9 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         ace.db.commit()
 
     def get_linked_analysis_requests(self, source: AnalysisRequest) -> list[AnalysisRequest]:
-        source_request = ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
+        source_request = (
+            ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
+        )
         if source_request is None:
             return None
 

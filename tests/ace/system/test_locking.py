@@ -49,6 +49,7 @@ def test_acquire_release():
     assert acquire(LOCK_1)
     release(LOCK_1)
 
+
 @pytest.mark.integration
 def test_lock_delete():
     assert get_lock_count() == 0
@@ -190,6 +191,7 @@ def test_lock_immediate_timeout():
 
     assert release_result is False
 
+
 @pytest.mark.integration
 def test_lock_eventual_timeout():
     # first we acquire a lock on another thread that times out
@@ -225,6 +227,7 @@ def test_lock_eventual_timeout():
 def test_release_expired_lock():
     acquire(LOCK_1, lock_timeout=0)
     assert not release(LOCK_1)
+
 
 @pytest.mark.integration
 def test_delete_expired_lock():

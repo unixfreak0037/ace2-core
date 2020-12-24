@@ -23,6 +23,9 @@ from sqlalchemy import (
     text,
 )
 
+from sqlalchemy.orm import relationship
+from sqlalchemy.schema import Table
+
 
 class RootAnalysisTracking(Base):
 
@@ -73,6 +76,14 @@ class AnalysisModuleTracking(Base):
 
     json_data = Column(Text, nullable=False)
 
+analysis_request_links = Table('analysis_request_links', Base.metadata,
+    Column( 'source_id', 
+        String(36), ForeignKey("analysis_request_tracking.id", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True
+    ),
+    Column( 'dest_id',
+        String(36), ForeignKey("analysis_request_tracking.id", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True
+    ))
+
 
 class AnalysisRequestTracking(Base):
 
@@ -92,7 +103,35 @@ class AnalysisRequestTracking(Base):
 
     cache_key = Column(String, nullable=True, index=True)
 
+    root_uuid = Column(String, nullable=False, index=True)
+
     json_data = Column(Text, nullable=False)
+
+    # https://docs.sqlalchemy.org/en/14/orm/basic_relationships.html#many-to-many
+    linked_requests = relationship("AnalysisRequestTracking", secondary=analysis_request_links,
+            primaryjoin=id == analysis_request_links.c.source_id,
+            secondaryjoin=id == analysis_request_links.c.dest_id)
+
+
+#class AnalysisRequestLink(Base):
+
+    #__tablename__ = "analysis_request_links"
+    #__table_args__ = {
+        #"mysql_engine": "InnoDB",
+        #"mysql_charset": "utf8mb4",
+    #}
+
+    #source_id = Column(
+        #String(36), ForeignKey("analysis_request_tracking.id", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True
+    #)
+
+    #source = relationship("AnalysisRequestTracking", foreign_keys='[AnalyisRequestLink.source_id]')
+
+    #dest_id = Column(
+        #String(36), ForeignKey("analysis_request_tracking.id", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True
+    #)
+
+    #dest = relationship("AnalysisRequestTracking", back_populates="linked_requests")
 
 
 class AnalysisResultCache(Base):

@@ -8,10 +8,10 @@ from ace.analysis import RootAnalysis, Analysis
 from ace.constants import *
 from ace.system.analysis_request import (
     AnalysisRequest,
-    AnalysisResult,
     delete_analysis_request,
     get_analysis_request_by_observable,
     get_analysis_request_by_request_id,
+    get_analysis_requests_by_root,
     get_expired_analysis_requests,
     process_expired_analysis_requests,
     track_analysis_request,
@@ -43,7 +43,7 @@ def test_is_observable_analysis_result():
     root = RootAnalysis()
     observable = root.add_observable(F_TEST, "1.2.3.4")
     request = observable.create_analysis_request(amt)
-    request.result = AnalysisResult(root, observable)
+    request.initialize_result()
     assert request.is_observable_analysis_result
 
 
@@ -75,8 +75,8 @@ def test_result_observables():
     request = observable.create_analysis_request(amt)
     root = get_root_analysis(root)
     observable = root.get_observable(observable)
-    request.result = AnalysisResult(root, observable)
-    analysis = request.result.observable.add_analysis(type=amt)
+    request.initialize_result()
+    analysis = request.modified_observable.add_analysis(type=amt)
     analysis.add_observable(F_TEST, TEST_2)
     # request.observables should return the observable in the request as well as any new observables in the analysis
     observables = sorted(request.observables, key=attrgetter("value"))
@@ -103,8 +103,10 @@ def test_track_analysis_request():
     request = root.create_analysis_request()
     track_analysis_request(request)
     assert get_analysis_request_by_request_id(request.id) == request
+    assert get_analysis_requests_by_root(root.uuid) == [request]
     assert delete_analysis_request(request.id)
     assert get_analysis_request_by_request_id(request.id) is None
+    assert not get_analysis_requests_by_root(root.uuid)
 
 
 @pytest.mark.integration

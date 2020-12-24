@@ -108,8 +108,8 @@ def test_cache_analysis_result():
     root = RootAnalysis()
     observable = root.add_observable("type", "value")
     request = observable.create_analysis_request(amt_1)
-    request.result = request.create_result()
-    analysis = request.result.observable.add_analysis(type=amt_1)
+    request.initialize_result()
+    analysis = request.modified_observable.add_analysis(type=amt_1)
 
     assert cache_analysis_result(request) is not None
     assert get_cached_analysis_result(observable, amt_1) == request
@@ -120,8 +120,8 @@ def test_nocache_analysis():
     root = RootAnalysis()
     observable = root.add_observable("type", "value")
     request = observable.create_analysis_request(amt_no_cache)
-    request.result = request.create_result()
-    analysis = request.result.observable.add_analysis(type=amt_no_cache)
+    request.initialize_result()
+    analysis = request.modified_observable.add_analysis(type=amt_no_cache)
 
     assert cache_analysis_result(request) is None
     assert get_cached_analysis_result(observable, amt_no_cache) is None
@@ -132,8 +132,8 @@ def test_cache_expiration():
     root = RootAnalysis()
     observable = root.add_observable("type", "value")
     request = observable.create_analysis_request(amt_fast_expire_cache)
-    request.result = request.create_result()
-    analysis = request.result.observable.add_analysis(type=amt_fast_expire_cache)
+    request.initialize_result()
+    analysis = request.modified_observable.add_analysis(type=amt_fast_expire_cache)
 
     assert cache_analysis_result(request) is not None
     # should have expired right away

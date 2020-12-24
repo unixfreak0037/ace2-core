@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import List, Union, Optional, Any
 
 import ace
+from ace.time import parse_datetime_string, utc_now
 from ace.json import JSONEncoder
 from ace.constants import *
 from ace.indicators import Indicator, IndicatorList
@@ -715,6 +716,23 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     def add_ioc(self, type_: str, value: str, status: str = "New", tags: List[str] = []):
         self.iocs.append(Indicator(type_, value, status=status, tags=tags))
 
+    def duplicate(self) -> "Analysis":
+        """Returns a new Analysis object that is a duplicate of this one with a new uuid and no root set."""
+        # first make sure the details are loaded if we need to
+        if self._details is None:
+            self._load_details()
+
+        # make the full copy of the object
+        result = copy.deepcopy(self)
+        # make a new uuid
+        result.id = str(uuid.uuid4())
+        # clear the root
+        result.root = None
+        # and mark it as not loaded
+        result._details_loaded = False
+        result._details_modified = True
+        return result
+
     def __str__(self):
         return f"Analysis({self.uuid},{self.type},{self.observable})"
 
@@ -950,7 +968,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
                 value = ace.LOCAL_TIMEZONE.localize(value)
             self._time = value
         elif isinstance(value, str):
-            self._time = parse_event_time(value)
+            self._time = parse_datetime_string(value)
         else:
             raise ValueError(
                 "time must be a datetime.datetime object or a string in the format "
@@ -1449,8 +1467,11 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             if before.get_analysis(amt):
                 continue
 
-            # add any missing analysis
-            self.add_analysis(analysis)
+            # why duplicate here?
+            # each analysis has a uuid that is tracked separately
+            # the duplicate creates a copy but with a new uuid so it becomes a new analysis object
+            # it also make sure the details are loaded and copied over
+            self.add_analysis(analysis.duplicate())
 
         return self
 
@@ -1540,6 +1561,7 @@ class RootAnalysis(Analysis, MergableObject):
         queue=None,
         instructions=None,
         version=0,
+        expires=None,
         *args,
         **kwargs,
     ):
@@ -1621,6 +1643,14 @@ class RootAnalysis(Analysis, MergableObject):
         # the reason why the analysis was cancelled
         self._analysis_cancelled_reason = None
 
+        # if this is set to True then this analyis will expire (be removed)
+        # if is_expired() returns True (see is_expired()) for the criteria
+        # the default is to not expire root analysis
+        # for systems that perform detection operations you would want to set this to True
+        self._expires = False
+        if expires is not None:
+            self.expires = expires
+
     #
     # the json property is used for internal storage
     #
@@ -1643,6 +1673,7 @@ class RootAnalysis(Analysis, MergableObject):
     KEY_INSTRUCTIONS = "instructions"
     KEY_ANALYSIS_CANCELLED = "analysis_cancelled"
     KEY_ANALYSIS_CANCELLED_REASON = "analysis_cancelled_reason"
+    KEY_EXPIRES = "expires"
 
     def to_dict(self):
         result = Analysis.to_dict(self)
@@ -1664,6 +1695,7 @@ class RootAnalysis(Analysis, MergableObject):
                 RootAnalysis.KEY_INSTRUCTIONS: self.instructions,
                 RootAnalysis.KEY_ANALYSIS_CANCELLED: self.analysis_cancelled,
                 RootAnalysis.KEY_ANALYSIS_CANCELLED_REASON: self.analysis_cancelled_reason,
+                RootAnalysis.KEY_EXPIRES: self.expires,
             }
         )
         return result
@@ -1699,6 +1731,7 @@ class RootAnalysis(Analysis, MergableObject):
         root.instructions = value[RootAnalysis.KEY_INSTRUCTIONS]
         root.analysis_cancelled = value[RootAnalysis.KEY_ANALYSIS_CANCELLED]
         root.analysis_cancelled_reason = value[RootAnalysis.KEY_ANALYSIS_CANCELLED_REASON]
+        root.expires = value[RootAnalysis.KEY_EXPIRES]
         return root
 
     @property
@@ -1820,12 +1853,40 @@ class RootAnalysis(Analysis, MergableObject):
                 value = ace.LOCAL_TIMEZONE.localize(value)
             self._event_time = value
         elif isinstance(value, str):
-            self._event_time = parse_event_time(value)
+            self._event_time = parse_datetime_string(value)
         else:
             raise ValueError(
                 "event_time must be a datetime.datetime object or a string in the format "
                 "%Y-%m-%d %H:%M:%S %z but you passed {}".format(type(value).__name__)
             )
+
+    @property
+    def expires(self) -> bool:
+        """Returns True if this root should eventually expire."""
+        return self._expires
+
+    @expires.setter
+    def expires(self, value: bool):
+        assert isinstance(value, bool)
+        self._expires = value
+
+    def is_expired(self):
+        """Returns True if this root has expired."""
+        from ace.system.analysis_request import get_analysis_requests_by_root
+
+        # is it set to expire
+        if not self.expires:
+            return False
+
+        # does it have any detection points?
+        if self.has_detection_points():
+            return False
+
+        # are there any outstanding analysis requests?
+        if get_analysis_requests_by_root(self.uuid):
+            return False
+
+        return True
 
     # override the summary property of the Analysis object to reflect the description
     @property
@@ -2381,6 +2442,7 @@ class RootAnalysis(Analysis, MergableObject):
         assert isinstance(after, RootAnalysis)
 
         if before.uuid != after.uuid:
+            breakpoint()
             logging.error(f"attempting to apply diff merge against two difference roots {before} and {after}")
             return None
 

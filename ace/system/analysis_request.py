@@ -12,41 +12,6 @@ from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModule
 from ace.system.constants import TRACKING_STATUS_NEW, TRACKING_STATUS_QUEUED, SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS
 from ace.system.locking import Lockable, acquire, release
 
-
-class AnalysisResult:
-    """Contains the results of an analysis by an analysis module.
-
-    The root and observable properties of object contain the modifications made
-    by the analysis module.  These are compared to the root and observable
-    properties of the parent AnalysisRequest object in order to determine what
-    changed during analysis, so that the changes can be made to the tracked
-    root object."""
-
-    def __init__(self, root: RootAnalysis, observable: Observable):
-        assert isinstance(root, RootAnalysis)
-        assert isinstance(observable, Observable)
-
-        self.root = root
-        self.observable = observable
-
-    def to_dict(self) -> dict:
-        return {
-            "root": self.root.to_dict(),
-            "observable": self.observable.to_dict(),
-        }
-
-    @staticmethod
-    def from_dict(json_dict: dict) -> "AnalysisResult":
-        assert isinstance(json_dict, dict)
-        root = RootAnalysis.from_dict(json_dict["root"])
-        observable = Observable.from_dict(json_dict["observable"], root)
-        return AnalysisResult(root, observable)
-
-    @property
-    def json(self):
-        return self.to_dict()
-
-
 class AnalysisRequest(Lockable):
     """Represents a request to analyze a single observable or a new analysis."""
 
@@ -94,12 +59,13 @@ class AnalysisRequest(Lockable):
 
         # the current status of this analysis request
         self.status = TRACKING_STATUS_NEW
-        # additional RootAnalysis UUIDs that are waiting for this analysis
-        self.additional_roots = []
         # the UUID of the analysis module that is currently processing this request
         self.owner = None
+
         # the result of the analysis
-        self.result = None
+        self.original_root = None
+        self.modified_root = None
+
 
     def __eq__(self, other):
         if not isinstance(other, AnalysisRequest):
@@ -116,11 +82,11 @@ class AnalysisRequest(Lockable):
             "observable": self.observable.to_dict() if self.observable else None,
             "type": self.type.to_dict() if self.type else None,
             "root": self.root.to_dict(),
-            "additional_roots": self.additional_roots,
             "dependency_analysis": self.dependency_analysis,
             "status": self.status,
             "owner": self.owner,
-            "result": self.result.to_dict() if self.result else None,
+            "original_root": self.original_root.to_dict() if self.original_root else None,
+            "modified_root": self.modified_root.to_dict() if self.modified_root else None,
         }
 
     @staticmethod
@@ -140,14 +106,15 @@ class AnalysisRequest(Lockable):
 
         ar = AnalysisRequest(root, observable, type)
         ar.id = json_data["id"]
-        ar.additional_roots = json_data["additional_roots"]
         ar.dependency_analysis = json_data["dependency_analysis"]
         ar.status = json_data["status"]
         ar.owner = json_data["owner"]
 
-        ar.result = None
-        if json_data["result"]:
-            ar.result = AnalysisResult.from_dict(json_data["result"])
+        if json_data["original_root"]:
+            ar.original_root = RootAnalysis.from_dict(json_data["original_root"])
+
+        if json_data["modified_root"]:
+            ar.modified_root = RootAnalysis.from_dict(json_data["modified_root"])
 
         return ar
 
@@ -180,7 +147,7 @@ class AnalysisRequest(Lockable):
     @property
     def is_observable_analysis_result(self) -> bool:
         """Does this include the result of the analysis?"""
-        return self.result
+        return self.result is not None
 
     @property
     def is_root_analysis_request(self) -> bool:
@@ -194,10 +161,8 @@ class AnalysisRequest(Lockable):
             if self.is_observable_analysis_result:
                 # process both the new observables and the one we already processed
                 # doing so resolves dependencies
-                observables = self.result.observable.get_analysis(self.type).observables[
-                    :
-                ]  # get all the observables from the Analysis object
-                observables.append(self.result.observable)  # and also reprocess our original observable
+                observables = self.modified_observable.get_analysis(self.type).observables[:]
+                observables.append(self.modified_observable)
                 return observables
             else:
                 # otherwise we just want to look at the observable
@@ -206,29 +171,24 @@ class AnalysisRequest(Lockable):
             # otherwise we analyze all the observables in the entire RootAnalysis
             return self.root.all_observables
 
-    def append_root(self, root: RootAnalysis):
-        """Append the given root to this analysis request so that when request
-        has finished processing, the root that was appended will also be
-        analyzed with the same result data."""
-        assert isinstance(root, RootAnalysis)
-        self.additional_roots.append(root.uuid)
+    @property
+    def result(self):
+        """Returns the RootAnalysis object that contains the results for this analysis."""
+        return self.modified_root
 
-    # XXX shall we use copy.deepcopy instead?
-    def duplicate(self):
-        dup = AnalysisRequest(self.root, self.observable, self.type)
+    @property
+    def modified_observable(self):
+        """Returns a reference to the observable instance to use to store analysis results."""
+        if self.modified_root is None:
+            return None
 
-        dup.dependency_analysis = self.dependency_analysis
-        dup.status = self.status
-        dup.additional_roots = self.additional_roots
-        dup.owner = self.owner
-        dup.result = self.result  # XXX need another duplicate here?
-        return dup
+        return self.modified_root.get_observable(self.observable)
 
-    def create_result(self) -> AnalysisResult:
-        """Utility function to create an AnalysisResult for a given AnalysisRequest object."""
-        root = copy.deepcopy(self.root)
-        observable = root.get_observable(self.observable)
-        return AnalysisResult(root, observable)
+    def initialize_result(self):
+        """Initializes the results for this request."""
+        self.original_root = copy.deepcopy(self.root)
+        self.modified_root = copy.deepcopy(self.root)
+        return self.result
 
     def submit(self):
         """Submits this analysis request for processing."""
@@ -239,6 +199,12 @@ class AnalysisRequestTrackingInterface(ACESystemInterface):
     """Tracks and manages analysis requests."""
 
     def track_analysis_request(self, request: AnalysisRequest):
+        raise NotImplementedError()
+
+    def link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest):
+        raise NotImplementedError()
+
+    def get_linked_analysis_requests(self, source: AnalysisRequest) -> list[AnalysisRequest]:
         raise NotImplementedError()
 
     def delete_analysis_request(self, key: str) -> bool:
@@ -253,6 +219,9 @@ class AnalysisRequestTrackingInterface(ACESystemInterface):
     def get_analysis_request_by_cache_key(self, key: str) -> Union[AnalysisRequest, None]:
         raise NotImplementedError()
 
+    def get_analysis_requests_by_root(self, key: str) -> list[AnalysisRequest]:
+        raise NotImplementedError()
+
     def clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
         raise NotImplementedError()
 
@@ -261,6 +230,18 @@ def track_analysis_request(request: AnalysisRequest):
     """Begins tracking the given AnalysisRequest."""
     assert isinstance(request, AnalysisRequest)
     return get_system().request_tracking.track_analysis_request(request)
+
+
+def link_analysis_requests(source: AnalysisRequest, dest: AnalysisRequest):
+    assert isinstance(source, AnalysisRequest)
+    assert isinstance(dest, AnalysisRequest)
+    assert source != dest
+    get_system().request_tracking.link_analysis_requests(source, dest)
+
+
+def get_linked_analysis_requests(source: AnalysisRequest) -> list[AnalysisRequest]:
+    assert isinstance(source, AnalysisRequest)
+    return get_system().request_tracking.get_linked_analysis_requests(source)
 
 
 def get_analysis_request_by_request_id(request_id: str) -> Union[AnalysisRequest, None]:
@@ -296,6 +277,11 @@ def delete_analysis_request(target: Union[AnalysisRequest, str]) -> bool:
 def get_expired_analysis_requests() -> List[AnalysisRequest]:
     """Returns all AnalysisRequests that are in the TRACKING_STATUS_ANALYZING state and have expired."""
     return get_system().request_tracking.get_expired_analysis_requests()
+
+
+def get_analysis_requests_by_root(key: str) -> list[AnalysisRequest]:
+    """Returns all requests assigned to the given root analysis."""
+    return get_system().request_tracking.get_analysis_requests_by_root(key)
 
 
 def clear_tracking_by_analysis_module_type(amt: AnalysisModuleType):

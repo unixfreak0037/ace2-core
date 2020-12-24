@@ -7,7 +7,7 @@ from ace.system.analysis_module import (
     UnknownAnalysisModuleTypeError,
     CircularDependencyError,
 )
-from ace.system.analysis_request import AnalysisRequest, get_analysis_request
+from ace.system.analysis_request import AnalysisRequest, get_analysis_request, get_linked_analysis_requests
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.caching import get_cached_analysis_result
 from ace.system.constants import TRACKING_STATUS_ANALYZING
@@ -90,8 +90,8 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
     original_root = RootAnalysis()
     test_observable = original_root.add_observable(F_TEST, "test")
 
-    root_request = original_root.create_analysis_request()
-    process_analysis_request(root_request)
+    original_request = original_root.create_analysis_request()
+    process_analysis_request(original_request)
 
     # we should have a single work entry in the work queue
     assert get_queue_size(amt) == 1
@@ -103,18 +103,16 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
     process_analysis_request(root_request)
 
     if cache_ttl is not None:
-        # if the analysis type can be cached then there should only be one request
-        # since there is already a request to analyze it
+        # there should still only be one outbound request
         assert get_queue_size(amt) == 1
 
-        # now the existing analysis request should have a reference to the new root analysis
+        # the first analysis request should now be linked to a new analysis request
         request = get_next_analysis_request(OWNER_UUID, amt, 0)
-        assert len(request.additional_roots) == 1
-        assert root.uuid in request.additional_roots
+        assert get_linked_analysis_requests(request)
 
         # process the result of the original request
-        request.result = request.create_result()
-        request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
+        request.initialize_result()
+        request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
         process_analysis_request(request)
 
         # now the second root analysis should have it's analysis completed
@@ -123,10 +121,10 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
         assert analysis is not None
         assert analysis.root == root
         assert analysis.observable == request.observable
-        assert analysis.details == request.result.observable.get_analysis(amt).details
+        assert analysis.details == request.modified_observable.get_analysis(amt).details
 
     else:
-        # otherwise there should be two requests
+        # otherwise there should just be two requests
         assert get_queue_size(amt) == 2
 
 
@@ -157,8 +155,8 @@ def test_process_analysis_result(cache_ttl):
     assert request.status == TRACKING_STATUS_ANALYZING
     assert request.owner == OWNER_UUID
 
-    request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
     process_analysis_request(request)
 
     if cache_ttl is not None:
@@ -174,7 +172,7 @@ def test_process_analysis_result(cache_ttl):
     assert analysis is not None
     assert analysis.root == root
     assert analysis.observable == request.observable
-    assert analysis.details == request.result.observable.get_analysis(amt).details
+    assert analysis.details == request.modified_observable.get_analysis(amt).details
 
     # request should be deleted
     assert get_analysis_request(request.id) is None
@@ -198,8 +196,8 @@ def test_cached_analysis_result():
     assert get_analysis_request(root_request.id) is None
 
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
-    request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
     process_analysis_request(request)
 
     # this analysis result for this observable should be cached now
@@ -233,7 +231,7 @@ def test_cached_analysis_result():
     assert analysis is not None
     assert analysis.root == root
     assert analysis.observable == request.observable
-    assert analysis.details == request.result.observable.get_analysis(amt).details
+    assert analysis.details == request.modified_observable.get_analysis(amt).details
 
 
 @pytest.mark.integration
@@ -254,14 +252,14 @@ def test_process_existing_analysis_merge():
     request_2 = get_next_analysis_request(OWNER_UUID, amt_2, 0)
 
     # process the first one
-    request_1.result = request_1.create_result()
-    request_1.result.observable.add_tag("tag_1")  # make a modification to the observable
-    analysis = request_1.result.observable.add_analysis(type=amt_1)
+    request_1.initialize_result()
+    request_1.modified_observable.add_tag("tag_1")  # make a modification to the observable
+    analysis = request_1.modified_observable.add_analysis(type=amt_1)
     process_analysis_request(request_1)
 
     # process the second one
-    request_2.result = request_2.create_result()
-    analysis = request_2.result.observable.add_analysis(type=amt_2)
+    request_2.initialize_result()
+    analysis = request_2.modified_observable.add_analysis(type=amt_2)
     process_analysis_request(request_2)
 
     root = get_root_analysis(root)
@@ -302,8 +300,8 @@ def test_known_dependency():
 
     # process the amt request
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
-    request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
     process_analysis_request(request)
 
     # now we should have a request for the dependency
@@ -338,8 +336,8 @@ def test_chained_dependency():
 
     # process the amt request
     request = get_next_analysis_request(OWNER_UUID, amt_1, 0)
-    request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt_1, details={"Hello": "World"})
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt_1, details={"Hello": "World"})
     process_analysis_request(request)
 
     # now amt_2 should be ready but still not amt_3
@@ -349,8 +347,8 @@ def test_chained_dependency():
 
     # process the amt request
     request = get_next_analysis_request(OWNER_UUID, amt_2, 0)
-    request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt_2, details={"Hello": "World"})
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt_2, details={"Hello": "World"})
     process_analysis_request(request)
 
     # now amt_3 should be ready
@@ -405,10 +403,10 @@ def test_cancel_analysis_from_result():
 
     # get the analysis request
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
-    request.result = request.create_result()
-    analysis = request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
+    request.initialize_result()
+    analysis = request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
     new_observable = analysis.add_observable("new", "new")
-    request.result.root.cancel_analysis("test")
+    request.result.cancel_analysis("test")
     process_analysis_request(request)
 
     # root analysis should be cancelled
@@ -452,10 +450,10 @@ def test_cancel_analysis():
     # now it doesn't say it's cancelled here because this was created before we cancelled it
     assert not request.root.analysis_cancelled
     # post our results
-    request.result = request.create_result()
-    analysis = request.result.observable.add_analysis(type=amt, details={"Hello": "World"})
+    request.initialize_result()
+    analysis = request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
     new_observable = analysis.add_observable("new", "new")
-    request.result.root.cancel_analysis("test")
+    request.result.cancel_analysis("test")
     process_analysis_request(request)
 
     # root analysis should be cancelled here since this a fresh request
@@ -472,3 +470,80 @@ def test_cancel_analysis():
 
     # we should not have any new work requests since the analysis was cancelled
     assert get_queue_size(amt) == 0
+
+@pytest.mark.integration
+def test_root_analysis_default_expiration():
+    # by default a root should not expire
+    root = RootAnalysis()
+    assert not root.is_expired()
+
+@pytest.mark.integration
+def test_root_analysis_explicit_expiration():
+    # but we can set that explicitly
+    root = RootAnalysis(expires=True)
+    assert root.is_expired()
+
+@pytest.mark.integration
+def test_root_analysis_expiration_detection_points():
+    # but a root will not expire if it has a detection point
+    root = RootAnalysis(expires=True)
+    root.add_detection_point('test')
+    assert not root.is_expired()
+
+@pytest.mark.integration
+def test_root_analysis_expiration_processing():
+    # root analysis set to expire should be removed after it is processed
+    root = RootAnalysis(expires=True)
+    root.submit()
+    assert not get_root_analysis(root.uuid)
+
+@pytest.mark.integration
+def test_root_analysis_expiration_processing_detection_points():
+    # but not if it has a detection point
+    root = RootAnalysis(expires=True)
+    root.add_detection_point('test')
+    root.submit()
+    assert get_root_analysis(root.uuid)
+
+@pytest.mark.integration
+def test_root_analysis_expiration_processing_outstanding_requests():
+    # and not if it has any outstanding analysis requests
+    amt = register_analysis_module_type(AnalysisModuleType('test', ''))
+    root = RootAnalysis(expires=True)
+    observable = root.add_observable('test', 'test')
+    root.submit()
+    assert get_root_analysis(root.uuid)
+    request = get_next_analysis_request('test', amt, 0)
+    # analysis requests have still not completed yet...
+    assert get_root_analysis(root.uuid)
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details={'hello': "world"})
+    request.submit()
+    # should be gone now because the analysis requests have completed
+    assert not get_root_analysis(root.uuid)
+
+@pytest.mark.integration
+def test_root_analysis_expiration_processing_outstanding_root_dependency():
+    # and then in this case we have one root that depends on the analysis of another root
+    amt = register_analysis_module_type(AnalysisModuleType(name='test', description='', cache_ttl=300))
+    root = RootAnalysis(expires=True)
+    observable = root.add_observable('test', 'test')
+    root.submit()
+    assert get_root_analysis(root.uuid)
+    root_2 = RootAnalysis(expires=True)
+    observable_2 = root_2.add_observable('test', 'test')
+    root_2.submit()
+    # at this point root_2 has piggy-backed on root
+    assert get_root_analysis(root_2.uuid)
+    # complete the first root
+    request = get_next_analysis_request('test', amt, 0)
+    # analysis requests have still not completed yet...
+    assert get_root_analysis(root.uuid)
+    assert get_root_analysis(root_2.uuid)
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details={'hello': "world"})
+    request.submit()
+    # now they should both be gone because they were both set to expire
+    assert not get_root_analysis(root.uuid)
+    assert not get_root_analysis(root_2.uuid)
+

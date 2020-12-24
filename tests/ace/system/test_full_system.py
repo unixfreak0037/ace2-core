@@ -43,8 +43,8 @@ def test_basic_analysis():
     analysis_details = {"test": "result"}
 
     # "analyze" it
-    request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt, details=analysis_details)
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details=analysis_details)
 
     # submit the result of the analysis
     process_analysis_request(request)
@@ -90,14 +90,14 @@ def test_multiple_amts():
     analysis_details_2 = {"test_2": "result_2"}
 
     # "analyze" them
-    request_1.result = request_1.create_result()
-    request_1.result.observable.add_analysis(type=amt_1, details=analysis_details_1)
+    request_1.initialize_result()
+    request_1.modified_observable.add_analysis(type=amt_1, details=analysis_details_1)
 
     # submit the result of the analysis
     process_analysis_request(request_1)
 
-    request_2.result = request_2.create_result()
-    request_2.result.observable.add_analysis(type=amt_2, details=analysis_details_2)
+    request_2.initialize_result()
+    request_2.modified_observable.add_analysis(type=amt_2, details=analysis_details_2)
 
     # submit the result of the analysis
     process_analysis_request(request_2)
@@ -190,8 +190,8 @@ def test_expected_status():
     analysis_details = {"test": "result"}
 
     # "analyze" it
-    request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt, details=analysis_details)
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details=analysis_details)
 
     # submit the result of the analysis
     process_analysis_request(request)
@@ -311,8 +311,8 @@ def test_amt_version_upgrade():
     # amt comes back on, re-register
     amt = register_analysis_module_type(AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"]))
     request = get_next_analysis_request("test", amt, 0)
-    request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt).add_observable("test", "other")
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt).add_observable("test", "other")
     process_analysis_request(request)
 
     # amt gets upgraded from another process

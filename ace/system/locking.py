@@ -188,6 +188,7 @@ def default_owner_id():
 
     return f"{socket.gethostname()}-{os.getpid()}-{threading.get_ident()}"
 
+
 def get_lock_count() -> int:
     return get_system().locking.get_lock_count()
 

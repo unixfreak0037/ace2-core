@@ -179,8 +179,8 @@ class TimeoutRLock(Lock):
             self.lock = threading.Lock()
             self.owner = None
             self.count = 0
-            #self.acquire_date = None
-            #self.expiration_date = None
+            # self.acquire_date = None
+            # self.expiration_date = None
 
             # and then notify that the lock is ready again
             self.condition.notify_all()
@@ -221,7 +221,6 @@ class ThreadedLockingInterface(LockingInterface):
     def get_lock_class(self) -> type:
         """Returns the class to use that extends the Lock class this interfaces uses to create locks."""
         return TimeoutRLock
-
 
     def get_lock_owner(self, lock_id: str) -> Union[str, None]:
         lock = self.locks.get(lock_id)
@@ -327,4 +326,3 @@ class ThreadedLockingInterface(LockingInterface):
         for lock_id in expired_lock_ids:
             logging.debug(f"deleting expired lock {lock_id}")
             self.delete_lock(lock_id)
-

@@ -21,8 +21,15 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         # we have different ways to tracking the requests
         # track by AnalysisRequest.id
         self.analysis_requests = {}  # key = AnalysisRequest.id, value = AnalysisRequest
+
+        # linked requests
+        self.links = {}  # key = source AnalysisRequest.id, value = set(dest AnalysisRequest.id)
+
         # track by the cache index, if it exists
         self.cache_index = {}  # key = generate_cache_key(observable, amt), value = AnalysisRequest
+
+        # track by root
+        self.root_index = {}  # key = RootAnalysis.uuid, value = set(AnalysisRequest)
 
         # expiration tracking
         self.expiration_tracking = {}  # key = request.id, value = of (datetime, request)
@@ -47,6 +54,12 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             if request.cache_key:
                 self.cache_index[request.cache_key] = request
 
+            # update root lookup index
+            if request.root.uuid not in self.root_index:
+                self.root_index[request.root.uuid] = set()
+
+            self.root_index[request.root.uuid].add(request.id)
+
             if request.type:
                 # if we've started analyzing this request then we start tracking expiration of the request
                 if request.status == TRACKING_STATUS_ANALYZING:
@@ -54,6 +67,17 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
                 else:
                     # if the status is anything but ANALYZING then we STOP tracking the expiration
                     self._delete_request_expiration(request)
+
+    def link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest):
+        with self.sync_lock:
+            if source.id not in self.links:
+                self.links[source.id] = set()
+
+            self.links[source.id].add(dest.id)
+
+    def get_linked_analysis_requests(self, source: AnalysisRequest) -> list[AnalysisRequest]:
+        with self.sync_lock:
+            return [self.get_analysis_request_by_request_id(_) for _ in self.links.get(source.id, [])]
 
     def _track_request_expiration(self, request: AnalysisRequest):
         """Utility function that implements the tracking of the expiration of the request."""
@@ -84,6 +108,19 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             if request.cache_key:
                 logging.debug(f"analysis request {key} deleted from cache with key {request.cache_key}")
                 self.cache_index.pop(request.cache_key, None)
+
+            # update the root lookup index
+            try:
+                self.root_index[request.root.uuid].remove(request.id)
+            except KeyError:
+                pass
+
+            # clear the root lookup index if this is the last request
+            if not self.root_index[request.root.uuid]:
+                del self.root_index[request.root.uuid]
+
+            # clear any links
+            self.links.pop(request.id, None)
 
             # and finally delete any expiration tracking if it exists
             if request.type:
@@ -128,6 +165,10 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
     def get_analysis_request_by_cache_key(self, key: str) -> Union[AnalysisRequest, None]:
         with self.sync_lock:
             return self.cache_index.get(key)
+
+    def get_analysis_requests_by_root(self, key: str) -> list[AnalysisRequest]:
+        with self.sync_lock:
+            return [self.get_analysis_request_by_request_id(_) for _ in self.root_index.get(key, set())]
 
     def reset(self):
         self.analysis_requests = {}

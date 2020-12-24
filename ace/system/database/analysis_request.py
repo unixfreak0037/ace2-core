@@ -30,11 +30,31 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             expiration_date=expiration_date,
             analysis_module_type=request.type.name if request.type else None,
             cache_key=request.cache_key,
+            root_uuid=request.root.uuid,
             json_data=json.dumps(request, cls=JSONEncoder, sort_keys=True),
         )
 
         ace.db.merge(db_request)
         ace.db.commit()
+
+    def link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest):
+        source_request = ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
+        if source_request is None:
+            return
+
+        dest_request = ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == dest.id).one_or_none()
+        if dest_request is None:
+            return
+
+        source_request.linked_requests.append(dest_request)
+        ace.db.commit()
+
+    def get_linked_analysis_requests(self, source: AnalysisRequest) -> list[AnalysisRequest]:
+        source_request = ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
+        if source_request is None:
+            return None
+
+        return [AnalysisRequest.from_dict(json.loads(_.json_data)) for _ in source_request.linked_requests]
 
     def delete_analysis_request(self, key: str) -> bool:
         ace.db.execute(AnalysisRequestTracking.__table__.delete().where(AnalysisRequestTracking.id == key))
@@ -60,6 +80,12 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             return None
 
         return AnalysisRequest.from_dict(json.loads(result.json_data))
+
+    def get_analysis_requests_by_root(self, key: str) -> list[AnalysisRequest]:
+        return [
+            AnalysisRequest.from_dict(json.loads(_.json_data))
+            for _ in ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.root_uuid == key).all()
+        ]
 
     def get_analysis_request_by_cache_key(self, key: str) -> Union[AnalysisRequest, None]:
         assert isinstance(key, str)

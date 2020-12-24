@@ -62,7 +62,7 @@ def test_analysis_result_detection():
     process_analysis_request(root.create_analysis_request())
     assert get_alert(root) is None
     request = get_next_analysis_request("test", amt, 0)
-    request.result = request.create_result()
-    request.result.observable.add_analysis(type=amt).add_detection_point("test")
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt).add_detection_point("test")
     process_analysis_request(request)
     assert get_alert(root)

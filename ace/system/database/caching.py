@@ -12,6 +12,7 @@ from ace.json import JSONEncoder
 from ace.database.schema import AnalysisResultCache
 from ace.system.caching import CachingInterface
 from ace.system.analysis_request import AnalysisRequest
+from ace.time import utc_now
 
 
 class DatabaseCachingInterface(CachingInterface):
@@ -20,7 +21,7 @@ class DatabaseCachingInterface(CachingInterface):
         if result is None:
             return None
 
-        if result.expiration_date is not None and datetime.datetime.now() > result.expiration_date:
+        if result.expiration_date is not None and utc_now() > result.expiration_date:
             return None
 
         return AnalysisRequest.from_dict(json.loads(result.json_data))
@@ -29,7 +30,7 @@ class DatabaseCachingInterface(CachingInterface):
         expiration_date = None
         # XXX using system side time
         if expiration is not None:
-            expiration_date = datetime.datetime.now() + datetime.timedelta(seconds=expiration)
+            expiration_date = utc_now() + datetime.timedelta(seconds=expiration)
 
         cache_result = AnalysisResultCache(
             cache_key=cache_key,

@@ -12,6 +12,7 @@ from typing import Union, Optional, Iterator
 from ace.analysis import RootAnalysis
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_tracking import get_root_analysis
+from ace.time import utc_now
 
 
 @dataclass
@@ -29,7 +30,7 @@ class ContentMetadata:
     # or on systems that store the data externally this can be the reference key to the content
     location: str = None
     # when the content was created (defaults to now)
-    insert_date: datetime.datetime = field(default_factory=datetime.datetime.now)
+    insert_date: datetime.datetime = field(default_factory=utc_now)
     # when the content should be discarded (defaults to None which means never)
     expiration_date: Union[datetime.datetime, None] = None
     # dict for storing any required custom properties of the content

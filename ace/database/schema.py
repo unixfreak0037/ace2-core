@@ -1,5 +1,7 @@
 # vim: sw=4:ts=4:et:cc=120
 
+from datetime import datetime, timezone
+
 from ace.database import Base
 
 from sqlalchemy import (
@@ -16,15 +18,39 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
-    TIMESTAMP,
     Text,
     UniqueConstraint,
     func,
     text,
 )
 
+import sqlalchemy.types
 from sqlalchemy.orm import relationship
 from sqlalchemy.schema import Table
+
+
+# https://mike.depalatis.net/blog/sqlalchemy-timestamps.html
+class TimeStamp(sqlalchemy.types.TypeDecorator):
+    impl = sqlalchemy.types.DateTime
+    LOCAL_TIMEZONE = datetime.utcnow().astimezone().tzinfo
+
+    def process_bind_param(self, value: datetime, dialect):
+        if value is None:
+            return None
+
+        if value.tzinfo is None:
+            value = value.astimezone(self.LOCAL_TIMEZONE)
+
+        return value.astimezone(timezone.utc)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+
+        return value.astimezone(timezone.utc)
 
 
 class RootAnalysisTracking(Base):
@@ -39,7 +65,7 @@ class RootAnalysisTracking(Base):
 
     json_data = Column(Text, nullable=False)
 
-    insert_date = Column(TIMESTAMP, nullable=False, index=True, server_default=text("CURRENT_TIMESTAMP"))
+    insert_date = Column(TimeStamp, nullable=False, index=True, server_default=text("CURRENT_TIMESTAMP"))
 
 
 class AnalysisDetailsTracking(Base):
@@ -61,7 +87,7 @@ class AnalysisDetailsTracking(Base):
 
     json_data = Column(Text, nullable=False)
 
-    insert_date = Column(TIMESTAMP, nullable=False, index=True, server_default=text("CURRENT_TIMESTAMP"))
+    insert_date = Column(TimeStamp, nullable=False, index=True, server_default=text("CURRENT_TIMESTAMP"))
 
 
 class AnalysisModuleTracking(Base):
@@ -105,9 +131,9 @@ class AnalysisRequestTracking(Base):
 
     id = Column(String(36), primary_key=True)
 
-    insert_date = Column(TIMESTAMP, nullable=False, index=True, server_default=text("CURRENT_TIMESTAMP"))
+    insert_date = Column(TimeStamp, nullable=False, index=True, server_default=text("CURRENT_TIMESTAMP"))
 
-    expiration_date = Column(TIMESTAMP, nullable=True, index=True)
+    expiration_date = Column(TimeStamp, nullable=True, index=True)
 
     analysis_module_type = Column(String, nullable=True, index=True)
 
@@ -126,27 +152,6 @@ class AnalysisRequestTracking(Base):
     )
 
 
-# class AnalysisRequestLink(Base):
-
-# __tablename__ = "analysis_request_links"
-# __table_args__ = {
-# "mysql_engine": "InnoDB",
-# "mysql_charset": "utf8mb4",
-# }
-
-# source_id = Column(
-# String(36), ForeignKey("analysis_request_tracking.id", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True
-# )
-
-# source = relationship("AnalysisRequestTracking", foreign_keys='[AnalyisRequestLink.source_id]')
-
-# dest_id = Column(
-# String(36), ForeignKey("analysis_request_tracking.id", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True
-# )
-
-# dest = relationship("AnalysisRequestTracking", back_populates="linked_requests")
-
-
 class AnalysisResultCache(Base):
 
     __tablename__ = "analysis_result_cache"
@@ -157,7 +162,7 @@ class AnalysisResultCache(Base):
 
     cache_key = Column(String, primary_key=True)
 
-    expiration_date = Column(TIMESTAMP, nullable=True, index=True)
+    expiration_date = Column(TimeStamp, nullable=True, index=True)
 
     json_data = Column(Text, nullable=False)
 
@@ -174,9 +179,9 @@ class Lock(Base):
 
     owner = Column(String, nullable=True, index=True)
 
-    acquire_date = Column(TIMESTAMP, nullable=True, index=True)
+    acquire_date = Column(TimeStamp, nullable=True, index=True)
 
-    expiration_date = Column(TIMESTAMP, nullable=True, index=True)
+    expiration_date = Column(TimeStamp, nullable=True, index=True)
 
     count = Column(Integer, nullable=False, default=1)
 

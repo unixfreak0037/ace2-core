@@ -5,7 +5,7 @@ import pytest
 from ace.analysis import RootAnalysis, AnalysisModuleType
 from ace.system.analysis_module import register_analysis_module_type
 from ace.system.alerting import track_alert, get_alert
-from ace.system.inbound import process_analysis_request
+from ace.system.processing import process_analysis_request
 from ace.system.work_queue import get_next_analysis_request
 
 

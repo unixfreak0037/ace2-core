@@ -11,7 +11,7 @@ from ace.system.analysis_request import AnalysisRequest, get_analysis_request, g
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.caching import get_cached_analysis_result
 from ace.system.constants import TRACKING_STATUS_ANALYZING
-from ace.system.inbound import process_analysis_request
+from ace.system.processing import process_analysis_request
 from ace.system.work_queue import get_next_analysis_request, get_queue_size
 
 import pytest

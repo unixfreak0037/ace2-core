@@ -14,7 +14,7 @@ from ace.system.analysis_module import register_analysis_module_type, AnalysisMo
 from ace.system.analysis_request import AnalysisRequest, submit_analysis_request, get_analysis_request
 from ace.system.analysis_tracking import get_root_analysis, track_root_analysis
 from ace.system.constants import *
-from ace.system.inbound import process_analysis_request
+from ace.system.processing import process_analysis_request
 from ace.system.locking import LockAcquireFailed
 from ace.system.work_queue import get_next_analysis_request, get_queue_size
 

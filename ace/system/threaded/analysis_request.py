@@ -174,7 +174,6 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
 
         return AnalysisRequest.from_dict(json.loads(json_data))
 
-
     def get_analysis_request_by_cache_key(self, key: str) -> Union[AnalysisRequest, None]:
         with self.sync_lock:
             json_data = self.cache_index.get(key)

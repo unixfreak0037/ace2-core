@@ -1,7 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 
 import copy
-import json
 import uuid
 from typing import Union, List, Optional, Any
 

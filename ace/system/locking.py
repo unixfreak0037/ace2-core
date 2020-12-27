@@ -184,7 +184,9 @@ def is_locked(lock_id: str) -> bool:
 
 
 def default_owner_id():
-    import socket, os, threading
+    import os
+    import socket
+    import threading
 
     return f"{socket.gethostname()}-{os.getpid()}-{threading.get_ident()}"
 

@@ -52,7 +52,7 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
 
             ace.db.merge(tracking)
             ace.db.commit()
-        except sqlalchemy.exc.IntegrityError as e:
+        except sqlalchemy.exc.IntegrityError:
             raise UnknownRootAnalysisError(root_uuid)
 
     def delete_analysis_details(self, uuid: str) -> bool:

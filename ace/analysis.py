@@ -9,28 +9,30 @@ import os
 import os.path
 import shutil
 import sys
-import time
 import uuid
+import tempfile
+import unicodedata
 
 from dataclasses import dataclass, field
 from typing import List, Union, Optional, Any
 
 import ace
-from ace.time import parse_datetime_string, utc_now
-from ace.json import JSONEncoder
-from ace.constants import *
+from ace.constants import F_FILE
 from ace.indicators import Indicator, IndicatorList
+from ace.json import JSONEncoder
+from ace.system.exceptions import UnknownObservableError
 from ace.system.locking import Lockable
+from ace.time import parse_datetime_string, utc_now
 
 
 class MergableObject:
     """An object is mergable if a newer version of it can be merged into an older existing version."""
 
     def apply_merge(self, target: "MergableObject") -> Union["MergableObject", None]:
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def apply_diff_merge(self, before: "MergableObject", after: "MergableObject") -> Union["MergableObject", None]:
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class DetectionPoint:
@@ -432,22 +434,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         self.save()
         self._details = None
 
-    # XXX refactor for ace.system
-    def reset(self):
-        """Deletes the current analysis output if it exists."""
-        logging.debug("called reset() on {}".format(self))
-        if self.external_details_path is not None:
-            full_path = abs_path(os.path.join(self.root.storage_dir, ".ace", self.external_details_path))
-            if os.path.exists(full_path):
-                logging.debug("removing external details file {}".format(full_path))
-                os.remove(full_path)
-            else:
-                logging.warning("external details path {} does not exist".format(full_path))
-
-        self._details = None
-        self.external_details_path = None
-        self.external_details = None
-
     @property
     def details(self):
         # do we already have the details loaded or set?
@@ -707,7 +693,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
         return observable
 
-    def add_file(self, path: str, **kwargs) -> "FileObservable":
+    def add_file(self, path: str, **kwargs) -> "Observable":
         """Utility function that adds a F_FILE observable to the root analysis by passing a path to the file."""
         from ace.system.storage import store_file
 
@@ -788,7 +774,6 @@ class Relationship(object):
 
     @r_type.setter
     def r_type(self, value):
-        assert value in VALID_RELATIONSHIP_TYPES
         self._r_type = value
 
     @property
@@ -1141,7 +1126,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
     def add_relationship(self, r_type, target):
         """Adds a new Relationship to this Observable.
         Existing relationship is returned, other new Relationship object is added and returned."""
-        assert r_type in VALID_RELATIONSHIP_TYPES
         assert isinstance(target, Observable)
 
         for r in self.relationships:
@@ -2018,209 +2002,6 @@ class RootAnalysis(Analysis, MergableObject):
 
         # save our own details
         return Analysis.save(self)
-
-    # XXX refactor
-    def flush(self):
-        """Calls Analysis.flush on all Analysis objects in this RootAnalysis."""
-        # logging.debug("called RootAnalysis.flush() on {}".format(self))
-        # Analysis.flush(self) # <-- we don't want to flush out the RootAnalysis details
-
-        # make sure the containing directory exists
-        if not os.path.exists(os.path.join(ace.SAQ_RELATIVE_DIR, self.storage_dir)):
-            os.makedirs(os.path.join(ace.SAQ_RELATIVE_DIR, self.storage_dir))
-
-        # analysis details go into a hidden directory
-        if not os.path.exists(os.path.join(ace.SAQ_RELATIVE_DIR, self.storage_dir, ".ace")):
-            os.makedirs(os.path.join(ace.SAQ_RELATIVE_DIR, self.storage_dir, ".ace"))
-
-        for analysis in self.all_analysis:
-            if analysis is not self:
-                analysis.flush()
-
-        freed_items = gc.collect()
-        # logging.debug("{} items freed by gc".format(freed_items))
-
-    # def load(self):
-    # """Utility function to replace specific dict() in json with runtime object references."""
-    # in other words, load the JSON
-    # self._load_observable_store()
-
-    # load the Analysis objects in the Observables
-    # for observable in self.observable_store.values():
-    # observable._load_analysis()
-
-    # load the Observable references in the Analysis objects
-    # for analysis in self.all_analysis:
-    # analysis._load_observable_references()
-
-    # load DetectionPoints
-    # for analysis in self.all_analysis:
-    # analysis.detections = [DetectionPoint.from_json(dp) for dp in analysis.detections]
-
-    # for observable in self.all_observables:
-    # observable.detections = [DetectionPoint.from_json(dp) for dp in observable.detections]
-
-    # load Relationships
-    # for observable in self.all_observables:
-    # observable._load_relationships()
-
-    # return self
-
-    # def _load_observable_store(self):
-    # from ace.system.observables import create_observable
-    # invalid_uuids = [] # list of uuids that don't load for whatever reason
-    # for uuid in self.observable_store.keys():
-    # get the JSON dict from the observable store for this uuid
-    # value = self.observable_store[uuid]
-    # create the observable from the type and value
-    # o = create_observable(value['type'], value['value'])
-    # basically this is backwards compatibility with old alerts that have invalid values for observables
-    # if o:
-    # o.root = self
-    # o.json = value # this sets everything else
-
-    # self.observable_store[uuid] = o
-    # else:
-    # logging.warning("invalid observable type {} value {}".format(value['type'], value['value']))
-    # invalid_uuids.append(uuid)
-
-    # for uuid in invalid_uuids:
-    # del self.observable_store[uuid]
-
-    # XXX reset
-    def reset(self):
-        """Removes analysis, dispositions and any observables that did not originally come with the alert."""
-        from ace.database import acquire_lock, release_lock, LockedException
-
-        lock_uuid = None
-        try:
-            lock_uuid = acquire_lock(self.uuid)
-            if not lock_uuid:
-                raise LockedException(self)
-
-            return self._reset()
-
-        finally:
-            if lock_uuid:
-                release_lock(self.uuid, lock_uuid)
-
-    # XXX refactor
-    def _reset(self):
-        from subprocess import Popen
-
-        logging.info("resetting {}".format(self))
-
-        # NOTE that we do not clear the details that came with Alert
-        # clear external details storage for all analysis (except self)
-        for _analysis in self.all_analysis:
-            if _analysis is self:
-                continue
-
-            _analysis.reset()
-
-        # remove analysis objects from all observables
-        for o in self.observables:
-            o.clear_analysis()
-
-        # remove observables from the observable_store that didn't come with the original alert
-        # import pdb; pdb.set_trace()
-        original_uuids = set([o.id for o in self.observables])
-        remove_list = []
-        for uuid in self.observable_store.keys():
-            if uuid not in original_uuids:
-                remove_list.append(uuid)
-
-        for uuid in remove_list:
-            # if the observable is a F_FILE then try to also delete the file
-            if self.observable_store[uuid].type == F_FILE:
-                target_path = abs_path(self.observable_store[uuid].value)
-                if os.path.exists(target_path):
-                    logging.debug("deleting observable file {}".format(target_path))
-
-                    try:
-                        os.remove(target_path)
-                    except Exception as e:
-                        logging.error("unable to remove {}: {}".format(target_path, str(e)))
-
-            del self.observable_store[uuid]
-
-        # remove tags from observables
-        # NOTE there's currently no way to know which tags originally came with the alert
-        for o in self.observables:
-            o.clear_tags()
-
-        # clear the state
-        # this also clears any pre/post analysis module tracking
-        self.state = {}
-
-        # remove any empty directories left behind
-        logging.debug("removing empty directories inside {}".format(self.storage_dir))
-        p = Popen(["find", abs_path(self.storage_dir), "-type", "d", "-empty", "-delete"])
-        p.wait()
-
-    # XXX not quite sure we really need this but refactor if we do
-    def archive(self):
-        """Removes the details of analysis and external files.  Keeps observables and tags."""
-        from subprocess import Popen
-
-        logging.info("archiving {}".format(self))
-
-        # NOTE that we do not clear the details that came with Alert
-        # clear external details storage for all analysis (except self)
-        for _analysis in self.all_analysis:
-            if _analysis is self:
-                continue
-
-            _analysis.reset()
-
-        retained_files = set()
-        for o in self.all_observables:
-            # skip the ones that came with the alert
-            if o in self.observables:
-                logging.debug("{} came with the alert (skipping)".format(o))
-                if o.type == F_FILE:
-                    retained_files.add(os.path.join(ace.SAQ_RELATIVE_DIR, self.storage_dir, o.value))
-
-                continue
-
-            if o.type == F_FILE:
-                target_path = os.path.join(ace.SAQ_RELATIVE_DIR, self.storage_dir, o.value)
-                if os.path.exists(target_path):
-                    logging.debug("deleting observable file {}".format(target_path))
-
-                    try:
-                        os.remove(target_path)
-                    except Exception as e:
-                        logging.error("unable to remove {}: {}".format(target_path, str(e)))
-
-        for dir_path, dir_names, file_names in os.walk(os.path.join(ace.SAQ_RELATIVE_DIR, self.storage_dir)):
-            # ignore anything in the root of the storage directory
-            if dir_path == os.path.join(ace.SAQ_RELATIVE_DIR, self.storage_dir):
-                logging.debug("skipping core directory {}".format(dir_path))
-                continue
-
-            # and ignore anything in the .ace subdirectory
-            if dir_path == os.path.join(ace.SAQ_RELATIVE_DIR, self.storage_dir, ".ace"):
-                logging.debug("skipping core directory {}".format(dir_path))
-                continue
-
-            for file_name in file_names:
-                file_path = os.path.join(dir_path, file_name)
-                # and ignore any F_FILE we wanted to keep
-                if file_path in retained_files:
-                    logging.debug("skipping retained file {}".format(file_path))
-                    continue
-
-                try:
-                    logging.debug("deleting {}".format(file_path))
-                    os.remove(file_path)
-                except Exception as e:
-                    logging.error("unable to remove {}: {}".format(file_path, e))
-
-        # remove any empty directories left behind
-        logging.debug("removing empty directories inside {}".format(self.storage_dir))
-        p = Popen(["find", os.path.join(ace.SAQ_HOME, self.storage_dir), "-type", "d", "-empty", "-delete"])
-        p.wait()
 
     def __del__(self):
         # make sure that any remaining storage directories are wiped out

@@ -10,7 +10,7 @@ from typing import Optional, List, Union
 
 from ace.json import JSONEncoder
 from ace.analysis import Observable
-from ace.system.constants import *
+from ace.system.constants import TRACKING_STATUS_ANALYZING
 from ace.system.analysis_request import AnalysisRequestTrackingInterface, AnalysisRequest
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.caching import generate_cache_key

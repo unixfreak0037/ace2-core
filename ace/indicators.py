@@ -6,7 +6,7 @@ from collections import UserList
 from typing import Iterable, List, Union
 from urllib.parse import urlsplit
 
-from ace.constants import *
+from ace.constants import I_URL, I_IPV4, I_FQDN, I_URI_PATH
 
 
 class Indicator:

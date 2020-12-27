@@ -3,7 +3,7 @@
 from typing import Union, Optional
 
 from ace.system import ACESystemInterface, get_system
-from ace.system.constants import *
+from ace.system.constants import TRACKING_STATUS_ANALYZING
 from ace.system.analysis_module import (
     AnalysisModuleType,
     AnalysisModuleTypeVersionError,

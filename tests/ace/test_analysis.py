@@ -519,7 +519,7 @@ def test_apply_diff_merge_analysis():
     target_observable = target_root.get_observable(original_observable)
 
     assert not target_observable.analysis
-    target_observable.apply_diff_merge(original_observable, modified_observable)
+    target_observable.apply_diff_merge(original_observable, modified_observable, amt)
     assert target_observable.analysis
     assert target_observable.get_analysis("test") is not None
 
@@ -569,7 +569,7 @@ def test_apply_diff_merge_analysis_with_observables():
     target_observable = target_root.get_observable(original_observable)
 
     assert not target_root.get_observable(new_observable)
-    target_observable.apply_diff_merge(original_observable, modified_observable)
+    target_observable.apply_diff_merge(original_observable, modified_observable, type=amt)
     assert target_root.get_observable(new_observable) == new_observable
 
     # exists before but not after
@@ -625,7 +625,7 @@ def test_apply_diff_merge_analysis_with_existing_observables():
 
     # should only have the root as the parent
     assert len(existing_observable.parents) == 1
-    target_observable.apply_diff_merge(original_observable, modified_observable)
+    target_observable.apply_diff_merge(original_observable, modified_observable, amt)
     # should now have both the root and the new analysis as parents
     assert len(existing_observable.parents) == 2
 

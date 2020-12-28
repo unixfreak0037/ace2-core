@@ -23,10 +23,10 @@ class ThreadedAnalysisTrackingInterface(AnalysisTrackingInterface):
     root_analysis = {}  # key = RootAnalysis.uuid, value = RootAnalysisTracking
     analysis_details = {}  # key = Analysis.uuid, value = Any
 
-    def track_root_analysis(self, uuid: str, root: dict):
-        assert isinstance(uuid, str)
-        assert isinstance(root, dict)
-        self.root_analysis[uuid] = RootAnalysisTracking(root=json.dumps(root, cls=JSONEncoder))
+    def track_root_analysis(self, root: RootAnalysis):
+        assert isinstance(root, RootAnalysis)
+        root_dict = root.to_dict(exclude_analysis_details=True)
+        self.root_analysis[root.uuid] = RootAnalysisTracking(root=json.dumps(root_dict, cls=JSONEncoder))
 
     def get_root_analysis(self, uuid: str) -> Union[dict, None]:
         try:

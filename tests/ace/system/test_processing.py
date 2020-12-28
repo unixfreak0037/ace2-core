@@ -198,7 +198,7 @@ def test_cached_analysis_result():
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
     request.initialize_result()
     request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
-    process_analysis_request(request)
+    process_analysis_request(AnalysisRequest.from_dict(request.to_dict()))
 
     # this analysis result for this observable should be cached now
     assert get_cached_analysis_result(request.observable, request.type) is not None

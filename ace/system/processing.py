@@ -86,7 +86,7 @@ def process_analysis_request(ar: AnalysisRequest):
                 logging.error(f"cannot find {ar.observable} in modified root {ar.modified_root}")
                 raise UnknownObservableError(ar.observable)
 
-            target_observable.apply_diff_merge(original_observable, modified_observable)
+            target_observable.apply_diff_merge(original_observable, modified_observable, ar.type)
             target_root.save()
 
             # process any analysis request links

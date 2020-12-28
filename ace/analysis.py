@@ -23,6 +23,7 @@ from ace.json import JSONEncoder
 from ace.system.exceptions import UnknownObservableError
 from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
+from ace.data_model import DetectionPointModel
 
 #
 # MERGING
@@ -53,28 +54,20 @@ class MergableObject:
 class DetectionPoint:
     """Represents an observation that would result in a detection."""
 
-    KEY_DESCRIPTION = "description"
-    KEY_DETAILS = "details"
-
     def __init__(self, description=None, details=None):
         self.description = description
         self.details = details
 
     def to_dict(self, *args, **kwargs) -> dict:
-        return {
-            DetectionPoint.KEY_DESCRIPTION: self.description,
-            DetectionPoint.KEY_DETAILS: self.details,
-        }
+        return DetectionPointModel(description=self.description, details=self.details).dict()
 
     @staticmethod
     def from_dict(value: dict, detection_point: Optional["DetectionPoint"] = None):
         assert isinstance(value, dict)
+        data = DetectionPointModel(**value)
         result = detection_point or DetectionPoint()
-        if DetectionPoint.KEY_DESCRIPTION in value:
-            result.description = value[DetectionPoint.KEY_DESCRIPTION]
-        if DetectionPoint.KEY_DETAILS in value:
-            result.details = value[DetectionPoint.KEY_DETAILS]
-
+        result.description = data.description
+        result.details = data.details
         return result
 
     def __str__(self):

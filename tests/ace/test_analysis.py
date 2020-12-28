@@ -65,7 +65,7 @@ def test_encoding():
 
 @pytest.mark.unit
 def test_detection_point_serialization():
-    dp = DetectionPoint("description", {})
+    dp = DetectionPoint("description", "")
     dp == DetectionPoint.from_dict(dp.to_dict())
 
 
@@ -75,7 +75,7 @@ def test_detectable_object():
     assert not target.has_detection_points()
     assert not target.detections
 
-    target.add_detection_point("Something was detected.", {"detection": "details"})
+    target.add_detection_point("Something was detected.", "These here are details.")
     assert target.has_detection_points()
     assert target.detections
 

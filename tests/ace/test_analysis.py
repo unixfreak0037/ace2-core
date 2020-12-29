@@ -402,12 +402,12 @@ def test_find_observables():
     o_all = sorted([o1, o2])
 
     # search by type, single observable
-    assert root.find_observable(F_TEST).id in [o.id for o in o_all]
+    assert root.find_observable(F_TEST).uuid in [o.uuid for o in o_all]
     # search by type, multi observable
     assert sorted(root.find_observables(F_TEST)) == o_all
 
     # search by lambda, single observable
-    assert root.find_observable(lambda o: o.type == F_TEST).id in [o.id for o in o_all]
+    assert root.find_observable(lambda o: o.type == F_TEST).uuid in [o.uuid for o in o_all]
     # search by lambda, multi observable
     assert sorted(root.find_observables(lambda o: o.type == F_TEST)) == o_all
 

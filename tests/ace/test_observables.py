@@ -321,9 +321,7 @@ def test_apply_merge_relationships():
 
     assert not observable.relationships
     observable.apply_merge(target_observable)
-    assert observable.relationships
-    assert observable.relationships[0].r_type == R_DOWNLOADED_FROM
-    assert observable.relationships[0].target == r_observable
+    assert observable.relationships[R_DOWNLOADED_FROM] == [r_observable]
 
     # also test the case where the relationship target already exists in the root analysis
 
@@ -340,9 +338,7 @@ def test_apply_merge_relationships():
 
     assert not observable.relationships
     observable.apply_merge(target_observable)
-    assert observable.relationships
-    assert observable.relationships[0].r_type == R_DOWNLOADED_FROM
-    assert observable.relationships[0].target == r_observable
+    assert observable.relationships[R_DOWNLOADED_FROM] == [r_observable]
 
 
 @pytest.mark.unit
@@ -360,8 +356,7 @@ def test_apply_diff_merge_relationships():
     assert not observable.relationships
     observable.apply_diff_merge(original_observable, modified_observable)
     target_observable = target_root.get_observable(target_observable)
-    assert observable.relationships[0].r_type == R_DOWNLOADED_FROM
-    assert observable.relationships[0].target == target_observable
+    assert observable.relationships[R_DOWNLOADED_FROM] == [target_observable]
 
     # exists before but not after
     original_root = RootAnalysis()

@@ -55,12 +55,12 @@ class ObservableModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
     value: str
     time: Optional[datetime.datetime] = Field(default_factory=utc_now)
     analysis: Optional[dict[str, AnalysisModel]] = Field(default_factory=dict)
-    directives: Optional[set[str]] = Field(default_factory=set)
+    directives: Optional[list[str]] = Field(default_factory=list)  # XXX set
     redirection: Optional[str] = None
-    links: Optional[set[str]] = Field(default_factory=set)
-    limited_analysis: Optional[set[str]] = Field(default_factory=set)
-    excluded_analysis: Optional[set[str]] = Field(default_factory=set)
-    relationships: Optional[dict[str, set[str]]] = Field(default_factory=dict)
+    links: Optional[list[str]] = Field(default_factory=list)  # XXX set
+    limited_analysis: Optional[list[str]] = Field(default_factory=list)  # XXX set
+    excluded_analysis: Optional[list[str]] = Field(default_factory=list)  # XXX set
+    relationships: Optional[dict[str, list[str]]] = Field(default_factory=dict)  # XXX set
     grouping_target: Optional[bool] = False
     request_tracking: Optional[dict[str, str]] = Field(default_factory=dict)
 

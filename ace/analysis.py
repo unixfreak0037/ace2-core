@@ -24,11 +24,12 @@ from ace.system.exceptions import UnknownObservableError
 from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
 from ace.data_model import (
-    DetectionPointModel,
-    DetectableObjectModel,
-    TaggableObjectModel,
-    AnalysisModuleTypeModel,
     AnalysisModel,
+    AnalysisModuleTypeModel,
+    DetectableObjectModel,
+    DetectionPointModel,
+    ObservableModel,
+    TaggableObjectModel,
 )
 
 #
@@ -88,8 +89,6 @@ class DetectionPoint:
 
 class DetectableObject(MergableObject):
     """Mixin for objects that can have detection points."""
-
-    KEY_DETECTIONS = "detections"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -160,8 +159,6 @@ class DetectableObject(MergableObject):
 
 class TaggableObject(MergableObject):
     """A mixin class that adds a tags property that is a list of tags assigned to this object."""
-
-    KEY_TAGS = "tags"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -342,15 +339,6 @@ class AnalysisModuleType:
 class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     """Represents an output of analysis work."""
 
-    # dictionary keys used by the Analysis class
-    KEY_OBSERVABLE_IDS = "observable_ids"
-    KEY_OBSERVABLE_ID = "observable_id"
-    KEY_DETAILS = "details"
-    KEY_SUMMARY = "summary"
-    KEY_TYPE = "type"
-    KEY_UUID = "uuid"
-    KEY_IOCS = "iocs"
-
     def __init__(self, *args, details=None, type=None, root=None, observable=None, summary=None, **kwargs):
         super().__init__(*args, **kwargs)
         assert root is None or isinstance(root, RootAnalysis)
@@ -382,7 +370,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             self.details = details
 
         # the observable this Analysis is for
-        self.observable_id = observable.id if observable else None
+        self.observable_id = observable.uuid if observable else None
 
         # a brief (or brief-ish summary of what the Analysis produced)
         # the idea here is that the analyst can read this summary and get
@@ -463,9 +451,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             raise e
 
     def to_dict(self, *args, exclude_analysis_details=False, **kwargs):
-        result = TaggableObject.to_dict(self, *args, **kwargs)
-        result.update(DetectableObject.to_dict(self, *args, **kwargs))
         return AnalysisModel(
+            tags=self.tags,
+            detections=[DetectionPointModel(**_.to_dict(*args, **kwargs)) for _ in self.detections],
             uuid=self.uuid,
             type=None if self.type is None else AnalysisModuleTypeModel(**self.type.to_dict()).dict(),
             observable_id=self.observable_id,
@@ -473,18 +461,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             summary=self.summary,
             details=None if exclude_analysis_details else self._details,
         ).dict()
-        # result.update(
-        # {
-        # Analysis.KEY_TYPE: self.type.to_dict(*args, **kwargs) if self.type else None,
-        # Analysis.KEY_OBSERVABLE_ID: self.observable.id if self.observable else None,
-        # Analysis.KEY_OBSERVABLE_IDS: [_.id for _ in self.observables],
-        # Analysis.KEY_SUMMARY: self.summary,
-        # Analysis.KEY_IOCS: self.iocs.to_dict(),
-        # Analysis.KEY_UUID: self.uuid,
-        # Analysis.KEY_DETAILS: None if exclude_analysis_details else self._details,
-        # }
-        # )
-        return result
 
     @staticmethod
     def from_dict(value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
@@ -504,7 +480,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         # if value[Analysis.KEY_TYPE]:
         # result.type = AnalysisModuleType.from_dict(value[Analysis.KEY_TYPE])
 
-        # NOTE this is just a list of the Observable.id values (see to_dict())
+        # NOTE this is just a list of the Observable.uuid values (see to_dict())
         # we can't load them yet because the root would still be loading as all the observables expand
 
         result.observable_ids = data.observable_ids
@@ -544,7 +520,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     @observable.setter
     def observable(self, value):
         assert value is None or isinstance(value, Observable)
-        self.observable_id = value.id if value is not None else None
+        self.observable_id = value.uuid if value is not None else None
 
     @property
     def observables(self):
@@ -556,7 +532,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     @observables.setter
     def observables(self, value):
         assert isinstance(value, list)
-        self.observable_ids = [_.id for _ in value]
+        self.observable_ids = [_.uuid for _ in value]
 
     def has_observable(self, o_or_o_type=None, o_value=None):
         """Returns True if this Analysis has this Observable.  Accepts a single Observable or o_type, o_value."""
@@ -723,8 +699,8 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         observable = self.root.record_observable(observable)
 
         # add it to this Analysis object
-        if observable.id not in self.observable_ids:
-            self.observable_ids.append(observable.id)
+        if observable.uuid not in self.observable_ids:
+            self.observable_ids.append(observable.uuid)
 
         return observable
 
@@ -764,72 +740,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     def __hash__(self):
         return hash(self.summary)
 
-    ##########################################################################
-    # OVERRIDABLES
-
-
-class Relationship(object):
-    """Represents a relationship to another object."""
-
-    KEY_RELATIONSHIP_TYPE = "type"
-    KEY_RELATIONSHIP_TARGET = "target"
-
-    def __init__(self, r_type=None, target=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self._r_type = r_type
-        self._target = target
-
-    def __str__(self):
-        return "Relationship({} -> {})".format(self.r_type, self.target)
-
-    def __repr__(self):
-        return str(self)
-
-    @property
-    def r_type(self):
-        return self._r_type
-
-    @r_type.setter
-    def r_type(self, value):
-        self._r_type = value
-
-    @property
-    def target(self):
-        return self._target
-
-    @target.setter
-    def target(self, value):
-        assert isinstance(value, str) or isinstance(value, Observable)
-        self._target = value
-
-    def to_dict(self, *args, **kwargs) -> dict:
-        return {Relationship.KEY_RELATIONSHIP_TYPE: self.r_type, Relationship.KEY_RELATIONSHIP_TARGET: self.target.id}
-
-    @staticmethod
-    def from_dict(self, value: dict) -> "Relationship":
-        assert isinstance(value, dict)
-        return Relationship(
-            r_type=value[Relationship.KEY_RELATIONSHIP_TYPE], target=value[Relationship.KEY_RELATIONSHIP_TYPE]
-        )
-
 
 class Observable(TaggableObject, DetectableObject, MergableObject):
     """Represents a piece of information discovered in an analysis that can itself be analyzed."""
-
-    KEY_ID = "id"
-    KEY_TYPE = "type"
-    KEY_VALUE = "value"
-    KEY_TIME = "time"
-    KEY_ANALYSIS = "analysis"
-    KEY_DIRECTIVES = "directives"
-    KEY_REDIRECTION = "redirection"
-    KEY_LINKS = "links"
-    KEY_LIMITED_ANALYSIS = "limited_analysis"
-    KEY_EXCLUDED_ANALYSIS = "excluded_analysis"
-    KEY_RELATIONSHIPS = "relationships"
-    KEY_GROUPING_TARGET = "grouping_target"
-    KEY_REQUEST_TRACKING = "request_tracking"
 
     def __init__(
         self,
@@ -842,14 +755,14 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         links: Optional[list[str]] = None,
         limited_analysis: Optional[list[str]] = None,
         excluded_analysis: Optional[list[str]] = None,
-        relationships: Optional[list[Relationship]] = None,
+        relationships: Optional[dict[str, str]] = None,
         *args,
         **kwargs,
     ):
 
         super().__init__(*args, **kwargs)
 
-        self._id = str(uuid.uuid4())
+        self.uuid = str(uuid.uuid4())
         self._type = type
         self.value = value
         self._time = time
@@ -859,7 +772,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         self._links = links or []  # [ str ]
         self._limited_analysis = limited_analysis or []  # [ str ]
         self._excluded_analysis = excluded_analysis or []  # [ str ]
-        self._relationships = relationships or []  # [ Relationship ]
+        self._relationships = relationships or {}  # key = name, value = [ Observable.uuid ]
         self._grouping_target = False
         self._request_tracking = {}  # key = AnalysisModuleType.name, value = AnalysisRequest.id
 
@@ -881,65 +794,58 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return self.value == value
 
     def to_dict(self, *args, **kwargs) -> dict:
-        result = TaggableObject.to_dict(self, *args, **kwargs)
-        result.update(DetectableObject.to_dict(self, *args, **kwargs))
-        result.update(
-            {
-                Observable.KEY_ID: self.id,
-                Observable.KEY_TYPE: self.type,
-                Observable.KEY_TIME: self.time,
-                Observable.KEY_VALUE: self._value,
-                Observable.KEY_ANALYSIS: {
-                    key: analysis.to_dict(*args, **kwargs) for key, analysis in self.analysis.items()
-                },
-                Observable.KEY_DIRECTIVES: self.directives,
-                Observable.KEY_REDIRECTION: self._redirection,
-                Observable.KEY_LINKS: self._links,
-                Observable.KEY_LIMITED_ANALYSIS: self._limited_analysis,
-                Observable.KEY_EXCLUDED_ANALYSIS: self._excluded_analysis,
-                Observable.KEY_RELATIONSHIPS: [_.to_dict(*args, **kwargs) for _ in self._relationships],
-                Observable.KEY_GROUPING_TARGET: self._grouping_target,
-                Observable.KEY_REQUEST_TRACKING: self._request_tracking,
-            }
-        )
-        return result
+        return ObservableModel(
+            tags=self.tags,
+            detections=[DetectionPointModel(**_.to_dict(*args, **kwargs)) for _ in self.detections],
+            uuid=self.uuid,
+            type=self.type,
+            value=self.value,
+            time=self.time,
+            analysis={
+                name: AnalysisModel(**analysis.to_dict(*args, **kwargs)).dict()
+                for name, analysis in self.analysis.items()
+            },
+            directives=self.directives,
+            redirection=self.redirection,
+            links=self.links,
+            limited_analysis=self.limited_analysis,
+            excluded_analysis=self.excluded_analysis,
+            relationships=self.relationships,
+            grouping_target=self.grouping_target,
+            request_tracking=self.request_tracking,
+        ).dict()
 
     @staticmethod
     def from_dict(value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None) -> "Observable":
         assert isinstance(value, dict)
+        assert isinstance(root, RootAnalysis)
+        assert observable is None or isinstance(observable, Observable)
+
+        data = ObservableModel(**value)
+
         from ace.system.observables import create_observable
 
-        observable = observable or create_observable(value[Observable.KEY_TYPE], value[Observable.KEY_VALUE], root=root)
+        observable = observable or create_observable(data.type, data.value, root=root)
         observable = TaggableObject.from_dict(value, observable)
         observable = DetectableObject.from_dict(value, observable)
 
-        observable.id = value[Observable.KEY_ID]
-        observable.type = value[Observable.KEY_TYPE]
-        observable.time = value[Observable.KEY_TIME]
-        observable._value = value[Observable.KEY_VALUE]
+        observable.uuid = data.uuid
+        observable.type = data.type
+        observable.time = data.time
+        observable.value = data.value
         observable.analysis = {
-            key: Analysis.from_dict(analysis, root=root) for key, analysis in value[Observable.KEY_ANALYSIS].items()
+            key: Analysis.from_dict(analysis.dict(), root=root) for key, analysis in data.analysis.items()
         }
-        observable.directives = value[Observable.KEY_DIRECTIVES]
-        observable._redirection = value[Observable.KEY_REDIRECTION]
-        observable._links = value[Observable.KEY_LINKS]
-        observable._limited_analysis = value[Observable.KEY_LIMITED_ANALYSIS]
-        observable._excluded_analysis = value[Observable.KEY_EXCLUDED_ANALYSIS]
-        observable._relationships = value[Observable.KEY_RELATIONSHIPS]
-        observable._grouping_target = value[Observable.KEY_GROUPING_TARGET]
-        observable._request_tracking = value[Observable.KEY_REQUEST_TRACKING]
+        observable.directives = data.directives
+        observable._redirection = data.redirection
+        observable.links = data.links
+        observable.limited_analysis = data.limited_analysis
+        observable.excluded_analysis = data.excluded_analysis
+        observable.relationships = data.relationships
+        observable.grouping_target = data.grouping_target
+        observable.request_tracking = data.request_tracking
 
         return observable
-
-    @property
-    def id(self) -> str:
-        """A unique ID for this Observable instance."""
-        return self._id
-
-    @id.setter
-    def id(self, value: str):
-        assert isinstance(value, str)
-        self._id = value
 
     @property
     def type(self) -> str:
@@ -1026,7 +932,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
     @redirection.setter
     def redirection(self, value: Observable):
         assert isinstance(value, Observable)
-        self._redirection = value.id
+        self._redirection = value.uuid
 
     @property
     def links(self):
@@ -1041,7 +947,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         for v in value:
             assert isinstance(v, Observable)
 
-        self._links = [x.id for x in value]
+        self._links = [x.uuid for x in value]
 
     def add_link(self, target):
         """Links this Observable object to another Observable object.  Any tags
@@ -1055,8 +961,8 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             logging.warning("{} already links to {}".format(target, self))
             return
 
-        if target.id not in self._links:
-            self._links.append(target.id)
+        if target.uuid not in self._links:
+            self._links.append(target.uuid)
 
         logging.debug("linked {} to {}".format(self, target))
 
@@ -1108,60 +1014,47 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
         return amt in self.excluded_analysis
 
+    #
+    # relationships
+    #
+
     @property
-    def relationships(self):
-        return self._relationships
+    def relationships(self) -> dict[str, list[Observable]]:
+        return {
+            type: [self.root.observable_store[_] for _ in observables]
+            for type, observables in self._relationships.items()
+        }
 
     @relationships.setter
-    def relationships(self, value):
-        self._relationships = value
+    def relationships(self, value: dict[str, list[Observable]]):
+        self._relationships = {type: [_.uuid for _ in observables] for type, observables in value}
 
-    def has_relationship(self, _type):
-        for r in self.relationships:
-            if r.r_type == _type:
-                return True
+    def has_relationship(self, type: str, observable: Optional["Observable"] = None) -> bool:
+        if observable is None:
+            return type in self.relationships
 
-        return False
+        try:
+            return observable.uuid in self.relationships[type]
+        except KeyError:
+            return False
 
-    def _load_relationships(self):
-        temp = []
-        for value in self.relationships:
-            if isinstance(value, dict):
-                r = Relationship()
-                r.json = value
-
-                try:
-                    # find the observable this points to and reference that
-                    r.target = self.root._observable_store[r.target]
-                except KeyError:
-                    logging.error("missing observable uuid {} in {}".format(r.target, self))
-                    continue
-
-                value = r
-
-            temp.append(value)
-
-        self._relationships = temp
-
-    def add_relationship(self, r_type, target):
-        """Adds a new Relationship to this Observable.
-        Existing relationship is returned, other new Relationship object is added and returned."""
+    def add_relationship(self, type: str, target: "Observable") -> "Observable":
+        """Adds a relationship between this observable and the target observable."""
+        assert isinstance(type, str)
         assert isinstance(target, Observable)
 
-        for r in self.relationships:
-            if r.r_type == r_type and r.target == target:
-                return r
+        if not type in self.relationships:
+            self._relationships[type] = list()
 
-        r = Relationship(r_type, target)
-        self.relationships.append(r)
-        return r
+        self._relationships[type].append(target.uuid)
+        return self
 
-    def get_relationships_by_type(self, r_type):
-        """Returns the list of Relationship objects by type."""
-        return [r for r in self.relationships if r.r_type == r_type]
+    def get_relationships_by_type(self, type: str) -> list["Observable"]:
+        """Returns the list of related observables by type."""
+        return self.relationships.get(type, [])
 
-    def get_relationship_by_type(self, r_type):
-        """Returns the first Relationship found of a given type, or None if none exist."""
+    def get_relationship_by_type(self, type: str) -> "Observable":
+        """Returns the first related observable by type, or None if there are no observables related in that way."""
         result = self.get_relationships_by_type(r_type)
         if not result:
             return None
@@ -1200,12 +1093,12 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
     @request_tracking.setter
     def request_tracking(self, value) -> dict:
-        """Returns a dict that maps the AnalysisModuleType.name to the AnalysisRequest.id."""
+        """Returns a dict that maps the AnalysisModuleType.name to the AnalysisRequest.uuid."""
         assert isinstance(value, dict)
         self._request_tracking = value
 
     def get_analysis_request_id(self, amt: Union[AnalysisModuleType, str]) -> Union[str, None]:
-        """Returns the AnalysisRequest.id for the given analysis module type, or None if nothing is tracked yet."""
+        """Returns the AnalysisRequest.uuid for the given analysis module type, or None if nothing is tracked yet."""
         assert isinstance(amt, AnalysisModuleType) or isinstance(amt, str)
         if isinstance(amt, AnalysisModuleType):
             amt = amt.name
@@ -1383,14 +1276,15 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         for amt in target.excluded_analysis:
             self.exclude_analysis(amt)
 
-        for rel in target.relationships:
-            # get a reference to the local copy of the target observable
-            local_observable = self.root.get_observable(rel.target)
-            if not local_observable:
-                # if we can't get it then add it
-                local_observable = self.root.add_observable(rel.target)
+        for r_type, observables in target.relationships.items():
+            for observable in observables:
+                # get a reference to the local copy of the target observable
+                local_observable = self.root.get_observable(observable)
+                if not local_observable:
+                    # if we can't get it then add it
+                    local_observable = self.root.add_observable(observable.type, observable.value, time=observable.time)
 
-            self.add_relationship(rel.r_type, local_observable)
+                self.add_relationship(r_type, local_observable)
 
         if target.grouping_target:
             self.grouping_target = target.grouping_target
@@ -1456,17 +1350,18 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             if amt not in before.excluded_analysis:
                 self.exclude_analysis(amt)
 
-        for rel in after.relationships:
-            if rel in before.relationships:
-                continue
+        for r_type, observables in after.relationships.items():
+            for observable in observables:
+                if before.has_relationship(r_type, observable):
+                    continue
 
-            # get a reference to the local copy of the target observable
-            local_observable = self.root.get_observable(rel.target)
-            if not local_observable:
-                # if we can't get it then add it
-                local_observable = self.root.add_observable(rel.target)
+                # get a reference to the local copy of the target observable
+                local_observable = self.root.get_observable(observable)
+                if not local_observable:
+                    # if we can't get it then add it
+                    local_observable = self.root.add_observable(observable.type, observable.value, time=observable.time)
 
-            self.add_relationship(rel.r_type, local_observable)
+                self.add_relationship(r_type, local_observable)
 
         if before.grouping_target != after.grouping_target:
             self.grouping_target = after.grouping_target
@@ -1502,7 +1397,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             return False
 
         # exactly the same?
-        if other.id == self.id:
+        if other.uuid == self.uuid:
             return True
 
         if other.type != self.type:
@@ -1979,14 +1874,14 @@ class RootAnalysis(Analysis, MergableObject):
             if o == observable:
                 logging.debug(
                     "returning existing observable {} ({}) [{}] <{}> for {} ({}) [{}] <{}>".format(
-                        o, id(o), o.id, o.type, observable, id(observable), observable.id, observable.type
+                        o, id(o), o.uuid, o.type, observable, id(observable), observable.uuid, observable.type
                     )
                 )
                 return o
 
         observable.root = self
-        self.observable_store[observable.id] = observable
-        logging.debug("recorded observable {} with id {}".format(observable, observable.id))
+        self.observable_store[observable.uuid] = observable
+        logging.debug("recorded observable {} with id {}".format(observable, observable.uuid))
         return observable
 
     def save(self):
@@ -2127,7 +2022,7 @@ class RootAnalysis(Analysis, MergableObject):
         try:
             # if we passed an existing Observable (same id) then we return the reference inside the RootAnalysis
             # with the matching id
-            return self.observable_store[observable.id]
+            return self.observable_store[observable.uuid]
         except KeyError:
             # otherwise we try to match based on the type, value and time
             return self.find_observable(

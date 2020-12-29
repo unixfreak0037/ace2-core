@@ -18,7 +18,7 @@ class DetectionPointModel(BaseModel):
 
 
 class DetectableObjectModel(BaseModel):
-    detections: Optional[set[DetectionPointModel]] = Field(default_factory=set)
+    detections: Optional[list[DetectionPointModel]] = Field(default_factory=list)  # XXX set
 
 
 class TaggableObjectModel(BaseModel):

@@ -23,7 +23,7 @@ from ace.json import JSONEncoder
 from ace.system.exceptions import UnknownObservableError
 from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
-from ace.data_model import DetectionPointModel
+from ace.data_model import DetectionPointModel, DetectableObjectModel
 
 #
 # MERGING
@@ -90,15 +90,14 @@ class DetectableObject(MergableObject):
         self._detections = []
 
     def to_dict(self, *args, **kwargs) -> dict:
-        return {DetectableObject.KEY_DETECTIONS: [_.to_dict(*args, **kwargs) for _ in self._detections]}
+        return DetectableObjectModel(detections=[DetectionPointModel(**_.to_dict()) for _ in self.detections]).dict()
 
     @staticmethod
     def from_dict(value: dict, detectable_object: Optional["DetectableObject"] = None) -> "DetectableObject":
         assert isinstance(value, dict)
+        data = DetectableObjectModel(**value)
         result = detectable_object or DetectableObject()
-        if DetectableObject.KEY_DETECTIONS in value:
-            result.detectables = [DetectionPoint.from_dict(_) for _ in value[DetectableObject.KEY_DETECTIONS]]
-
+        result.detectables = [DetectionPoint.from_dict(_.dict()) for _ in data.detections]
         return result
 
     @property

@@ -23,7 +23,7 @@ from ace.json import JSONEncoder
 from ace.system.exceptions import UnknownObservableError
 from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
-from ace.data_model import DetectionPointModel, DetectableObjectModel
+from ace.data_model import DetectionPointModel, DetectableObjectModel, TaggableObjectModel
 
 #
 # MERGING
@@ -164,15 +164,14 @@ class TaggableObject(MergableObject):
         self._tags = []
 
     def to_dict(self, *args, **kwargs) -> dict:
-        return {TaggableObject.KEY_TAGS: self.tags}
+        return TaggableObjectModel(tags=self.tags).dict()
 
     @staticmethod
     def from_dict(value: dict, taggable_object: Optional["TaggableObject"] = None) -> "TaggableObject":
         assert isinstance(value, dict)
+        data = TaggableObjectModel(**value)
         result = taggable_object or TaggableObject()
-        if TaggableObject.KEY_TAGS in value:
-            result.tags = value[TaggableObject.KEY_TAGS]
-
+        result.tags = data.tags
         return result
 
     @property

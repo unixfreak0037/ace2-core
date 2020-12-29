@@ -22,7 +22,7 @@ class DetectableObjectModel(BaseModel):
 
 
 class TaggableObjectModel(BaseModel):
-    tags: Optional[set[str]] = Field(default_factory=set)
+    tags: Optional[list[str]] = Field(default_factory=list)
 
 
 class AnalysisModuleTypeModel(BaseModel):

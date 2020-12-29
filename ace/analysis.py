@@ -29,6 +29,7 @@ from ace.data_model import (
     DetectableObjectModel,
     DetectionPointModel,
     ObservableModel,
+    RootAnalysisModel,
     TaggableObjectModel,
 )
 
@@ -1438,8 +1439,6 @@ class CaselessObservable(Observable):
 class RootAnalysis(Analysis, MergableObject):
     """Root analysis object."""
 
-    DEFAULT_TOOL = "unknown"
-    DEFAULT_TOOL_INSTANCE = "unknown"
     DEFAULT_ALERT_TYPE = "default"
     DEFAULT_QUEUE = "default"
     DEFAULT_DESCRIPTION = "ACE Analysis"
@@ -1464,16 +1463,14 @@ class RootAnalysis(Analysis, MergableObject):
         *args,
         **kwargs,
     ):
+        super().__init__(*args, **kwargs)
 
         import uuid as uuidlib
-
-        super().__init__(*args, **kwargs)
 
         # we are the root
         self.root = self
 
-        self._original_analysis_mode = None
-        self._analysis_mode = None
+        self.analysis_mode = analysis_mode
         if analysis_mode:
             self.analysis_mode = analysis_mode
 
@@ -1485,11 +1482,11 @@ class RootAnalysis(Analysis, MergableObject):
         if version is not None:
             self.version = version
 
-        self._tool = RootAnalysis.DEFAULT_TOOL
+        self._tool = None
         if tool:
             self.tool = tool
 
-        self._tool_instance = RootAnalysis.DEFAULT_TOOL_INSTANCE
+        self._tool_instance = None
         if tool_instance:
             self.tool_instance = tool_instance
 
@@ -1525,16 +1522,12 @@ class RootAnalysis(Analysis, MergableObject):
         if storage_dir:
             self.storage_dir = storage_dir
 
-        self._state = {}
+        self.state = {}
         if state:
             self.state = state
 
         # all of the Observables discovered during analysis go into the observable_store
-        # these objects are what are serialized to and from JSON
         self._observable_store = {}  # key = uuid, value = Observable object
-
-        # set to True after load() is called
-        self.is_loaded = False
 
         # set to True to cancel any outstanding analysis for this root
         self._analysis_cancelled = False
@@ -1550,105 +1543,79 @@ class RootAnalysis(Analysis, MergableObject):
         if expires is not None:
             self.expires = expires
 
-    #
-    # the json property is used for internal storage
-    #
-
-    # json keys
-    KEY_ANALYSIS_MODE = "analysis_mode"
-    KEY_ID = "id"
-    KEY_VERSION = "version"
-    KEY_UUID = "uuid"
-    KEY_TOOL = "tool"
-    KEY_TOOL_INSTANCE = "tool_instance"
-    KEY_TYPE = "alert_type"
-    KEY_DESCRIPTION = "description"
-    KEY_EVENT_TIME = "event_time"
-    KEY_DETAILS = "details"
-    KEY_OBSERVABLE_STORE = "observable_store"
-    KEY_NAME = "name"
-    KEY_NETWORK = "network"
-    KEY_QUEUE = "queue"
-    KEY_INSTRUCTIONS = "instructions"
-    KEY_ANALYSIS_CANCELLED = "analysis_cancelled"
-    KEY_ANALYSIS_CANCELLED_REASON = "analysis_cancelled_reason"
-    KEY_EXPIRES = "expires"
-
-    def to_dict(self, *args, **kwargs):
-        result = Analysis.to_dict(self, *args, **kwargs)
-        result.update(
-            {
-                RootAnalysis.KEY_ANALYSIS_MODE: self.analysis_mode,
-                RootAnalysis.KEY_UUID: self.uuid,
-                RootAnalysis.KEY_VERSION: self.version,
-                RootAnalysis.KEY_TOOL: self.tool,
-                RootAnalysis.KEY_TOOL_INSTANCE: self.tool_instance,
-                RootAnalysis.KEY_TYPE: self.alert_type,
-                RootAnalysis.KEY_DESCRIPTION: self.description,
-                RootAnalysis.KEY_EVENT_TIME: self.event_time,
-                RootAnalysis.KEY_OBSERVABLE_STORE: {
-                    id: observable.to_dict(*args, **kwargs) for id, observable in self.observable_store.items()
-                },
-                RootAnalysis.KEY_NAME: self.name,
-                RootAnalysis.KEY_QUEUE: self.queue,
-                RootAnalysis.KEY_INSTRUCTIONS: self.instructions,
-                RootAnalysis.KEY_ANALYSIS_CANCELLED: self.analysis_cancelled,
-                RootAnalysis.KEY_ANALYSIS_CANCELLED_REASON: self.analysis_cancelled_reason,
-                RootAnalysis.KEY_EXPIRES: self.expires,
-            }
-        )
-        return result
+    def to_dict(self, *args, exclude_analysis_details=False, **kwargs):
+        return RootAnalysisModel(
+            tags=self.tags,
+            detections=[
+                DetectionPointModel(**_.to_dict(*args, exclude_analysis_details=exclude_analysis_details, **kwargs))
+                for _ in self.detections
+            ],
+            uuid=self.uuid,
+            type=None if self.type is None else AnalysisModuleTypeModel(**self.type.to_dict()).dict(),
+            observable_id=self.observable_id,
+            observable_ids=self.observable_ids,
+            summary=self.summary,
+            details=None if exclude_analysis_details else self._details,
+            tool=self.tool,
+            tool_instance=self.tool_instance,
+            alert_type=self.alert_type,
+            description=self.description,
+            event_time=self.event_time,
+            name=self.name,
+            state=self.state,
+            analysis_mode=self.analysis_mode,
+            queue=self.queue,
+            instructions=self.instructions,
+            version=self.version,
+            expires=self.expires,
+            analysis_cancelled=self.analysis_cancelled,
+            analysis_cancelled_reason=self.analysis_cancelled_reason,
+            observable_store={
+                id: ObservableModel(
+                    **observable.to_dict(*args, exclude_analysis_details=exclude_analysis_details, **kwargs)
+                ).dict()
+                for id, observable in self.observable_store.items()
+            },
+        ).dict()
 
     @staticmethod
     def from_dict(value: dict) -> "RootAnalysis":
         assert isinstance(value, dict)
 
-        root = RootAnalysis()
+        data = RootAnalysisModel(**value)
 
-        # this is important to do first before we load Observable references
+        root = RootAnalysis()
         root.observable_store = {
-            id: Observable.from_dict(observable, root=root)
-            for id, observable in value[RootAnalysis.KEY_OBSERVABLE_STORE].items()
+            id: Observable.from_dict(observable.dict(), root=root) for id, observable in data.observable_store.items()
         }
+
         root = Analysis.from_dict(value, root, analysis=root)
 
-        root.analysis_mode = value[RootAnalysis.KEY_ANALYSIS_MODE]
-        root.uuid = value[RootAnalysis.KEY_UUID]
-        root.version = value[RootAnalysis.KEY_VERSION]
-        root.tool = value[RootAnalysis.KEY_TOOL]
-        root.tool_instance = value[RootAnalysis.KEY_TOOL_INSTANCE]
-        root.alert_type = value[RootAnalysis.KEY_TYPE]
-        root.description = value[RootAnalysis.KEY_DESCRIPTION]
-        root.event_time = value[RootAnalysis.KEY_EVENT_TIME]
-        root.name = value[RootAnalysis.KEY_NAME]
-        root.queue = value[RootAnalysis.KEY_QUEUE]
-        root.instructions = value[RootAnalysis.KEY_INSTRUCTIONS]
-        root.analysis_cancelled = value[RootAnalysis.KEY_ANALYSIS_CANCELLED]
-        root.analysis_cancelled_reason = value[RootAnalysis.KEY_ANALYSIS_CANCELLED_REASON]
-        root.expires = value[RootAnalysis.KEY_EXPIRES]
+        root._analysis_mode = data.analysis_mode
+        root._uuid = data.uuid
+        root._version = data.version
+        root._tool = data.tool
+        root._tool_instance = data.tool_instance
+        root._alert_type = data.alert_type
+        root._description = data.description
+        root._event_time = data.event_time
+        root._name = data.name
+        root._queue = data.queue
+        root._instructions = data.instructions
+        root._analysis_cancelled = data.analysis_cancelled
+        root._analysis_cancelled_reason = data.analysis_cancelled_reason
+        root._expires = data.expires
+        root._state = data.state
         return root
 
     @property
     def analysis_mode(self):
         return self._analysis_mode
 
-    @property
-    def original_analysis_mode(self):
-        return self._original_analysis_mode
-
     @analysis_mode.setter
     def analysis_mode(self, value):
         assert value is None or (isinstance(value, str) and value)
         self._analysis_mode = value
-        if self._original_analysis_mode is None:
-            self._original_analysis_mode = value
-
-    def override_analysis_mode(self, value):
-        """Change the analysis mode and disregard current values.
-        This has the effect of setting both the analysis mode and original analysis mode."""
-        assert value is None or (isinstance(value, str) and value)
-        self._analysis_mode = value
-        self._original_analysis_mode = value
 
     @property
     def uuid(self):

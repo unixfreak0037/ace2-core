@@ -28,16 +28,16 @@ class TaggableObjectModel(BaseModel):
 class AnalysisModuleTypeModel(BaseModel):
     name: str
     description: str
-    observable_types: set[str] = Field(default_factory=set)
-    directives: set[str] = Field(default_factory=set)
-    dependencies: set[str] = Field(default_factory=set)
-    tags: set[str] = Field(default_factory=set)
-    modes: set[str] = Field(default_factory=set)
+    observable_types: list[str] = Field(default_factory=list)  # XXX set
+    directives: list[str] = Field(default_factory=list)  # XXX set
+    dependencies: list[str] = Field(default_factory=list)  # XXX set
+    tags: list[str] = Field(default_factory=list)  # XXX set
+    modes: list[str] = Field(default_factory=list)  # XXX set
     version: str = "1.0.0"
     timeout: int = 30
     cache_ttl: Optional[int] = None
     additional_cache_keys: list[str] = Field(default_factory=list)
-    types: set[str] = Field(default_factory=set)
+    types: list[str] = Field(default_factory=list)  # XXX set
 
 
 class AnalysisModel(DetectionPointModel, TaggableObjectModel, BaseModel):

@@ -13,7 +13,7 @@ import uuid
 import tempfile
 import unicodedata
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import List, Union, Optional, Any
 
 import ace
@@ -23,7 +23,7 @@ from ace.json import JSONEncoder
 from ace.system.exceptions import UnknownObservableError
 from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
-from ace.data_model import DetectionPointModel, DetectableObjectModel, TaggableObjectModel
+from ace.data_model import DetectionPointModel, DetectableObjectModel, TaggableObjectModel, AnalysisModuleTypeModel
 
 #
 # MERGING
@@ -273,37 +273,12 @@ class AnalysisModuleType:
         # XXX should probably check the other fields as well
 
     def to_dict(self, *args, **kwargs) -> dict:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "observable_types": self.observable_types,
-            "directives": self.directives,
-            "dependencies": self.dependencies,
-            "tags": self.tags,
-            "modes": self.modes,
-            "version": self.version,
-            "timeout": self.timeout,
-            "cache_ttl": self.cache_ttl,
-            "additional_cache_keys": self.additional_cache_keys,
-            "types": self.types,
-        }
+        return AnalysisModuleTypeModel(**asdict(self)).dict()
 
     @staticmethod
     def from_dict(value: dict) -> "AnalysisModuleType":
-        return AnalysisModuleType(
-            name=value["name"],
-            description=value["description"],
-            observable_types=value["observable_types"],
-            directives=value["directives"],
-            dependencies=value["dependencies"],
-            tags=value["tags"],
-            modes=value["modes"],
-            version=value["version"],
-            timeout=value["timeout"],
-            cache_ttl=value["cache_ttl"],
-            additional_cache_keys=value["additional_cache_keys"],
-            types=value["types"],
-        )
+        data = AnalysisModuleTypeModel(**value)
+        return AnalysisModuleType(**data.dict())
 
     def accepts(self, observable: Observable) -> bool:
         from ace.system.analysis_module import get_analysis_module_type

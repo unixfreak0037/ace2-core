@@ -11,8 +11,8 @@ import shutil
 import sys
 import uuid
 import tempfile
-import unicodedata
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
 from typing import List, Union, Optional, Any
 
@@ -49,14 +49,16 @@ from ace.data_model import (
 #
 
 
-class MergableObject:
+class MergableObject(ABC):
     """An object is mergable if a newer version of it can be merged into an older existing version."""
 
+    @abstractmethod
     def apply_merge(self, target: "MergableObject") -> Union["MergableObject", None]:
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def apply_diff_merge(self, before: "MergableObject", after: "MergableObject") -> Union["MergableObject", None]:
-        raise NotImplementedError()
+        pass
 
 
 class DetectionPoint:
@@ -113,7 +115,7 @@ class DetectableObject(MergableObject):
     @detections.setter
     def detections(self, value):
         assert isinstance(value, list)
-        assert all([isinstance(x, DetectionPoint) for x in value]) or all([isinstance(x, dict) for x in value])
+        assert all([isinstance(x, DetectionPoint) for x in value])
         self._detections = value
 
     def has_detection_points(self):
@@ -608,23 +610,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     def summary(self, value):
         self._summary = value
 
-    def search_tree(self, tags=()):
-        """Searches this object and every object in it's analysis tree for the given items.  Returns the list of items that matched."""
-
-        if not isinstance(tags, tuple):
-            tags = (tags,)
-
-        result = []
-
-        def _search(target):
-            for tag in tags:
-                if target.has_tag(tag):
-                    if target not in result:
-                        result.append(target)
-
-        recurse_tree(self, _search)
-        return result
-
     def apply_merge(self, target: "Analysis") -> "Analysis":
         assert isinstance(target, Analysis)
 
@@ -737,9 +722,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
         # otherwise two Analysis objects are equal if they have the same amt and observable
         return self.type == other.type and self.observable == other.observable
-
-    def __hash__(self):
-        return hash(self.summary)
 
 
 class Observable(TaggableObject, DetectableObject, MergableObject):
@@ -909,20 +891,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         """Returns True if this Observable has this directive."""
         return directive in self.directives
 
-    def remove_directive(self, directive: str):
-        """Removes the given directive from this observable."""
-        if directive in self.directives:
-            self.directives.remove(directive)
-            logging.debug(f"removed directive {directive} from {self}")
-
-        return self
-
-    def copy_directives_to(self, target: Observable):
-        """Copies all directives applied to this Observable to another Observable."""
-        assert isinstance(target, Observable)
-        for directive in self.directives:
-            target.add_directive(directive)
-
     @property
     def redirection(self) -> Union[Observable, None]:
         if not self._redirection:
@@ -945,9 +913,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
     @links.setter
     def links(self, value):
         assert isinstance(value, list)
-        for v in value:
-            assert isinstance(v, Observable)
-
         self._links = [x.uuid for x in value]
 
     def add_link(self, target):
@@ -959,8 +924,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         # two observables cannot link to each other
         # that would cause a recursive loop in add_tag override
         if self in target.links:
-            logging.warning("{} already links to {}".format(target, self))
-            return
+            raise ValueError("{target} already links to {self}")
 
         if target.uuid not in self._links:
             self._links.append(target.uuid)
@@ -1035,7 +999,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             return type in self.relationships
 
         try:
-            return observable.uuid in self.relationships[type]
+            return observable.uuid in self._relationships[type]
         except KeyError:
             return False
 
@@ -1056,7 +1020,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
     def get_relationship_by_type(self, type: str) -> "Observable":
         """Returns the first related observable by type, or None if there are no observables related in that way."""
-        result = self.get_relationships_by_type(r_type)
+        result = self.get_relationships_by_type(type)
         if not result:
             return None
 
@@ -1151,18 +1115,14 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         if analysis.type is None:
             raise ValueError("the type property of the Analysis object must be a valid AnalysisModuleType")
 
+        # does this analysis already exist?
+        if analysis.type.name in self.analysis:
+            raise ValueError(f"analysis for {self} type {analysis.type} already set")
+
         # set the document root for this analysis
         analysis.root = self.root
         # set the source of the Analysis
         analysis.observable = self
-
-        # does this analysis already exist?
-        if analysis.type.name in self.analysis and not (self.analysis[analysis.type.name] is analysis):
-            logging.error(
-                "replacing analysis type {} with {} for {} (are you returning the correct type from generated_analysis_type()?)".format(
-                    self.analysis[analysis.type.name], analysis, self
-                )
-            )
 
         self.analysis[analysis.type.name] = analysis
 
@@ -1199,47 +1159,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             amt = amt.name
 
         return self.get_analysis(amt) is not None
-
-    def _load_analysis(self):
-        assert isinstance(self.analysis, dict)
-
-        from ace.system.analysis_module import get_analysis_module_type
-
-        # see the module_path property of the Analysis object
-        for amt_type_name in self.analysis.keys():
-            # have we already translated this?
-            if isinstance(self.analysis[amt_type_name], Analysis):
-                continue
-
-            # this should be a json dict
-            assert isinstance(self.analysis[amt_type_name], dict)
-
-            analysis = Analysis(root=self.root, type=get_analysis_module_type(amt_type_name), observable=self)
-
-            analysis.json = self.analysis[amt_type_name]
-            self.analysis[amt_type_name] = analysis  # replace the JSON dict with the actual object
-
-    # XXX refactor
-    def clear_analysis(self):
-        """Deletes all analysis records for this observable."""
-        self.analysis = {}
-
-    def search_tree(self, tags=()):
-        """Searches this object and every object in it's analysis tree for the given items.  Returns the list of items that matched."""
-
-        if not isinstance(tags, tuple):
-            tags = (tags,)
-
-        result = []
-
-        def _search(target):
-            for tag in tags:
-                if target.has_tag(tag):
-                    if target not in result:
-                        result.append(target)
-
-        recurse_tree(self, _search)
-        return result
 
     def apply_merge(self, target: "Observable") -> "Observable":
         """Merge all the mergable properties of the target Observable into this observable."""
@@ -1417,23 +1336,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             return self.value < other.value
 
         return self.type < other.type
-
-
-class CaselessObservable(Observable):
-    """An observable that doesn't care about the case of the value."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    # see https://stackoverflow.com/a/29247821
-    def normalize_caseless(self, value):
-        if value is None:
-            return None
-
-        return unicodedata.normalize("NFKD", value.casefold())
-
-    def _compare_value(self, other):
-        return self.normalize_caseless(self.value) == self.normalize_caseless(other)
 
 
 class RootAnalysis(Analysis, MergableObject):
@@ -1906,17 +1808,6 @@ class RootAnalysis(Analysis, MergableObject):
                     result.append(analysis)
 
         return result
-
-    def set_analysis(self, observable: Observable, analysis: Analysis):
-        assert isinstance(observable, Observable)
-        assert isinstance(analysis, Analysis)
-        assert isinstance(analysis.type, AnalysisModuleType)
-
-        observable = self.get_observable(observable)
-        if observable is None:
-            raise UnknownObservableError(observable)
-
-        return observable.add_analysis(analysis)
 
     @property
     def all_iocs(self) -> list:

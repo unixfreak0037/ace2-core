@@ -52,6 +52,8 @@ class AnalysisRequest(Lockable):
         # dict of analysis dependencies requested
         # key = analysis_module, value = Analysis
         self.dependency_analysis = {}
+        # set to True if this observable analysis result is the result of a cache hit
+        self.cache_hit = False
 
         #
         # dynamic data

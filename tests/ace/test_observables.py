@@ -1,4 +1,5 @@
 import copy
+import datetime
 import os.path
 import shutil
 
@@ -7,6 +8,57 @@ import pytest
 from ace.analysis import RootAnalysis, AnalysisModuleType, Analysis
 from ace.constants import R_DOWNLOADED_FROM
 from ace.system.analysis_tracking import get_root_analysis
+from ace.time import utc_now
+
+
+@pytest.mark.unit
+def test_observable_properties():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+
+    assert observable.all_analysis == [analysis]
+    assert observable.children == [analysis]
+
+
+@pytest.mark.unit
+def test_observable_str():
+    assert str(RootAnalysis().add_observable("test", "test"))
+    assert str(RootAnalysis().add_observable("test", "test", time=utc_now()))
+
+
+@pytest.mark.unit
+def test_observable_eq():
+    # same type, value no time
+    assert RootAnalysis().add_observable("test", "test") == RootAnalysis().add_observable("test", "test")
+    # same type, value same time
+    _now = utc_now()
+    assert RootAnalysis().add_observable("test", "test", time=_now) == RootAnalysis().add_observable(
+        "test", "test", time=_now
+    )
+    # same type, value different time
+    assert RootAnalysis().add_observable("test", "test", time=_now) != RootAnalysis().add_observable(
+        "test", "test", time=_now - datetime.timedelta(seconds=1)
+    )
+    # same type different value
+    assert RootAnalysis().add_observable("test", "test") != RootAnalysis().add_observable("test", "different")
+    # different type
+    assert RootAnalysis().add_observable("test", "test") != RootAnalysis().add_observable("other", "test")
+    # wrong object
+    assert RootAnalysis().add_observable("test", "test") != object()
+
+
+@pytest.mark.unit
+def test_add_duplicate_analysis():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+
+    # adding the same analysis twice will fail
+    with pytest.raises(ValueError):
+        observable.add_analysis(type=amt)
 
 
 @pytest.mark.unit
@@ -30,9 +82,48 @@ def test_add_excluded_analysis():
     assert observable.excluded_analysis
     assert "test" in observable.excluded_analysis
     assert observable.is_excluded("test")
+    assert observable.is_excluded(AnalysisModuleType("test", ""))
 
     observable.exclude_analysis(AnalysisModuleType("other", ""))
     assert "other" in observable.excluded_analysis
+
+
+@pytest.mark.unit
+def test_add_link():
+    root = RootAnalysis()
+    observable_1 = root.add_observable("test", "test1")
+    observable_2 = root.add_observable("test", "test2")
+    observable_3 = root.add_observable("test", "test3")
+
+    observable_2.add_link(observable_1)
+    assert observable_2.links == [observable_1]
+    observable_2.add_link(observable_3)
+    assert sorted(observable_2.links) == sorted([observable_1, observable_3])
+
+    observable_2.add_tag("test")
+    assert observable_2.has_tag("test")
+    assert observable_1.has_tag("test")
+    assert observable_3.has_tag("test")
+
+    with pytest.raises(ValueError):
+        # cannot do this since 2 already points to 1
+        observable_1.add_link(observable_2)
+
+
+@pytest.mark.unit
+def test_relationships():
+    root = RootAnalysis()
+    observable_1 = root.add_observable("test", "test1")
+    observable_2 = root.add_observable("test", "test2")
+
+    observable_1.add_relationship("test", observable_2)
+    assert observable_1.has_relationship("test")
+    assert observable_1.has_relationship("test", observable_2)
+
+    assert observable_1.get_relationships_by_type("test") == [observable_2]
+    assert observable_1.get_relationship_by_type("test") == observable_2
+    assert observable_1.get_relationships_by_type("unknown") == []
+    assert observable_1.get_relationship_by_type("unknown") is None
 
 
 @pytest.mark.unit
@@ -214,6 +305,22 @@ def test_apply_diff_merge_links():
     # should still not exist
     assert not observable.links
 
+    # exists before and after
+    original_root = RootAnalysis()
+    original_observable = original_root.add_observable("test", "test")
+    link_target = original_root.add_observable("target", "target")
+    original_observable.add_link(link_target)
+
+    modified_root = copy.deepcopy(original_root)
+    modified_observable = modified_root.get_observable(original_observable)
+
+    target_root = RootAnalysis()
+    observable = target_root.add_observable("test", "test")
+    assert not observable.links
+    observable.apply_diff_merge(original_observable, modified_observable)
+    # should still not exist
+    assert not observable.links
+
 
 @pytest.mark.unit
 def test_apply_merge_limited_analysis():
@@ -366,6 +473,22 @@ def test_apply_diff_merge_relationships():
 
     target_observable = original_root.add_observable("target", "target")
     original_observable.add_relationship(R_DOWNLOADED_FROM, target_observable)
+
+    target_root = RootAnalysis()
+    observable = target_root.add_observable("test", "test")
+    assert not observable.relationships
+    observable.apply_diff_merge(original_observable, modified_observable)
+    # should still not exist
+    assert not observable.relationships
+
+    # exists before and after
+    original_root = RootAnalysis()
+    original_observable = original_root.add_observable("test", "test")
+    target_observable = original_root.add_observable("target", "target")
+    original_observable.add_relationship(R_DOWNLOADED_FROM, target_observable)
+
+    modified_root = copy.deepcopy(original_root)
+    modified_observable = modified_root.get_observable(original_observable)
 
     target_root = RootAnalysis()
     observable = target_root.add_observable("test", "test")

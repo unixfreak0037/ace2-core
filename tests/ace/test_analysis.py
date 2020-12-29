@@ -70,6 +70,33 @@ def test_detection_point_serialization():
 
 
 @pytest.mark.unit
+def test_detection_point_eq():
+    assert DetectionPoint("description", "") == DetectionPoint("description", "")
+    assert DetectionPoint("description", "") != DetectionPoint("other", "")
+    assert DetectionPoint("description", "") != DetectionPoint("description", "Hey.")
+    assert DetectionPoint("description", "") != object()
+
+
+@pytest.mark.unit
+def test_detectable_object_serialization():
+    target = DetectableObject()
+    target.add_detection_point("test")
+
+    target == DetectableObject.from_dict(target.to_dict())
+
+
+@pytest.mark.unit
+def test_detectable_object_properties():
+    target = DetectableObject()
+    target.detections = [DetectionPoint("test")]
+    assert target.detections == [DetectionPoint("test")]
+
+    # adding the same detection point doesn't add another one
+    target.add_detection_point("test")
+    assert target.detections == [DetectionPoint("test")]
+
+
+@pytest.mark.unit
 def test_detectable_object():
     target = DetectableObject()
     assert not target.has_detection_points()
@@ -151,6 +178,13 @@ def test_taggable_object():
     assert target.tags
     assert target.has_tag("tag")
     assert not target.has_tag("t@g")
+    comp_target = TaggableObject()
+    comp_target.add_tag("tag")
+    assert target == comp_target
+    assert target != object()
+    comp_target = TaggableObject()
+    comp_target.add_tag("t@g")
+    assert target != comp_target
     target.clear_tags()
     assert not target.tags
 
@@ -260,6 +294,68 @@ def test_root_analysis_serialization():
     assert root.analysis_mode == new_root.analysis_mode
     assert root.queue == new_root.queue
     assert root.instructions == new_root.instructions
+
+    # the observable property for the root should always be None
+    assert root.observable is None
+    assert len(root.observables) == 1
+
+
+@pytest.mark.unit
+def test_analysis_properties():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt, details={"test": "test"})
+    observable_2 = analysis.add_observable("test2", "test2")
+
+    assert analysis.uuid
+    assert analysis.root == root
+    assert analysis.type == amt
+    assert analysis.observable == observable
+    assert analysis.observables == [observable_2]
+    assert analysis.details == {"test": "test"}
+    assert analysis.children == [observable_2]
+    assert analysis.observable_types == ["test2"]
+
+
+@pytest.mark.unit
+def test_analysis_get_observables_by_type():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    observable_2 = analysis.add_observable("test", "test_2")
+    observable_3 = analysis.add_observable("test", "test_3")
+    observable_4 = analysis.add_observable("test_4", "test_4")
+
+    assert analysis.get_observables_by_type("test") == [observable_2, observable_3]
+    assert analysis.get_observables_by_type("test_4") == [observable_4]
+    assert analysis.get_observables_by_type("unknown") == []
+
+    assert analysis.get_observable_by_type("test") in [observable_2, observable_3]
+    assert analysis.get_observable_by_type("test_4") == observable_4
+    assert analysis.get_observable_by_type("unknown") is None
+
+
+@pytest.mark.unit
+def test_root_analysis_get_observables_by_type():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable_1 = root.add_observable("test", "test_1")
+    observable_2 = root.add_observable("test", "test_2")
+    observable_3 = root.add_observable("test_3", "test_3")
+    analysis = observable_3.add_analysis(type=amt)
+    observable_4 = analysis.add_observable("test_4", "test_4")
+
+    assert root.get_observables_by_type("test") == [observable_1, observable_2]
+    assert root.get_observables_by_type("test_3") == [observable_3]
+    assert root.get_observables_by_type("test_4") == [observable_4]
+    assert root.get_observables_by_type("unknown") == []
+
+    assert root.get_observable_by_type("test") in [observable_1, observable_2]
+    assert root.get_observable_by_type("test_3") == observable_3
+    assert root.get_observable_by_type("test_4") == observable_4
+    assert root.get_observable_by_type("unknown") is None
 
 
 @pytest.mark.integration
@@ -395,7 +491,7 @@ def test_has_observable():
 
 
 @pytest.mark.unit
-def test_find_observables():
+def test_root_find_observables():
     root = RootAnalysis()
     o1 = root.add_observable(F_TEST, "test_1")
     o2 = root.add_observable(F_TEST, "test_2")
@@ -410,6 +506,55 @@ def test_find_observables():
     assert root.find_observable(lambda o: o.type == F_TEST).uuid in [o.uuid for o in o_all]
     # search by lambda, multi observable
     assert sorted(root.find_observables(lambda o: o.type == F_TEST)) == o_all
+
+
+@pytest.mark.unit
+def test_analysis_find_observables():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "no find")
+    analysis = observable.add_analysis(type=amt)
+    o1 = analysis.add_observable("test", "test_1")
+    o2 = analysis.add_observable("test", "test_2")
+    o_all = sorted([o1, o2])
+
+    # search by type, single observable
+    assert analysis.find_observable("test") in o_all
+    # search by type, multi observable
+    assert sorted(analysis.find_observables("test")) == o_all
+
+    # search by lambda, single observable
+    assert analysis.find_observable(lambda o: o.type == "test") in o_all
+    # search by lambda, multi observable
+    assert sorted(analysis.find_observables(lambda o: o.type == "test")) == o_all
+
+
+@pytest.mark.unit
+def test_analysis_eq():
+    amt_1 = AnalysisModuleType("test1", "")
+    amt_2 = AnalysisModuleType("test2", "")
+
+    root = RootAnalysis()
+    observable_1 = root.add_observable("test", "test")
+    analysis_1 = observable_1.add_analysis(type=amt_1)
+    analysis_2 = observable_1.add_analysis(type=amt_2)
+    observable_2 = root.add_observable("test2", "test")
+    analysis_3 = observable_2.add_analysis(type=amt_1)
+
+    # different amt
+    assert analysis_1 != analysis_2
+    # different observable
+    assert analysis_1 != analysis_3
+    # wrong object type
+    assert analysis_1 != object()
+
+    root_1 = RootAnalysis.from_dict(root.to_dict())
+    root_2 = RootAnalysis.from_dict(root.to_dict())
+
+    # same amt and observable
+    assert root_1.get_observable(observable_1).get_analysis(amt_1) == root_2.get_observable(observable_1).get_analysis(
+        amt_1
+    )
 
 
 @pytest.mark.integration

@@ -23,7 +23,13 @@ from ace.json import JSONEncoder
 from ace.system.exceptions import UnknownObservableError
 from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
-from ace.data_model import DetectionPointModel, DetectableObjectModel, TaggableObjectModel, AnalysisModuleTypeModel
+from ace.data_model import (
+    DetectionPointModel,
+    DetectableObjectModel,
+    TaggableObjectModel,
+    AnalysisModuleTypeModel,
+    AnalysisModel,
+)
 
 #
 # MERGING
@@ -459,17 +465,25 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     def to_dict(self, *args, exclude_analysis_details=False, **kwargs):
         result = TaggableObject.to_dict(self, *args, **kwargs)
         result.update(DetectableObject.to_dict(self, *args, **kwargs))
-        result.update(
-            {
-                Analysis.KEY_TYPE: self.type.to_dict(*args, **kwargs) if self.type else None,
-                Analysis.KEY_OBSERVABLE_ID: self.observable.id if self.observable else None,
-                Analysis.KEY_OBSERVABLE_IDS: [_.id for _ in self.observables],
-                Analysis.KEY_SUMMARY: self.summary,
-                Analysis.KEY_IOCS: self.iocs.to_dict(),
-                Analysis.KEY_UUID: self.uuid,
-                Analysis.KEY_DETAILS: None if exclude_analysis_details else self._details,
-            }
-        )
+        return AnalysisModel(
+            uuid=self.uuid,
+            type=None if self.type is None else AnalysisModuleTypeModel(**self.type.to_dict()).dict(),
+            observable_id=self.observable_id,
+            observable_ids=self.observable_ids,
+            summary=self.summary,
+            details=None if exclude_analysis_details else self._details,
+        ).dict()
+        # result.update(
+        # {
+        # Analysis.KEY_TYPE: self.type.to_dict(*args, **kwargs) if self.type else None,
+        # Analysis.KEY_OBSERVABLE_ID: self.observable.id if self.observable else None,
+        # Analysis.KEY_OBSERVABLE_IDS: [_.id for _ in self.observables],
+        # Analysis.KEY_SUMMARY: self.summary,
+        # Analysis.KEY_IOCS: self.iocs.to_dict(),
+        # Analysis.KEY_UUID: self.uuid,
+        # Analysis.KEY_DETAILS: None if exclude_analysis_details else self._details,
+        # }
+        # )
         return result
 
     @staticmethod
@@ -482,23 +496,28 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         result = TaggableObject.from_dict(value, result)
         result = DetectableObject.from_dict(value, result)
 
-        if value[Analysis.KEY_TYPE]:
-            result.type = AnalysisModuleType.from_dict(value[Analysis.KEY_TYPE])
+        data = AnalysisModel(**value)
+
+        if data.type:
+            result.type = AnalysisModuleType.from_dict(data.type.dict())
+
+        # if value[Analysis.KEY_TYPE]:
+        # result.type = AnalysisModuleType.from_dict(value[Analysis.KEY_TYPE])
 
         # NOTE this is just a list of the Observable.id values (see to_dict())
         # we can't load them yet because the root would still be loading as all the observables expand
-        result.observable_ids = value[Analysis.KEY_OBSERVABLE_IDS]
-        result.observable_id = value[Analysis.KEY_OBSERVABLE_ID]
 
-        result._details = None
-        result.summary = value[Analysis.KEY_SUMMARY]
-        result.iocs = value[Analysis.KEY_IOCS]
-        result.uuid = value[Analysis.KEY_UUID]
+        result.observable_ids = data.observable_ids
+        result.observable_id = data.observable_id
 
-        if value[Analysis.KEY_DETAILS]:
-            result._details = value[Analysis.KEY_DETAILS]
+        result.summary = data.summary
+        # result.iocs = value[Analysis.KEY_IOCS]
+        result.uuid = data.uuid
+
+        if data.details:
+            result._details = data.details
             result._details_loaded = False
-            result._details_modified = True  # XXX ???
+            result._details_modified = True  # XXX ??? I think this is right
 
         result.root = root
         return result

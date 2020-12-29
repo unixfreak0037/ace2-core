@@ -2,7 +2,7 @@
 
 import datetime
 import uuid
-from typing import Optional
+from typing import Optional, Any
 
 from ace.time import utc_now
 
@@ -40,15 +40,16 @@ class AnalysisModuleTypeModel(BaseModel):
     types: list[str] = Field(default_factory=list)  # XXX set
 
 
-class AnalysisModel(DetectionPointModel, TaggableObjectModel, BaseModel):
+class AnalysisModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
     uuid: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
     type: Optional[AnalysisModuleTypeModel] = None
     observable_id: Optional[str] = None
-    observable_ids: Optional[set[str]] = Field(default_factory=set)
+    observable_ids: Optional[list[str]] = Field(default_factory=list)  # XXX set
     summary: Optional[str] = None
+    details: Optional[Any] = None
 
 
-class ObservableModel(DetectionPointModel, TaggableObjectModel, BaseModel):
+class ObservableModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
     uuid: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
     type: str
     value: str

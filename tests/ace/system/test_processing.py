@@ -166,7 +166,7 @@ def test_process_analysis_result(cache_ttl):
     # get the root analysis and ensure this observable has the analysis now
     root = get_root_analysis(root.uuid)
     assert root is not None
-    observable = root.get_observable_by_spec(request.observable.type, request.observable.value)
+    observable = root.get_observable(request.observable)
     assert observable is not None
     analysis = observable.get_analysis(request.type)
     assert analysis is not None
@@ -225,7 +225,7 @@ def test_cached_analysis_result():
     # get the root analysis and ensure this observable has the analysis now
     root = get_root_analysis(root.uuid)
     assert root is not None
-    observable = root.get_observable_by_spec(request.observable.type, request.observable.value)
+    observable = root.get_observable(request.observable)
     assert observable is not None
     analysis = observable.get_analysis(request.type)
     assert analysis is not None

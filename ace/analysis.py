@@ -1690,7 +1690,8 @@ class RootAnalysis(Analysis, MergableObject):
             if path:
                 self.storage_dir = path
             else:
-                self.storage_dir = tempfile.mkdtemp(dir=ace.TEMP_DIR)
+                # XXX get temp dir from config
+                self.storage_dir = tempfile.mkdtemp()
 
         if not os.path.isdir(self.storage_dir):
             os.mkdir(self.storage_dir)
@@ -1854,18 +1855,20 @@ class RootAnalysis(Analysis, MergableObject):
 
         return list(set(result))
 
-    def iterate_all_references(self, target):
+    def get_all_references(self, target: Union[Observable, Analysis]):
         """Iterators through all objects that refer to target."""
+        assert isinstance(target, Observable) or isinstance(target, Analysis)
+        result = []
         if isinstance(target, Observable):
             for analysis in self.all_analysis:
                 if target in analysis.observables:
-                    yield analysis
+                    result.append(analysis)
         elif isinstance(target, Analysis):
             for observable in self.all_observables:
                 if target in observable.all_analysis:
-                    yield observable
-        else:
-            raise ValueError("invalid type {} passed to iterate_all_references".format(type(target)))
+                    result.append(observable)
+
+        return result
 
     def get_observable(self, uuid_or_observable: Union[str, Observable]):
         """Returns the Observable object for the given uuid or None if the Observable does not exist."""
@@ -1886,15 +1889,6 @@ class RootAnalysis(Analysis, MergableObject):
             return self.find_observable(
                 lambda o: o.type == observable.type and o.value == observable.value and o.time == observable.time
             )
-
-    def get_observable_by_spec(self, o_type, o_value, o_time=None):
-        """Returns the Observable object by type and value, and optionally time, or None if it cannot be found."""
-        target = Observable(o_type, o_value, o_time)
-        for o in self.all_observables:
-            if o == target:
-                return o
-
-        return None
 
     @property
     def all_detection_points(self):
@@ -1934,7 +1928,7 @@ class RootAnalysis(Analysis, MergableObject):
         """Returns True if the given analysis has been completed for the given observable."""
         assert isinstance(observable, Observable)
         assert isinstance(amt, AnalysisModuleType)
-        observable = self.get_observable_by_spec(observable.type, observable.value)
+        observable = self.get_observable(observable)
         if observable is None:
             raise UnknownObservableError(observable)
 
@@ -1945,7 +1939,7 @@ class RootAnalysis(Analysis, MergableObject):
         assert isinstance(observable, Observable)
         assert isinstance(amt, AnalysisModuleType)
 
-        observable = self.get_observable_by_spec(observable.type, observable.value)
+        observable = self.get_observable(observable)
         if observable is None:
             raise UnknownObservableError(observable)
 
@@ -1958,8 +1952,7 @@ class RootAnalysis(Analysis, MergableObject):
 
         # you cannot merge two different root analysis objects together
         if self.uuid != target.uuid:
-            logging.error(f"attempting to merge a different RootAnalysis ({target}) into {self}")
-            return None
+            raise ValueError(f"attempting to merge a different RootAnalysis ({target}) into {self}")
 
         # merge any properties that can be modified after a RootAnalysis is created
         self.analysis_mode = target.analysis_mode
@@ -1974,9 +1967,7 @@ class RootAnalysis(Analysis, MergableObject):
         assert isinstance(after, RootAnalysis)
 
         if before.uuid != after.uuid:
-            breakpoint()
-            logging.error(f"attempting to apply diff merge against two difference roots {before} and {after}")
-            return None
+            raise ValueError(f"attempting to apply diff merge against two difference roots {before} and {after}")
 
         TaggableObject.apply_diff_merge(self, before, after)
         DetectableObject.apply_diff_merge(self, before, after)
@@ -1999,10 +1990,14 @@ class RootAnalysis(Analysis, MergableObject):
         return self
 
 
-def recurse_down(target, callback):
+def recurse_down(target: Union[Analysis, Observable], callback):
     """Calls callback starting at target back to the RootAnalysis."""
     assert isinstance(target, Analysis) or isinstance(target, Observable)
-    assert isinstance(target.root, RootAnalysis)
+    assert callable(callback)
+
+    if target == target.root:
+        callback(target)
+        return
 
     visited = []  # keep track of what we've looked at
     root = target.root
@@ -2013,34 +2008,29 @@ def recurse_down(target, callback):
         if target in visited:
             return
 
+        callback(target)
+        visited.append(target)
+
         # are we at the end?
         if target is root:
             return
 
-        visited.append(target)
-
         if isinstance(target, Observable):
             # find all Analysis objects that reference this Observable
-            for analysis in root.all_analysis:
-                for observable in analysis.observables:
-                    # not sure the == part is needed but just in case I screw up later...
-                    if target is observable or target == observable:
-                        callback(analysis)
-                        _recurse(analysis, callback)
+            for analysis in root.get_all_references(target):
+                _recurse(analysis, callback)
 
         elif isinstance(target, Analysis):
-            # find all Observable objects that reference this Analysis
-            for observable in root.all_observables:
-                for analysis in observable.all_analysis:
-                    if analysis is target:
-                        callback(observable)
-                        _recurse(observable, callback)
+            if target.observable:
+                _recurse(target.observable, callback)
 
     _recurse(target, callback)
 
 
-def search_down(target, callback):
+def search_down(target: Union[Observable, Analysis], callback) -> Union[Observable, Analysis]:
     """Searches from target down to RootAnalysis looking for callback(obj) to return True."""
+    assert isinstance(target, Observable) or isinstance(target, Analysis)
+    assert callable(callback)
     result = None
 
     def _callback(target):
@@ -2055,21 +2045,27 @@ def search_down(target, callback):
     return result
 
 
-def recurse_tree(target, callback):
-    """A utility function to run the given callback on every Observable and Analysis rooted at the given Observable or Analysis object."""
+# or "search_up" or "search_out"
+def recurse_tree(target: Union[Observable, Analysis], callback):
+    """A utility function to run the given callback on every Observable and
+    Analysis rooted at the given Observable or Analysis object."""
     assert isinstance(target, Analysis) or isinstance(target, Observable)
+    assert callable(callback)
 
-    def _recurse(target, visited, callback):
+    visited = []
+
+    def _recurse(target, callback):
+        nonlocal visited
         callback(target)
         visited.append(target)
 
         if isinstance(target, Analysis):
             for observable in target.observables:
                 if observable not in visited:
-                    _recurse(observable, visited, callback)
+                    _recurse(observable, callback)
         elif isinstance(target, Observable):
             for analysis in target.all_analysis:
-                if analysis and analysis not in visited:
-                    _recurse(analysis, visited, callback)
+                if analysis not in visited:
+                    _recurse(analysis, callback)
 
-    _recurse(target, [], callback)
+    _recurse(target, callback)

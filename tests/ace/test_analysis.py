@@ -3,6 +3,7 @@
 import copy
 import datetime
 import json
+import os.path
 
 from ace.analysis import (
     RootAnalysis,
@@ -12,10 +13,14 @@ from ace.analysis import (
     DetectableObject,
     TaggableObject,
     Observable,
+    recurse_down,
+    recurse_tree,
+    search_down,
 )
 from ace.json import JSONEncoder
 from ace.system.analysis_module import register_analysis_module_type
 from ace.system.analysis_request import AnalysisRequest
+from ace.system.exceptions import UnknownObservableError
 from ace.constants import F_TEST
 from ace.system.analysis_tracking import (
     get_analysis_details,
@@ -447,8 +452,12 @@ def test_analysis_completed():
     observable.add_analysis(Analysis(type=amt, details=TEST_DETAILS))
     assert root.analysis_completed(observable, amt)
 
+    # unknown observable
+    with pytest.raises(UnknownObservableError):
+        root.analysis_completed(RootAnalysis().add_observable("test", "blah"), amt)
 
-@pytest.mark.integration
+
+@pytest.mark.unit
 def test_analysis_tracked():
     register_analysis_module_type(amt := AnalysisModuleType("test", "test", [F_TEST]))
 
@@ -459,6 +468,10 @@ def test_analysis_tracked():
     ar = observable.create_analysis_request(amt)
     observable.track_analysis_request(ar)
     assert root.analysis_tracked(observable, amt)
+
+    # invalid observable
+    with pytest.raises(UnknownObservableError):
+        root.analysis_tracked(RootAnalysis().add_observable("test", "blah"), amt)
 
 
 @pytest.mark.integration
@@ -630,9 +643,307 @@ def test_deepcopy_root():
     assert not (analysis_copy is analysis)
 
 
+@pytest.mark.unit
+def test_storage_dir(tmpdir):
+    root = RootAnalysis()
+    assert root.storage_dir is None
+    # use the default temp dir
+    root.initialize_storage()
+    assert root.storage_dir
+    assert os.path.isdir(root.storage_dir)
+    path = root.storage_dir
+    root.discard()
+    assert root.storage_dir is None
+    assert not os.path.isdir(path)
+
+    # specify a temp dir
+    path = str(tmpdir.mkdir("temp"))
+    root = RootAnalysis()
+    assert root.storage_dir is None
+    root.initialize_storage(path)
+    assert root.storage_dir == path
+    assert os.path.exists(path)
+    root.discard()
+    assert root.storage_dir is None
+    assert not os.path.exists(path)
+
+    # specify a temp dir that does not exist yet
+    # we'll re-use the previous one
+    root = RootAnalysis()
+    assert root.storage_dir is None
+    root.initialize_storage(path)  # does not currently exist
+    assert root.storage_dir == path
+    assert os.path.exists(path)
+    root.discard()
+    assert root.storage_dir is None
+    assert not os.path.exists(path)
+
+    # delete on gc
+    root = RootAnalysis()
+    root.initialize_storage()
+    assert os.path.exists(root.storage_dir)
+    path = root.storage_dir
+    root = None
+    import gc
+
+    gc.collect()
+    assert not os.path.exists(path)
+
+
+@pytest.mark.unit
+def test_root_str():
+    assert str(RootAnalysis())
+    root = RootAnalysis()
+    root.initialize_storage()
+    assert str(root)
+
+
+@pytest.mark.unit
+def test_root_eq():
+    # two different uuids
+    assert RootAnalysis() != RootAnalysis()
+    root = RootAnalysis()
+    # same uuids
+    assert root == copy.deepcopy(root)
+    # invalid compare
+    assert root != object()
+
+
+@pytest.mark.unit
+def test_root_all():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    observable_2 = analysis.add_observable("test", "test2")
+
+    assert sorted(root.all) == sorted([root, analysis, observable, observable_2])
+
+
+@pytest.mark.unit
+def test_root_all_tags():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    observable_2 = analysis.add_observable("test", "test2")
+
+    root.add_tag("tag1")
+    observable.add_tag("tag2")
+    analysis.add_tag("tag3")
+    observable_2.add_tag("tag4")
+
+    assert sorted(root.all_tags) == sorted(["tag1", "tag2", "tag3", "tag4"])
+
+    # add a duplicate tag so tag2 exists twice
+    root.add_tag("tag2")
+
+    # should be the same list
+    assert sorted(root.all_tags) == sorted(["tag1", "tag2", "tag3", "tag4"])
+
+
+@pytest.mark.unit
+def test_root_all_refs():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    observable_2 = analysis.add_observable("test", "test2")
+
+    # root refers to observable
+    assert root.get_all_references(observable) == [root]
+
+    # observable refers to analysis
+    assert root.get_all_references(analysis) == [observable]
+
+    # analysis refers to observable2
+    assert root.get_all_references(observable_2) == [analysis]
+
+    # nothing refers to the root
+    assert root.get_all_references(root) == []
+
+
+@pytest.mark.unit
+def test_root_all_detection_points():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    observable_2 = analysis.add_observable("test", "test2")
+
+    root.add_detection_point("test")
+    assert root.all_detection_points == [DetectionPoint("test")]
+    observable.add_detection_point("test")
+    assert root.all_detection_points == [DetectionPoint("test"), DetectionPoint("test")]
+    analysis.add_detection_point("test")
+    assert root.all_detection_points == [DetectionPoint("test"), DetectionPoint("test"), DetectionPoint("test")]
+    observable_2.add_detection_point("test")
+    assert root.all_detection_points == [
+        DetectionPoint("test"),
+        DetectionPoint("test"),
+        DetectionPoint("test"),
+        DetectionPoint("test"),
+    ]
+
+
+@pytest.mark.unit
+def test_root_get_observable():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+
+    # get by uuid
+    assert root.get_observable(observable.uuid) == observable
+    # get by identity
+    assert root.get_observable(observable) == observable
+    # get by new object
+    assert root.get_observable(RootAnalysis().add_observable("test", "test")) == observable
+    # get invalid object
+    assert root.get_observable("") is None
+    assert root.get_observable(RootAnalysis().add_observable("test", "blah")) is None
+
+
 #
 # Merging
 #
+
+
+@pytest.mark.unit
+def test_apply_merge_different_roots():
+    # you cannot merge two different roots together
+    with pytest.raises(ValueError):
+        RootAnalysis().apply_merge(RootAnalysis())
+
+
+@pytest.mark.unit
+def test_apply_diff_merge_different_roots():
+    # you cannot merge two different roots together
+    with pytest.raises(ValueError):
+        RootAnalysis().apply_diff_merge(RootAnalysis(), RootAnalysis())
+
+
+@pytest.mark.unit
+def test_root_diff_merge():
+    target = RootAnalysis()
+    before = RootAnalysis()
+    after = copy.deepcopy(before)
+    after.analysis_mode = "test"
+    after.queue = "test"
+    after.description = "test"
+    after.analysis_cancelled = True
+    after.analysis_cancelled_reason = "test"
+
+    target.apply_diff_merge(before, after)
+    assert target.analysis_mode == "test"
+    assert target.queue == "test"
+    assert target.description == "test"
+    assert target.analysis_cancelled
+    assert target.analysis_cancelled_reason == "test"
+
+
+@pytest.mark.unit
+def test_recurse_down():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    child = analysis.add_observable("test", "child")
+    observable_2 = root.add_observable("test", "other")
+
+    # we'll build a list of the nodes we visit
+    result = []
+
+    def _callback(node):
+        result.append(node)
+
+    # R -> O1 -> A -> O2
+    #   -> O3
+    recurse_down(root, _callback)
+    assert result == [root]
+
+    result = []
+    recurse_down(observable, _callback)
+    assert result == [observable, root]
+
+    result = []
+    recurse_down(analysis, _callback)
+    assert result == [analysis, observable, root]
+
+    result = []
+    recurse_down(child, _callback)
+    assert result == [child, analysis, observable, root]
+
+    result = []
+    recurse_down(observable_2, _callback)
+    assert result == [observable_2, root]
+
+    # R -> O1 -> A -> O1
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    # this points to the same observable as before
+    child = analysis.add_observable("test", "test")
+
+    result = []
+    recurse_down(observable, _callback)
+    assert len(result) == 3
+    # (order is random when there are multiple paths to root)
+    assert analysis in result and observable in result and root in result
+
+
+@pytest.mark.unit
+def test_search_down():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    child = analysis.add_observable("test", "child")
+    observable_2 = root.add_observable("test", "other")
+
+    assert search_down(child, lambda obj: obj == analysis) == analysis
+    assert search_down(child, lambda obj: obj == observable) == observable
+    assert search_down(child, lambda obj: obj == root) == root
+    assert search_down(child, lambda obj: False) is None
+
+
+@pytest.mark.unit
+def test_recurse_tree():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    child = analysis.add_observable("test", "child")
+    observable_2 = root.add_observable("test", "other")
+
+    result = []
+
+    def _callback(node):
+        result.append(node)
+
+    recurse_tree(child, _callback)
+    assert result == [child]
+
+    result = []
+    recurse_tree(analysis, _callback)
+    assert result == [analysis, child]
+
+    result = []
+    recurse_tree(observable, _callback)
+    assert result == [observable, analysis, child]
+
+    result = []
+    recurse_tree(root, _callback)
+    assert result == [root, observable, analysis, child, observable_2]
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    analysis = observable.add_analysis(type=amt)
+    # refers to prev observable
+    child = analysis.add_observable("test", "test")
+
+    result = []
+    recurse_tree(root, _callback)
+    assert result == [root, observable, analysis]
 
 
 @pytest.mark.integration

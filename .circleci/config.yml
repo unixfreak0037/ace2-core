@@ -16,16 +16,23 @@ jobs:
           command: black --check ace/
       - run:
           name: Unit tests
-          command: pytest -v -m unit
+          command: coverage run -p -m pytest -v -m unit
       - run:
           name: Integration Tests
-          command: pytest -v -m integration
+          command: coverage run -p -m pytest -v -m integration
       - run:
           name: System Tests
-          command: pytest -v -m system
+          command: coverage run -p -m pytest -v -m system
+      - run:
+          name: Combine Coverage and Upload to CodeCov
+          command: |
+            coverage combine
+            bash <(curl -s https://codecov.io/bash)
 
 workflows:
   version: 2.1
   lint_format_test:
     jobs:
-      - lint_format_test
+      - lint_format_test:
+          context:
+            - ace2-core

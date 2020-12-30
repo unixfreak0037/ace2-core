@@ -21,7 +21,7 @@ In this example we register four analysis modules:
     - Accepts "_sha256_hash_" observable types and outputs if the file has been identified as malicious or not.
     - May also add observables like file names, etc.
 - **Word Document** analysis module
-    - Accepts "_file:word_doc_" observables and outputs if the word doc is malicious.
+    - Accepts "_file_" observables and outputs if the word doc is malicious. This module depends on the File Type module to determine if a file is malicious or not.
     - May also add observables like URLs from within the document, screenshots of the document content, etc.
 
 ![Analysis Module Registration](../../material/assets/images/ace2-core-example-flow-register.png)

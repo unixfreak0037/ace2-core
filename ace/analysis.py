@@ -1008,7 +1008,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         assert isinstance(type, str)
         assert isinstance(target, Observable)
 
-        if not type in self.relationships:
+        if type not in self.relationships:
             self._relationships[type] = list()
 
         self._relationships[type].append(target.uuid)

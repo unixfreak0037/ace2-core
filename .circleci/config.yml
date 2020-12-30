@@ -33,6 +33,6 @@ workflows:
   version: 2.1
   lint_format_test:
     jobs:
-      - lint_format_test
+      - lint_format_test:
           context:
             - ace2-core

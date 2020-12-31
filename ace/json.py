@@ -5,6 +5,7 @@ import json
 
 from ace.constants import event_time_format_json_tz
 
+
 # utility class to translate custom objects into JSON
 class JSONEncoder(json.JSONEncoder):
     def default(self, obj):

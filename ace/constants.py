@@ -156,6 +156,7 @@ VALID_OBSERVABLE_TYPES = sorted(
 
 DEPRECATED_OBSERVABLES = sorted([F_CIDR, F_PCAP, F_HTTP_REQUEST, F_SUSPECT_FILE, F_YARA])
 
+
 # utility functions to work with F_IPV4_FULL_CONVERSATION types
 def parse_ipv4_full_conversation(f_ipv4_fc):
     return f_ipv4_fc.split(":", 4)

@@ -11,7 +11,7 @@ from ace.system.analysis_request import AnalysisRequest, get_analysis_request, g
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.caching import get_cached_analysis_result
 from ace.system.constants import TRACKING_STATUS_ANALYZING
-from ace.system.inbound import process_analysis_request
+from ace.system.processing import process_analysis_request
 from ace.system.work_queue import get_next_analysis_request, get_queue_size
 
 import pytest
@@ -166,7 +166,7 @@ def test_process_analysis_result(cache_ttl):
     # get the root analysis and ensure this observable has the analysis now
     root = get_root_analysis(root.uuid)
     assert root is not None
-    observable = root.get_observable_by_spec(request.observable.type, request.observable.value)
+    observable = root.get_observable(request.observable)
     assert observable is not None
     analysis = observable.get_analysis(request.type)
     assert analysis is not None
@@ -198,7 +198,7 @@ def test_cached_analysis_result():
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
     request.initialize_result()
     request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
-    process_analysis_request(request)
+    process_analysis_request(AnalysisRequest.from_dict(request.to_dict()))
 
     # this analysis result for this observable should be cached now
     assert get_cached_analysis_result(request.observable, request.type) is not None
@@ -225,7 +225,7 @@ def test_cached_analysis_result():
     # get the root analysis and ensure this observable has the analysis now
     root = get_root_analysis(root.uuid)
     assert root is not None
-    observable = root.get_observable_by_spec(request.observable.type, request.observable.value)
+    observable = root.get_observable(request.observable)
     assert observable is not None
     analysis = observable.get_analysis(request.type)
     assert analysis is not None

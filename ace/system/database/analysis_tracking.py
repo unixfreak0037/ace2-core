@@ -6,6 +6,7 @@ from typing import Any, Union
 
 import ace
 
+from ace.analysis import RootAnalysis
 from ace.database.schema import RootAnalysisTracking, AnalysisDetailsTracking
 from ace.json import JSONEncoder
 from ace.system.analysis_tracking import AnalysisTrackingInterface, UnknownRootAnalysisError
@@ -22,9 +23,12 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
 
         return json.loads(result.json_data)
 
-    def track_root_analysis(self, uuid: str, root: dict):
+    def track_root_analysis(self, root: RootAnalysis):
         """Tracks the given root to the given RootAnalysis uuid."""
-        tracking = RootAnalysisTracking(uuid=uuid, json_data=json.dumps(root, cls=JSONEncoder, sort_keys=True))
+        root_dict = root.to_dict(exclude_analysis_details=True)
+        tracking = RootAnalysisTracking(
+            uuid=root.uuid, json_data=json.dumps(root_dict, cls=JSONEncoder, sort_keys=True)
+        )
 
         ace.db.merge(tracking)
         ace.db.commit()
@@ -52,7 +56,7 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
 
             ace.db.merge(tracking)
             ace.db.commit()
-        except sqlalchemy.exc.IntegrityError as e:
+        except sqlalchemy.exc.IntegrityError:
             raise UnknownRootAnalysisError(root_uuid)
 
     def delete_analysis_details(self, uuid: str) -> bool:

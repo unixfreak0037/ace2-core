@@ -1,2 +1,7 @@
 [run]
 source = ace
+
+[report]
+exclude_lines =
+    raise NotImplementedError
+    @abstractmethod

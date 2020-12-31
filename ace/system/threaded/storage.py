@@ -1,7 +1,8 @@
 import datetime
 import hashlib
 import io
-import os, os.path
+import os
+import os.path
 
 from dataclasses import dataclass
 from typing import Union, Optional, Iterator
@@ -25,7 +26,6 @@ class ThreadedStorageInterface(ACESystemInterface):
             data = content.encode()
         elif isinstance(content, io.IOBase):
             # TODO calculate sha2 as we go
-            stream = content
             data = io.BytesIO()
             while True:
                 _buffer = content.read(io.DEFAULT_BUFFER_SIZE)

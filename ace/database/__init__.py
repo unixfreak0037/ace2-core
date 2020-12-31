@@ -86,7 +86,7 @@ def use_db(method=None):
     Returns None on error and logs error message and stack trace."""
 
     if method is None:
-        return functools.partial(use_db, name=name)
+        return functools.partial(use_db)
 
     @functools.wraps(method)
     def wrapper(*args, **kwargs):
@@ -96,7 +96,6 @@ def use_db(method=None):
                 return method(db=db, c=c, *args, **kwargs)
         except DBAPIError as e:
             logging.error("database error: {}".format(e))
-            report_exception()
             et, ei, tb = sys.exc_info()
             raise e.with_traceback(tb)
 
@@ -253,7 +252,6 @@ def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
                     ace.db.rollback()  # rolls back to the begin_nested()
                 except Exception as e:
                     logging.error(f"unable to roll back transaction: {e}")
-                    report_exception()
 
                     et, ei, tb = sys.exc_info()
                     raise e.with_traceback(tb)
@@ -284,13 +282,13 @@ def retry_multi_sql_on_deadlock(executables, *args, **kwargs):
     return retry_on_deadlock(executables, *args, **kwargs)
 
 
-def retry(func, *args, **kwargs):
+def retry(_func, *args, **kwargs):
     """Executes the wrapped function with retry_on_deadlock."""
 
-    @functools.wraps(func)
+    @functools.wraps(_func)
     def wrapper(*w_args, **w_kwargs):
         w_kwargs.update(kwargs)
-        return retry_function_on_deadlock(func, *w_args, **w_kwargs)
+        return retry_function_on_deadlock(_func, *w_args, **w_kwargs)
 
     return wrapper
 
@@ -355,27 +353,3 @@ def initialize_database():
 
     DatabaseSession = sessionmaker(bind=engine)
     ace.db = scoped_session(DatabaseSession)
-
-
-def initialize_automation_user():
-    # get the id of the ace automation account
-    try:
-        # import pymysql
-        # pymysql.connections.DEBUG = True
-        ace.AUTOMATION_USER_ID = ace.db.query(User).filter(User.username == "ace").one().id
-        ace.db.remove()
-    except Exception as e:
-        # if the account is missing go ahead and create it
-        user = User(username="ace", email="ace@localhost", display_name="automation")
-        ace.db.add(user)
-        ace.db.commit()
-
-        try:
-            ace.AUTOMATION_USER_ID = ace.db.query(User).filter(User.username == "ace").one().id
-        except Exception as e:
-            logging.critical(f"missing automation account and unable to create it: {e}")
-            sys.exit(1)
-        finally:
-            ace.db.remove()
-
-    logging.debug(f"got id {ace.AUTOMATION_USER_ID} for automation user account")

@@ -127,10 +127,10 @@ class DistributedLockingInterfaceClient(LockingInterface):
         return result.json()["result"]
 
     def get_lock_count(self) -> int:
-        result = self.client.get(f"/get_lock_count")
+        result = self.client.get("/get_lock_count")
         result.raise_for_status()
         return result.json()["result"]
 
     def reset(self):
-        result = self.client.post(f"/reset")
+        result = self.client.post("/reset")
         result.raise_for_status()

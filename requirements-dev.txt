@@ -1,5 +1,7 @@
 black
+coverage
+flake8
 mkdocs
 mkdocs-awesome-pages-plugin
+pre-commit
 pytest
-coverage

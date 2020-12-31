@@ -60,7 +60,7 @@ def process_analysis_request(ar: AnalysisRequest):
                 raise UnknownRootAnalysisError(ar)
 
             # should we cache these results?
-            if ar.is_cachable:
+            if ar.is_cachable and not ar.cache_hit:
                 cache_analysis_result(ar)
 
             # NOTE
@@ -86,7 +86,7 @@ def process_analysis_request(ar: AnalysisRequest):
                 logging.error(f"cannot find {ar.observable} in modified root {ar.modified_root}")
                 raise UnknownObservableError(ar.observable)
 
-            target_observable.apply_diff_merge(original_observable, modified_observable)
+            target_observable.apply_diff_merge(original_observable, modified_observable, ar.type)
             target_root.save()
 
             # process any analysis request links
@@ -176,6 +176,7 @@ def process_analysis_request(ar: AnalysisRequest):
                         new_ar = observable.create_analysis_request(amt)
                         new_ar.original_root = cached_result.original_root
                         new_ar.modified_root = cached_result.modified_root
+                        new_ar.cache_hit = True
                         track_analysis_request(new_ar)
                         observable.track_analysis_request(new_ar)
                         target_root.save()

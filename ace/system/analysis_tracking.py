@@ -18,11 +18,11 @@ class UnknownRootAnalysisError(ValueError):
 
 
 class AnalysisTrackingInterface(ACESystemInterface):
-    def get_root_analysis(self, uuid: str) -> Union[dict, None]:
+    def get_root_analysis(self, uuid: str) -> Union[RootAnalysis, None]:
         """Returns the root for the given uuid or None if it does not exist.."""
         raise NotImplementedError()
 
-    def track_root_analysis(self, uuid: str, root: dict):
+    def track_root_analysis(self, root: RootAnalysis):
         """Tracks the given root to the given RootAnalysis uuid."""
         raise NotImplementedError()
 
@@ -65,7 +65,7 @@ def track_root_analysis(root: RootAnalysis):
         raise ValueError(f"uuid property of {root} is None in track_root_analysis")
 
     logging.debug(f"tracking {root}")
-    get_system().analysis_tracking.track_root_analysis(root.uuid, root.to_dict())
+    get_system().analysis_tracking.track_root_analysis(root)
 
 
 def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:

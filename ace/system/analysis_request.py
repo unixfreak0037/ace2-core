@@ -1,7 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 
 import copy
-import json
 import uuid
 from typing import Union, List, Optional, Any
 
@@ -53,6 +52,8 @@ class AnalysisRequest(Lockable):
         # dict of analysis dependencies requested
         # key = analysis_module, value = Analysis
         self.dependency_analysis = {}
+        # set to True if this observable analysis result is the result of a cache hit
+        self.cache_hit = False
 
         #
         # dynamic data
@@ -291,7 +292,7 @@ def clear_tracking_by_analysis_module_type(amt: AnalysisModuleType):
 
 def submit_analysis_request(ar: AnalysisRequest):
     """Submits the given AnalysisRequest to the appropriate queue for analysis."""
-    from ace.system.inbound import process_analysis_request
+    from ace.system.processing import process_analysis_request
     from ace.system.work_queue import put_work
 
     assert isinstance(ar, AnalysisRequest)

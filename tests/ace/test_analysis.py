@@ -17,7 +17,6 @@ from ace.analysis import (
     recurse_tree,
     search_down,
 )
-from ace.json import JSONEncoder
 from ace.system.analysis_module import register_analysis_module_type
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.exceptions import UnknownObservableError
@@ -30,40 +29,6 @@ from ace.system.analysis_tracking import (
 import pytest
 
 #
-# JSON serialization
-#
-
-
-@pytest.mark.unit
-def test_encoding():
-
-    test_data = {}
-
-    class _test(object):
-        def to_dict(self):
-            return "hello world"
-
-    test_data = {
-        "datetime": datetime.datetime(2017, 11, 11, hour=7, minute=36, second=1, microsecond=1),
-        "binary_string": "你好，世界".encode("utf-8"),
-        "custom_object": _test(),
-        "dict": {},
-        "list": [],
-        "str": "test",
-        "int": 1,
-        "float": 1.0,
-        "null": None,
-        "bool": True,
-    }
-
-    json_output = json.dumps(test_data, sort_keys=True, cls=JSONEncoder)
-    assert (
-        json_output
-        == r'{"binary_string": "\u00e4\u00bd\u00a0\u00e5\u00a5\u00bd\u00ef\u00bc\u008c\u00e4\u00b8\u0096\u00e7\u0095\u008c", "bool": true, "custom_object": "hello world", "datetime": "2017-11-11T07:36:01.000001", "dict": {}, "float": 1.0, "int": 1, "list": [], "null": null, "str": "test"}'
-    )
-
-
-#
 # Detection Points
 #
 
@@ -72,6 +37,7 @@ def test_encoding():
 def test_detection_point_serialization():
     dp = DetectionPoint("description", "")
     dp == DetectionPoint.from_dict(dp.to_dict())
+    dp == DetectionPoint.from_json(dp.to_json())
 
 
 @pytest.mark.unit
@@ -88,6 +54,7 @@ def test_detectable_object_serialization():
     target.add_detection_point("test")
 
     target == DetectableObject.from_dict(target.to_dict())
+    target == DetectableObject.from_json(target.to_json())
 
 
 @pytest.mark.unit
@@ -173,6 +140,7 @@ def test_taggable_object_serialization():
     taggable_object = TaggableObject()
     taggable_object.add_tag("test")
     assert taggable_object == TaggableObject.from_dict(taggable_object.to_dict())
+    assert taggable_object == TaggableObject.from_json(taggable_object.to_json())
 
 
 @pytest.mark.unit
@@ -260,7 +228,9 @@ def test_analysis_module_type_serialization():
         additional_cache_keys=["test1", "test2"],
         types=["test1", "test2"],
     )
+
     assert amt == AnalysisModuleType.from_dict(amt.to_dict())
+    assert amt == AnalysisModuleType.from_json(amt.to_json())
 
 
 #
@@ -289,6 +259,22 @@ def test_root_analysis_serialization():
     analysis = observable.add_analysis(type=amt, details={"test": "test"})
 
     new_root = RootAnalysis.from_dict(root.to_dict())
+    assert root == new_root
+    assert root.tool == new_root.tool
+    assert root.tool_instance == new_root.tool
+    assert root.alert_type == new_root.alert_type
+    assert root.description == new_root.description
+    assert root.event_time == new_root.event_time
+    assert root.name == new_root.name
+    assert root.analysis_mode == new_root.analysis_mode
+    assert root.queue == new_root.queue
+    assert root.instructions == new_root.instructions
+
+    # the observable property for the root should always be None
+    assert root.observable is None
+    assert len(root.observables) == 1
+
+    new_root = RootAnalysis.from_json(root.to_json())
     assert root == new_root
     assert root.tool == new_root.tool
     assert root.tool_instance == new_root.tool

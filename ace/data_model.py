@@ -2,7 +2,7 @@
 
 import datetime
 import uuid
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 from ace.time import utc_now
 
@@ -81,3 +81,15 @@ class RootAnalysisModel(AnalysisModel, BaseModel):
     analysis_cancelled: Optional[bool] = False
     analysis_cancelled_reason: Optional[str]
     observable_store: Optional[dict[str, ObservableModel]]
+
+
+class AnalysisRequestModel(BaseModel):
+    id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
+    root: Optional[Union[str, RootAnalysisModel]] = None
+    observable: Optional[ObservableModel] = None
+    type: Optional[AnalysisModuleTypeModel] = None
+    cache_hit: Optional[bool] = False
+    status: Optional[str] = None
+    owner: Optional[str] = None
+    original_root: Optional[RootAnalysisModel] = None
+    modified_root: Optional[RootAnalysisModel] = None

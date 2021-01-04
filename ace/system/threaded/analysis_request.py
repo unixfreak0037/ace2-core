@@ -8,7 +8,6 @@ import threading
 from operator import itemgetter
 from typing import Optional, List, Union
 
-from ace.json import JSONEncoder
 from ace.analysis import Observable
 from ace.system.constants import TRACKING_STATUS_ANALYZING
 from ace.system.analysis_request import AnalysisRequestTrackingInterface, AnalysisRequest
@@ -41,7 +40,7 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
 
     def track_analysis_request(self, request: AnalysisRequest):
         with self.sync_lock:
-            json_data = json.dumps(request.to_dict(), cls=JSONEncoder, sort_keys=True)
+            json_data = request.to_json()
             # are we already tracking this?
             existing_analysis_request = self.get_analysis_request_by_request_id(request.id)
             self.analysis_requests[request.id] = json_data
@@ -84,7 +83,7 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
 
     def _track_request_expiration(self, request: AnalysisRequest):
         """Utility function that implements the tracking of the expiration of the request."""
-        json_data = json.dumps(request.to_dict(), cls=JSONEncoder, sort_keys=True)
+        json_data = request.to_json()
         # are we already tracking this?
         if request.id not in self.expiration_tracking:
             self.expiration_tracking[request.id] = (
@@ -108,7 +107,7 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
                 logging.debug(f"analysis request {key} does not exist")
                 return False
 
-            request = AnalysisRequest.from_dict(json.loads(json_data))
+            request = AnalysisRequest.from_json(json_data)
 
             # also delete from the cache lookup if it's in there
             if request.cache_key:
@@ -147,14 +146,14 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             except KeyError:
                 return []
 
-        return [AnalysisRequest.from_dict(json.loads(_)) for _ in result]
+        return [AnalysisRequest.from_json(_) for _ in result]
 
     # this is called when an analysis module type is removed (or expired)
     def clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
         with self.sync_lock:
             target_list = []  # the list of request.id that we need to get rid of
             for request_id, json_data in self.request_tracking.items():
-                request = AnalysisRequest.from_dict(json.loads(json_data))
+                request = AnalysisRequest.from_json(json_data)
                 if request.type.name == amt.name:
                     target_list.append(request_id)
 
@@ -172,7 +171,7 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         if json_data is None:
             return None
 
-        return AnalysisRequest.from_dict(json.loads(json_data))
+        return AnalysisRequest.from_json(json_data)
 
     def get_analysis_request_by_cache_key(self, key: str) -> Union[AnalysisRequest, None]:
         with self.sync_lock:

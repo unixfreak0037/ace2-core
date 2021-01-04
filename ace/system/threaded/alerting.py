@@ -4,17 +4,16 @@ import json
 from typing import Union, Any
 
 from ace.analysis import RootAnalysis
-from ace.json import JSONEncoder
 from ace.system.alerting import AlertTrackingInterface
 
 
 class ThreadedAlertTrackingInterface(AlertTrackingInterface):
 
-    alerts = {}  # key = uuid, value = RootAnalysis
+    alerts = {}  # key = uuid, value = RootAnalysis.to_json()
 
     def track_alert(self, root: RootAnalysis) -> Any:
         assert isinstance(root, RootAnalysis)
-        self.alerts[root.uuid] = json.dumps(root.to_dict(), cls=JSONEncoder)
+        self.alerts[root.uuid] = root.to_json()
         return root.uuid
 
     def get_alert(self, id: str) -> Union[Any, None]:
@@ -23,7 +22,7 @@ class ThreadedAlertTrackingInterface(AlertTrackingInterface):
         if not result:
             return None
 
-        return RootAnalysis.from_dict(json.loads(result))
+        return RootAnalysis.from_json(result)
 
     def reset(self):
         self.alerts = {}

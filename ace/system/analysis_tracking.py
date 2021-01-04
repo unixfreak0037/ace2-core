@@ -51,11 +51,7 @@ def get_root_analysis(root: Union[RootAnalysis, str]) -> Union[RootAnalysis, Non
         root = root.uuid
 
     logging.debug(f"getting root analysis uuid {root}")
-    root_dict = get_system().analysis_tracking.get_root_analysis(root)
-    if root_dict is None:
-        return None
-
-    return RootAnalysis.from_dict(root_dict)
+    return get_system().analysis_tracking.get_root_analysis(root)
 
 
 def track_root_analysis(root: RootAnalysis):

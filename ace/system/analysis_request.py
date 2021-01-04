@@ -5,6 +5,7 @@ import uuid
 from typing import Union, List, Optional, Any
 
 from ace.analysis import RootAnalysis, Observable
+from ace.data_model import AnalysisRequestModel, RootAnalysisModel
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
@@ -77,51 +78,61 @@ class AnalysisRequest(Lockable):
     def __str__(self):
         return f"AnalysisRequest(id={self.id},root={self.root},observable={self.observable},type={self.type})"
 
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "observable": self.observable.to_dict() if self.observable else None,
-            "type": self.type.to_dict() if self.type else None,
-            "root": self.root.to_dict(),
-            "dependency_analysis": self.dependency_analysis,
-            "status": self.status,
-            "owner": self.owner,
-            "original_root": self.original_root.to_dict() if self.original_root else None,
-            "modified_root": self.modified_root.to_dict() if self.modified_root else None,
-        }
+    def to_model(self, *args, **kwargs) -> AnalysisRequestModel:
+        return AnalysisRequestModel(
+            id=self.id,
+            root=self.root if isinstance(self.root, str) else self.root.to_model(*args, **kwargs),
+            observable=self.observable.to_model(*args, **kwargs) if self.observable else None,
+            type=self.type.to_model(*args, **kwargs) if self.type else None,
+            status=self.status,
+            owner=self.owner,
+            original_root=self.original_root.to_model(*args, **kwargs) if self.original_root else None,
+            modified_root=self.modified_root.to_model(*args, **kwargs) if self.modified_root else None,
+        )
+
+    def to_dict(self, *args, **kwargs) -> dict:
+        return self.to_model(*args, **kwargs).dict()
+
+    def to_json(self, *args, **kwargs) -> str:
+        return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(json_data: dict) -> "AnalysisRequest":
-        assert isinstance(json_data, dict)
+    def from_dict(value: dict) -> "AnalysisRequest":
+        assert isinstance(value, dict)
 
-        root = RootAnalysis.from_dict(json_data["root"])
+        data = AnalysisRequestModel(**value)
+
+        root = None
+        if isinstance(data.root, RootAnalysisModel):
+            root = RootAnalysis.from_dict(data.root.dict())
 
         observable = None
-        if json_data["observable"]:
-            observable = Observable.from_dict(json_data["observable"], root)
+        if data.observable:
+            observable = Observable.from_dict(data.observable.dict(), root)
             observable = root.get_observable(observable)
 
         type = None
-        if json_data["type"]:
-            type = AnalysisModuleType.from_dict(json_data["type"])
+        if data.type:
+            type = AnalysisModuleType.from_dict(data.type.dict())
 
         ar = AnalysisRequest(root, observable, type)
-        ar.id = json_data["id"]
-        ar.dependency_analysis = json_data["dependency_analysis"]
-        ar.status = json_data["status"]
-        ar.owner = json_data["owner"]
+        ar.id = data.id
+        # ar.dependency_analysis = json_data["dependency_analysis"]
+        ar.status = data.status
+        ar.owner = data.owner
 
-        if json_data["original_root"]:
-            ar.original_root = RootAnalysis.from_dict(json_data["original_root"])
+        if data.original_root:
+            ar.original_root = RootAnalysis.from_dict(data.original_root.dict())
 
-        if json_data["modified_root"]:
-            ar.modified_root = RootAnalysis.from_dict(json_data["modified_root"])
+        if data.modified_root:
+            ar.modified_root = RootAnalysis.from_dict(data.modified_root.dict())
 
         return ar
 
-    @property
-    def json(self):
-        return self.to_dict()
+    @staticmethod
+    def from_json(value: str) -> "AnalysisRequest":
+        assert isinstance(value, str)
+        return AnalysisRequest.from_dict(AnalysisRequestModel.parse_raw(value).dict())
 
     #
     # Lockable interface

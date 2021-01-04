@@ -9,16 +9,13 @@ import ace.database.schema
 
 from ace.analysis import AnalysisModuleType
 from ace.database.schema import AnalysisModuleTracking
-from ace.json import JSONEncoder
 from ace.system.analysis_module import AnalysisModuleTrackingInterface
 
 
 class DatabaseAnalysisModuleTrackingInterface(AnalysisModuleTrackingInterface):
     def track_analysis_module_type(self, amt: AnalysisModuleType):
         assert isinstance(amt, AnalysisModuleType)
-        db_amt = AnalysisModuleTracking(
-            name=amt.name, json_data=json.dumps(amt.to_dict(), cls=JSONEncoder, sort_keys=True)
-        )
+        db_amt = AnalysisModuleTracking(name=amt.name, json_data=amt.to_json())
 
         ace.db.merge(db_amt)
         ace.db.commit()

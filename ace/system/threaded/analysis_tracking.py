@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from typing import Union, List, Optional, Any
 
 from ace.analysis import RootAnalysis, Observable, Analysis
-from ace.json import JSONEncoder
 from ace.system.analysis_tracking import AnalysisTrackingInterface, UnknownRootAnalysisError
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.exceptions import *
@@ -25,14 +24,15 @@ class ThreadedAnalysisTrackingInterface(AnalysisTrackingInterface):
 
     def track_root_analysis(self, root: RootAnalysis):
         assert isinstance(root, RootAnalysis)
-        root_dict = root.to_dict(exclude_analysis_details=True)
-        self.root_analysis[root.uuid] = RootAnalysisTracking(root=json.dumps(root_dict, cls=JSONEncoder))
+        self.root_analysis[root.uuid] = RootAnalysisTracking(root=root.to_json(exclude_analysis_details=True))
 
-    def get_root_analysis(self, uuid: str) -> Union[dict, None]:
+    def get_root_analysis(self, uuid: str) -> Union[RootAnalysis, None]:
         try:
-            return json.loads(self.root_analysis[uuid].root)
+            tracking = self.root_analysis[uuid]
         except KeyError:
             return None
+
+        return RootAnalysis.from_json(tracking.root)
 
     def delete_root_analysis(self, uuid: str) -> bool:
         root_tracking = self.root_analysis.pop(uuid, None)

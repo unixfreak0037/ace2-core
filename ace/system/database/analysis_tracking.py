@@ -8,26 +8,25 @@ import ace
 
 from ace.analysis import RootAnalysis
 from ace.database.schema import RootAnalysisTracking, AnalysisDetailsTracking
-from ace.json import JSONEncoder
 from ace.system.analysis_tracking import AnalysisTrackingInterface, UnknownRootAnalysisError
 
 import sqlalchemy.exc
 
 
 class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
-    def get_root_analysis(self, uuid: str) -> Union[dict, None]:
+    def get_root_analysis(self, uuid: str) -> Union[RootAnalysisTracking, None]:
         """Returns the root for the given uuid or None if it does not exist.."""
         result = ace.db.query(RootAnalysisTracking).filter(RootAnalysisTracking.uuid == uuid).one_or_none()
         if not result:
             return None
 
-        return json.loads(result.json_data)
+        return RootAnalysis.from_json(result.json_data)
 
     def track_root_analysis(self, root: RootAnalysis):
         """Tracks the given root to the given RootAnalysis uuid."""
-        root_dict = root.to_dict(exclude_analysis_details=True)
         tracking = RootAnalysisTracking(
-            uuid=root.uuid, json_data=json.dumps(root_dict, cls=JSONEncoder, sort_keys=True)
+            uuid=root.uuid,
+            json_data=root.to_json(exclude_analysis_details=True),
         )
 
         ace.db.merge(tracking)
@@ -51,7 +50,7 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
         """Tracks the details for the given Analysis object (uuid) in the given root (root_uuid)."""
         try:
             tracking = AnalysisDetailsTracking(
-                uuid=uuid, root_uuid=root_uuid, json_data=json.dumps(value, cls=JSONEncoder, sort_keys=True)
+                uuid=uuid, root_uuid=root_uuid, json_data=json.dumps(value, sort_keys=True)
             )
 
             ace.db.merge(tracking)

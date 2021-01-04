@@ -9,7 +9,6 @@ from typing import Optional, Union
 import ace
 
 from ace.analysis import Observable
-from ace.json import JSONEncoder
 from ace.database.schema import AnalysisRequestTracking
 from ace.system.constants import TRACKING_STATUS_ANALYZING
 from ace.system.analysis_request import AnalysisRequestTrackingInterface, AnalysisRequest
@@ -31,7 +30,7 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             analysis_module_type=request.type.name if request.type else None,
             cache_key=request.cache_key,
             root_uuid=request.root.uuid,
-            json_data=json.dumps(request, cls=JSONEncoder, sort_keys=True),
+            json_data=request.to_json(),
         )
 
         ace.db.merge(db_request)

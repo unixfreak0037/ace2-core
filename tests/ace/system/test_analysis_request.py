@@ -31,6 +31,34 @@ TEST_OWNER = "test_owner"
 
 
 @pytest.mark.unit
+def test_analysis_request_serialization():
+    root = RootAnalysis()
+    observable = root.add_observable(F_TEST, "1.2.3.4")
+    request = observable.create_analysis_request(amt)
+
+    assert request == AnalysisRequest.from_dict(request.to_dict())
+    assert request == AnalysisRequest.from_json(request.to_json())
+
+    other = AnalysisRequest.from_dict(request.to_dict())
+    assert request.id == other.id
+    assert request.observable == other.observable
+    assert request.type == other.type
+    assert request.status == other.status
+    assert request.owner == other.owner
+    assert request.original_root == other.original_root
+    assert request.modified_root == other.modified_root
+
+    other = AnalysisRequest.from_json(request.to_json())
+    assert request.id == other.id
+    assert request.observable == other.observable
+    assert request.type == other.type
+    assert request.status == other.status
+    assert request.owner == other.owner
+    assert request.original_root == other.original_root
+    assert request.modified_root == other.modified_root
+
+
+@pytest.mark.unit
 def test_is_observable_analysis_request():
     root = RootAnalysis()
     observable = root.add_observable(F_TEST, "1.2.3.4")

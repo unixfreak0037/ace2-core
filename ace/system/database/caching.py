@@ -1,14 +1,12 @@
 # vim: ts=4:sw=4:et:cc=120
 
 import datetime
-import json
 
 from dataclasses import dataclass
 from typing import Union, Optional
 
 import ace
 
-from ace.json import JSONEncoder
 from ace.database.schema import AnalysisResultCache
 from ace.system.caching import CachingInterface
 from ace.system.analysis_request import AnalysisRequest
@@ -24,7 +22,7 @@ class DatabaseCachingInterface(CachingInterface):
         if result.expiration_date is not None and utc_now() > result.expiration_date:
             return None
 
-        return AnalysisRequest.from_dict(json.loads(result.json_data))
+        return AnalysisRequest.from_json(result.json_data)
 
     def cache_analysis_result(self, cache_key: str, request: AnalysisRequest, expiration: Optional[int]) -> str:
         expiration_date = None
@@ -35,7 +33,7 @@ class DatabaseCachingInterface(CachingInterface):
         cache_result = AnalysisResultCache(
             cache_key=cache_key,
             expiration_date=expiration_date,
-            json_data=json.dumps(request.to_dict(), cls=JSONEncoder, sort_keys=True),
+            json_data=request.to_json(),
         )
 
         ace.db.merge(cache_result)

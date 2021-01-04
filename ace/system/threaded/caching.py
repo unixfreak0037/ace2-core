@@ -6,7 +6,6 @@ import json
 from dataclasses import dataclass
 from typing import Union, Optional
 
-from ace.json import JSONEncoder
 from ace.system.caching import CachingInterface
 from ace.system.analysis_request import AnalysisRequest
 
@@ -19,7 +18,7 @@ class CachedAnalysisResult:
 
 class ThreadedCachingInterface(CachingInterface):
 
-    cache = {}  # key = generate_cache_key(), value = CachedAnalysis.to_dict
+    cache = {}  # key = generate_cache_key(), value = CachedAnalysisResult
 
     def get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
         try:
@@ -28,13 +27,13 @@ class ThreadedCachingInterface(CachingInterface):
                 del self.cache[cache_key]
                 return None
 
-            return AnalysisRequest.from_dict(json.loads(cached_analysis.request))
+            return AnalysisRequest.from_json(cached_analysis.request)
 
         except KeyError:
             return None
 
     def cache_analysis_result(self, cache_key: str, request: AnalysisRequest, expiration: Optional[int]) -> str:
-        cached_result = CachedAnalysisResult(json.dumps(request.to_dict(), cls=JSONEncoder))
+        cached_result = CachedAnalysisResult(request.to_json())
         if expiration is not None:
             cached_result.expiration = datetime.datetime.now() + datetime.timedelta(seconds=expiration)
 

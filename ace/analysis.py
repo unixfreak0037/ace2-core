@@ -19,7 +19,8 @@ from typing import List, Union, Optional, Any
 import ace
 from ace.constants import F_FILE
 from ace.indicators import Indicator, IndicatorList
-from ace.json import JSONEncoder
+
+# from ace.json import JSONEncoder
 from ace.system.exceptions import UnknownObservableError
 from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
@@ -68,17 +69,31 @@ class DetectionPoint:
         self.description = description
         self.details = details
 
+    def to_model(self, *args, **kwargs) -> DetectionPointModel:
+        return DetectionPointModel(description=self.description, details=self.details)
+
     def to_dict(self, *args, **kwargs) -> dict:
-        return DetectionPointModel(description=self.description, details=self.details).dict()
+        return self.to_model(*args, **kwargs).dict()
+
+    def to_json(self, *args, **kwargs) -> str:
+        return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, detection_point: Optional["DetectionPoint"] = None):
+    def from_dict(value: dict, detection_point: Optional["DetectionPoint"] = None) -> "DetectionPoint":
         assert isinstance(value, dict)
+        assert detection_point is None or isinstance(detection_point, DetectionPoint)
         data = DetectionPointModel(**value)
         result = detection_point or DetectionPoint()
         result.description = data.description
         result.details = data.details
         return result
+
+    @staticmethod
+    def from_json(value: str, detection_point: Optional["DetectionPoint"] = None) -> "DetectionPoint":
+        assert isinstance(value, str)
+        assert detection_point is None or isinstance(detection_point, DetectionPoint)
+        data = DetectionPointModel.parse_raw(value)
+        return DetectionPoint.from_dict(data.dict(), detection_point)
 
     def __str__(self):
         return "DetectionPoint({})".format(self.description)
@@ -97,16 +112,29 @@ class DetectableObject(MergableObject):
         super().__init__(*args, **kwargs)
         self._detections = []
 
+    def to_model(self, *args, **kwargs) -> DetectableObjectModel:
+        return DetectableObjectModel(detections=[DetectionPointModel(**_.to_dict()) for _ in self.detections])
+
     def to_dict(self, *args, **kwargs) -> dict:
-        return DetectableObjectModel(detections=[DetectionPointModel(**_.to_dict()) for _ in self.detections]).dict()
+        return self.to_model(*args, **kwargs).dict()
+
+    def to_json(self, *args, **kwargs) -> str:
+        return self.to_model(*args, **kwargs).json()
 
     @staticmethod
     def from_dict(value: dict, detectable_object: Optional["DetectableObject"] = None) -> "DetectableObject":
         assert isinstance(value, dict)
+        assert detectable_object is None or isinstance(detectable_object, DetectableObject)
         data = DetectableObjectModel(**value)
         result = detectable_object or DetectableObject()
         result.detectables = [DetectionPoint.from_dict(_.dict()) for _ in data.detections]
         return result
+
+    @staticmethod
+    def from_json(value: str, detectable_object: Optional["DetectableObject"] = None) -> "DetectableObject":
+        assert isinstance(value, str)
+        assert detectable_object is None or isinstance(detectable_object, DetectableObject)
+        return DetectableObject.from_dict(DetectableObjectModel.parse_raw(value).dict(), detectable_object)
 
     @property
     def detections(self):
@@ -169,8 +197,14 @@ class TaggableObject(MergableObject):
         # list of strings
         self._tags = []
 
+    def to_model(self, *args, **kwargs) -> TaggableObjectModel:
+        return TaggableObjectModel(tags=self.tags)
+
     def to_dict(self, *args, **kwargs) -> dict:
-        return TaggableObjectModel(tags=self.tags).dict()
+        return self.to_model(*args, **kwargs).dict()
+
+    def to_json(self, *args, **kwargs) -> str:
+        return self.to_model(*args, **kwargs).json()
 
     @staticmethod
     def from_dict(value: dict, taggable_object: Optional["TaggableObject"] = None) -> "TaggableObject":
@@ -179,6 +213,12 @@ class TaggableObject(MergableObject):
         result = taggable_object or TaggableObject()
         result.tags = data.tags
         return result
+
+    @staticmethod
+    def from_json(value: str, taggable_object: Optional["TaggableObject"] = None) -> "TaggableObject":
+        assert isinstance(value, str)
+        assert taggable_object is None or isinstance(taggable_object, TaggableObject)
+        return TaggableObject.from_dict(TaggableObjectModel.parse_raw(value).dict(), taggable_object)
 
     @property
     def tags(self):
@@ -278,13 +318,24 @@ class AnalysisModuleType:
         )
         # XXX should probably check the other fields as well
 
+    def to_model(self, *args, **kwargs) -> AnalysisModuleTypeModel:
+        return AnalysisModuleTypeModel(**asdict(self))
+
     def to_dict(self, *args, **kwargs) -> dict:
-        return AnalysisModuleTypeModel(**asdict(self)).dict()
+        return self.to_model(*args, **kwargs).dict()
+
+    def to_json(self, *args, **kwargs) -> str:
+        return self.to_model(*args, **kwargs).json()
 
     @staticmethod
     def from_dict(value: dict) -> "AnalysisModuleType":
         data = AnalysisModuleTypeModel(**value)
         return AnalysisModuleType(**data.dict())
+
+    @staticmethod
+    def from_json(value: str) -> "AnalysisModuleType":
+        assert isinstance(value, str)
+        return AnalysisModuleType.from_dict(AnalysisModuleTypeModel.parse_raw(value).dict())
 
     def accepts(self, observable: Observable) -> bool:
         from ace.system.analysis_module import get_analysis_module_type
@@ -453,7 +504,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             logging.error("unable to load analysis details {self.uuid}: {e}")
             raise e
 
-    def to_dict(self, *args, exclude_analysis_details=False, **kwargs):
+    def to_model(self, *args, exclude_analysis_details=False, **kwargs) -> AnalysisModel:
         return AnalysisModel(
             tags=self.tags,
             detections=[DetectionPointModel(**_.to_dict(*args, **kwargs)) for _ in self.detections],
@@ -463,7 +514,13 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             observable_ids=self.observable_ids,
             summary=self.summary,
             details=None if exclude_analysis_details else self._details,
-        ).dict()
+        )
+
+    def to_dict(self, *args, **kwargs) -> dict:
+        return self.to_model(*args, **kwargs).dict()
+
+    def to_json(self, *args, **kwargs) -> str:
+        return self.to_model(*args, **kwargs).json()
 
     @staticmethod
     def from_dict(value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
@@ -493,13 +550,18 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         # result.iocs = value[Analysis.KEY_IOCS]
         result.uuid = data.uuid
 
-        if data.details:
+        if data.details is not None:
             result._details = data.details
             result._details_loaded = False
             result._details_modified = True  # XXX ??? I think this is right
 
         result.root = root
         return result
+
+    @staticmethod
+    def from_json(value: str, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
+        assert isinstance(value, str)
+        return Analysis.from_dict(AnalysisModel.parse_raw(value).dict(), root, analysis)
 
     @property
     def iocs(self):
@@ -776,7 +838,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         """Returns True if the given value matches this value of this observable.  This can be overridden to provide more advanced matching such as CIDR for ipv4."""
         return self.value == value
 
-    def to_dict(self, *args, **kwargs) -> dict:
+    def to_model(self, *args, **kwargs) -> ObservableModel:
         return ObservableModel(
             tags=self.tags,
             detections=[DetectionPointModel(**_.to_dict(*args, **kwargs)) for _ in self.detections],
@@ -796,7 +858,13 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             relationships=self.relationships,
             grouping_target=self.grouping_target,
             request_tracking=self.request_tracking,
-        ).dict()
+        )
+
+    def to_dict(self, *args, **kwargs) -> dict:
+        return self.to_model(*args, **kwargs).dict()
+
+    def to_json(self, *args, **kwargs) -> str:
+        return self.to_model(*args, **kwargs).json()
 
     @staticmethod
     def from_dict(value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None) -> "Observable":
@@ -829,6 +897,11 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         observable.request_tracking = data.request_tracking
 
         return observable
+
+    @staticmethod
+    def from_json(value: str, root: "RootAnalysis", observable: Optional["Observable"] = None) -> "Observable":
+        assert isinstance(value, str)
+        return Observable.from_dict(ObservableModel.parse_raw(value).dict(), root, observable)
 
     @property
     def type(self) -> str:
@@ -1445,7 +1518,7 @@ class RootAnalysis(Analysis, MergableObject):
         if expires is not None:
             self.expires = expires
 
-    def to_dict(self, *args, exclude_analysis_details=False, **kwargs):
+    def to_model(self, *args, exclude_analysis_details=False, **kwargs) -> RootAnalysisModel:
         return RootAnalysisModel(
             tags=self.tags,
             detections=[
@@ -1478,7 +1551,13 @@ class RootAnalysis(Analysis, MergableObject):
                 ).dict()
                 for id, observable in self.observable_store.items()
             },
-        ).dict()
+        )
+
+    def to_dict(self, *args, **kwargs) -> dict:
+        return self.to_model(*args, **kwargs).dict()
+
+    def to_json(self, *args, **kwargs) -> str:
+        return self.to_model(*args, **kwargs).json()
 
     @staticmethod
     def from_dict(value: dict) -> "RootAnalysis":
@@ -1509,6 +1588,11 @@ class RootAnalysis(Analysis, MergableObject):
         root._expires = data.expires
         root._state = data.state
         return root
+
+    @staticmethod
+    def from_json(value: str) -> "RootAnalysis":
+        assert isinstance(value, str)
+        return RootAnalysis.from_dict(RootAnalysisModel.parse_raw(value).dict())
 
     @property
     def analysis_mode(self):

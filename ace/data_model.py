@@ -24,7 +24,7 @@ class DetectableObjectModel(BaseModel):
 
     detections: Optional[list[DetectionPointModel]] = Field(
         description="the list of detection points", default_factory=list
-    )  # XXX set
+    )
 
 
 class TaggableObjectModel(BaseModel):
@@ -40,32 +40,32 @@ class AnalysisModuleTypeModel(BaseModel):
         default_factory=list,
         description="""List of observable types this analysis module will analyze. 
     An empty list means all observable types are supported.""",
-    )  # XXX set
+    )
     directives: list[str] = Field(
         default_factory=list,
         description="""List of required directives for this analysis module.
         An observable must have ALL of these directives added for this analysis module to accept it.
         An empty list means this analysis module has no required directives.""",
-    )  # XXX set
+    )
     dependencies: list[str] = Field(
         default_factory=list,
         description="""The list of analysis modules this module is dependant on.
     ACE waits until all dependencies are met before submitting the analysis request to the module.
     Analysis requests will contain the results of the dependent analysis.
     An empty list means this analysis module has no dependencies.""",
-    )  # XXX set
+    )
     tags: list[str] = Field(
         default_factory=list,
         description="""The list of all required tags for this analysis module.
     An analysis request will not created for this analysis module unless the target observable has all the tags listed.
     An empty list means this module has no required tags.""",
-    )  # XXX set
+    )
     modes: list[str] = Field(
         default_factory=list,
         description="""The list of valid analysis modes for this module.
     The analysis_mode property of the RootAnalysis must be set to one of these values.
     An empty list means that this module runs in all analysis modes.""",
-    )  # XXX set
+    )
     version: str = Field(
         "1.0.0",
         description="""Free form version of the module.
@@ -95,9 +95,7 @@ class AnalysisModuleTypeModel(BaseModel):
         module uses signatures, the hash of the signatures could be used here
         which would automatically invalidate cache results when it changed.""",
     )
-    types: list[str] = Field(
-        default_factory=list, description="""Optional list of module catagorization types."""
-    )  # XXX set
+    types: list[str] = Field(default_factory=list, description="""Optional list of module catagorization types.""")
 
 
 class AnalysisModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
@@ -110,7 +108,7 @@ class AnalysisModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
     observable_id: Optional[str] = Field(description="""The observable this analysis is for.""")
     observable_ids: Optional[list[str]] = Field(
         default_factory=list, description="""The list of observables discovered during this analysis."""
-    )  # XXX set
+    )
     summary: Optional[str] = Field(description="""A brief human readable description of the results of the analysis.""")
     details: Optional[Any] = Field(
         description="""The free-form result of the analysis (must be a serializable into JSON.)"""
@@ -153,34 +151,34 @@ class ObservableModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
 
     directives: Optional[list[str]] = Field(
         default_factory=list, description="""The list of directives added to this observable."""
-    )  # XXX set
+    )
 
     redirection: Optional[str] = Field(description="""Optional observable target for redirection.""")
     links: Optional[list[str]] = Field(
         default_factory=list,
         description="""The list of observables linked to this observable.
             Observables that are linked receive the same tags.""",
-    )  # XXX set
+    )
     limited_analysis: Optional[list[str]] = Field(
         default_factory=list,
         description="""The list of analysis modules this observable is
             limited to. The modules in this list are the only modules that will
             analyze this observable. An empty list means there are no
             limitation.""",
-    )  # XXX set
+    )
     excluded_analysis: Optional[list[str]] = Field(
         default_factory=list,
         description="""The list of analysis modules that are excluded by
             this observable. Modules in this list are not executed against this
             observable. An empty list means nothing is excluded.""",
-    )  # XXX set
+    )
     relationships: Optional[dict[str, list[str]]] = Field(
         default_factory=dict,
         description="""A mapping of relationships between this observable
             and other observables. The key is the name of the relationship. The
             value for each key is a list of one or more observables related in
             this way.""",
-    )  # XXX set
+    )
     grouping_target: Optional[bool] = Field(
         description="""An optional boolean value that indicates this
             observable should be used as the "grouping target" for all

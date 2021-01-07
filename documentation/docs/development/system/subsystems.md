@@ -6,7 +6,7 @@ The core library contains some default implementations of the subsystems for var
 
 ### Threaded
 
-The threaded subsystem interfaces defined in `ace.system.threaded` are simple implementations that
+The threaded subsystem interfaces defined in `ace.system.threaded` are simple implementations that:
 
 - assume the entire system runs in a single process under multiple threads
 - tracks all data in in-memory data structures
@@ -21,10 +21,10 @@ The database subsystem interfaces defined in `ace.system.database` are implement
 
 The distributed subsystem interfaces defined in `ace.system.distributed` are implementations that use FastAPI to expose the interfaces to external systems.
 
-The distributed subsystem can be used to implement a highly scalable ace core system.
+The distributed subsystem can be used to implement a highly scalable ACE core system.
 
 ## Core Subsystem Composition
 
-The ace core can be composed of any combination of subsystem implementations. They can be mixed in whatever combination is required.
+The ACE core can be composed of any combination of subsystem implementations. They can be mixed in whatever combination is required.
 
-This is possible because each subsystem has no dependency on another except though the core system API.
+This is possible because each subsystem has no dependency on another except through the core system API.

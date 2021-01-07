@@ -1,11 +1,11 @@
 # Analysis
 
-An **analysis** is the output of the analysis of an [observable](observable.md). It consists of
+An **analysis** is the output of the analysis of an [observable](observable.md). It consists of:
 
-- zero or more observables.
-- a free form JSON formatted analysis output.
-- zero or more [tags](tags.md).
-- zero or more [detection points](detection_points.md).
+- zero or more observables
+- a free form JSON formatted analysis output
+- zero or more [tags](tags.md)
+- zero or more [detection points](detection_points.md)
 
 The relationship between analysis and observable is always parent-child.
 

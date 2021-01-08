@@ -14,7 +14,7 @@ import tempfile
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
-from typing import List, Union, Optional, Any
+from typing import Union, Optional, Any
 
 import ace
 from ace.constants import F_FILE
@@ -285,15 +285,15 @@ class AnalysisModuleType:
     # brief English description of what the module does
     description: str
     # list of supported observable types (empty list supports all observable)
-    observable_types: List[str] = field(default_factory=list)
+    observable_types: list[str] = field(default_factory=list)
     # list of required directives (empty list means no requirement)
-    directives: List[str] = field(default_factory=list)
+    directives: list[str] = field(default_factory=list)
     # list of other analysis module type names to wait for (empty list means no deps)
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     # list of required tags (empty list means no requirement)
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     # list of valid analysis modes
-    modes: List[str] = field(default_factory=list)
+    modes: list[str] = field(default_factory=list)
     # the current version of the analysis module type
     version: str = "1.0.0"
     # how long this analysis module has before it times out (in seconds)
@@ -304,10 +304,10 @@ class AnalysisModuleType:
     # a value of None means it is not cached
     cache_ttl: Optional[int] = None
     # what additional values should be included to determine the cache key?
-    additional_cache_keys: List[str] = field(default_factory=list)
+    additional_cache_keys: list[str] = field(default_factory=list)
     # what kind of analysis module does this classify as?
     # examples: [ 'sandbox' ], [ 'splunk' ], etc...
-    types: List[str] = field(default_factory=list)
+    types: list[str] = field(default_factory=list)
 
     def version_matches(self, amt) -> bool:
         """Returns True if the given amt is the same version as this amt."""
@@ -758,7 +758,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
         return self.add_observable(F_FILE, store_file(path, roots=[self.uuid], **kwargs))
 
-    def add_ioc(self, type_: str, value: str, status: str = "New", tags: List[str] = []):
+    def add_ioc(self, type_: str, value: str, status: str = "New", tags: list[str] = []):
         self.iocs.append(Indicator(type_, value, status=status, tags=tags))
 
     def __str__(self):

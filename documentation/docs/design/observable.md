@@ -1,44 +1,45 @@
 # Observables
 
-An **observable** represents an observation made during the course of analysis. It always has a **type** and a **value**, and optionally has a time at which the observation was made. If the observable is missing the time then the time is assumed to be the time of the entire event that is being analyzed.
+An **observable** represents an observation made during the course of analysis. It always has a *type* and a *value*, and, optionally, has a time at which the observation was made. If the observable is missing the time, then the time is assumed to be the time of the entire event that is being analyzed.
 
-Observables are **always** children of [analysis](analysis.md) based objects.
+Observables are *always* children of [analysis](analysis.md)-based objects.
 
 Observables are analyzed by [analysis modules](analysis_module.md) which generate [analysis](analysis.md) as output. The newly created analysis can also contain more observables.
 
-Observables are unique according to their type, value and time. If an observable with the same type, value and time as another existing observable is added, it references the existing observable instead of creating a new one.
+Observables are unique according to their type, value, and time. If an observable with the same type, value, and time as another existing observable is added, it references the existing observable instead of creating a new one.
 
 Note that observables are unique by time. You can optionally [group them together by time]() if you need to.
 
 ## Tagging
 
-An observable can have zero or more [tags](tags.md). Tagging is used to tie some concept, idea or grouping property to the observables.
+An observable can have zero or more [tags](tags.md). **Tagging** is used to tie some concept, idea or grouping property to the observables.
 
 ## Directives
 
-An observable can have zero or more [directives](directives.md). Directives are used to give [analysis modules](analysis_module.md) some additional instructions on how to handle the observable.
+An observable can have zero or more **[directives](directives.md)**. Directives are used to give [analysis modules](analysis_module.md) some additional instructions on how to handle the observable.
 
 ## Redirection
 
-An observable can include a **redirection** which points to another observable. Redirections are often used when extracting artifacts from files. They give ACE the ability to say "This file actually came from this other file."
+An observable can include a **redirection**, which points to another observable. Redirections are often used when extracting artifacts from files. They give ACE the ability to say "This file actually came from this other file."
 
 A common example usage of this feature is determining which file to send to a sandboxing system. If a file was generated as part of an analysis, redirection can be used to point to the original file, giving the sandbox [analysis module](analysis_module.md) the correct file to analyze.
 
 ## Linking
 
-An observable can be **linked to** another observable. Any tags applied to the original observable are also applied to the linked observable.
+**Linking** occurs when an observable can be linked to another observable. Any tags applied to the original observable are also applied to the linked observable.
 
 ## Limited Analysis
 
-An observable can **limit** what [analysis modules](analysis_module.md) are executed against it by specifying one or more analysis modules as the *limited analysis* for the observable. Only modules in the list will be executed against it, and only if the module accepts it.
+Given an observable, a **limited analysis** results from limiting what [analysis modules](analysis_module.md) are allowed to execute against it. This occurs by specifying one or more analysis modules as the limited analysis for an observable. Only modules in the specified list will be executed against such observable, and only if the module accepts the observable.
+
 
 ## Excluded Analysis
 
-An observable can **restrict** what [analysis modules](analysis_module.md) are executed against it by specifying one or more analysis modules that will be *excluded* from analysis. These modules will **not** execute against the observable regardless of any other condition.
+An observable can *restrict* what [analysis modules](analysis_module.md) are executed against it by specifying one or more analysis modules as **excluded analysis**. Modules in the excluded analysis list are *excluded* from analyzing the observable. These modules will *not* execute against the observable regardless of any other condition.
 
 ## Relationships
 
-An observable can have a *relationship* to another observable. This has meaning only to [analysis modules](analysis_module.md) that utilized these relationships.
+An observable can have a **relationship** to another observable. This has meaning only to [analysis modules](analysis_module.md) that utilized these relationships.
 
 ## Grouping by Time
 
@@ -46,4 +47,4 @@ Observables can be grouped together for analysis purposes by time. This allows m
 
 ## Analysis
 
-An observable can have zero or more [analysis](analysis.md) objects attached to it. These represent the analysis performed by [analysis modules](analysis_module.md).
+An observable can have zero or more **[analysis](analysis.md)** objects attached to it. These represent the analysis performed by [analysis modules](analysis_module.md).

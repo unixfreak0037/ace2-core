@@ -1,6 +1,6 @@
 # Analysis Module
 
-An *analysis module* is what takes an [observable](observable.md) and generates [analysis](analysis.md) as output.
+An **analysis module** is what takes an [observable](observable.md) and generates [analysis](analysis.md) as output.
 
 Analysis modules execute in parallel to the core system.
 

@@ -1,16 +1,16 @@
 # ACE2 - Core System
 
-Work in progress as I port over to this new 2.0 branch.
+This documentation is a work in progress coinciding with the development of the **ACE2 Core System**. The ACE2 core system is _the_ core component of a complete re-write of the **Analysis Correlation Engine (ACE)**. Allow for imperfections as various sections of the documentation can be somewhere between pseudo code and proper documentation.
+
+This is what is in mind:
 
 ```python
-
-# this is what I have in mind for this
 
 from ace.analysis import RootAnalysis
 from ace.modules.threaded import initialize_modules
 from ace.system.threaded import initialize_system
 
-system initialize_system()
+initialize_system()
 modules = initialize_modules()
 modules.register()
 modules.start()
@@ -24,13 +24,9 @@ print(root)
 
 ```
 
-# in English, please
-
-I'm just going to do this first and then translate this into proper technical documentation later.
-
 ## Fundamentals
 
-ACE is fundamentally **the analysis of observations**. You have *observables* which are the things you have observed, and then you have the *analysis* of those observables, which may in turn production additional observables that need to be analyzed.
+ACE is fundamentally *the analysis of observations*. You have *observables*, which are the things you have observed, and then you have the *analysis* of those observables, which may in turn produce additional observables that need to be analyzed.
 
 The process is recursive until all observations have been analyzed.
 
@@ -38,25 +34,25 @@ ACE is a system that provides this simple analysis capability.
 
 ## System Design Overview
 
-ACE is split up into three pieces: core system, analysis modules, and alert management. Each system can operate on its own, independent of each other. They can (and do) communicate with each other through defined interfaces.
+ACE is split up into three pieces: *core system*, *analysis modules*, and *alert management*. Each system can operate on its own, independent of each other. They can (and do) communicate with each other through defined interfaces.
 
 ### Analysis Module Overview
 
-An analysis module takes an observable as input and generates analysis and zero or more observables as output. ACE can support any number of analysis modules in any programming language.
+An **analysis module** takes an observable as input, generates analysis results, and may produce zero or more observables as output. ACE can support any number of analysis modules in any programming language.
 
 ### Core System Overview
 
-The core system is responsible for tracking analysis requests and results, storing file content, maintaining a result cache, and other required operations.
+The **core system** is responsible for tracking analysis requests/results, storing file content, maintaining a result cache, and other required operations.
 
 The core system is itself composed of individual systems that are simple to extend to provide additional functionality.
 
 ### Alert Management Overview
 
-The alert management system receives alert tracking requests from the core system and tracks them over the lifetime of the alert. It provides tooling around alerts, as well as a graphical user interface for analysts to review and disposition the alerts.
+The **alert management system** receives alert tracking requests from the core system and tracks them over the lifetime of the alert. It provides tooling around alerts, as well as a graphical user interface for analysts to review and disposition the alerts.
 
 ## Core System Details
 
-The core system is composed of multiple **abstract interfaces** which can each be implemented in any manner required. The core systems are listed below.
+The core system is composed of multiple *abstract interfaces*, which can each be implemented in any manner required. These core system interfaces are listed below.
 
 - alerting: provides an interface to send an alert to the alert management system
 - analysis tracking: keeps track of root analysis data and analysis details
@@ -67,11 +63,9 @@ The core system is composed of multiple **abstract interfaces** which can each b
 - module tracking: keeps track of registered analysis modules
 - request tracking: keeps track of analysis requests
 - storage: provides a generic interface to read and write arbitrary binary data
-- work queue: provides an interface for analysis modules receive analysis requests
+- work queue: provides an interface for analysis modules to receive analysis requests
 
-Each interface is defined in `ace.system.*` Each abstract interface function is wrapped by an importable function that may provide additional functionality, error checking or are easier to use.
-
-## Core System Details
+Each interface is defined in `ace.system.*` Each abstract interface function is wrapped by an importable function that may provide additional functionality, error checking, or simplification for use.
 
 ### Core System Initialization
 
@@ -81,31 +75,31 @@ The first step is to provide a running core system that implements all the inter
 
 Once the core system is running, analysis modules must then register themselves to the system. This is accomplished by calling the `register_analysis_module_type` function.
 
-An analysis module type defines what requirements and restrictions around what kinds of observables the analysis module will accept. The most simple and common requirement is providing a list of one or more observable types the module supports. The core system will only generate analysis requests for observables that match the given type(s). A more complex example might be an analysis module that depends on another analysis module, in which case ACE would not submit an analysis request until the dependency is met.
+An analysis module type defines what requirements and restrictions are around certain kinds of observables that the analysis module will accept. The most simple and common requirement is providing a list of one or more observable types the module supports. The core system will only generate analysis requests for observables that match the given type(s). A more complex example might be an analysis module that depends on another analysis module, in which case, ACE would not submit an analysis request until the dependency is met.
 
 Analysis modules also register under specific versions. The core system keeps track of the registration data.
 
-Finally, each module asks the core system for the next analysis request to process by calling the `get_next_analysis_request` function which blocks until work is available or times out.
+Finally, each module asks the core system for the next analysis request to process by calling the `get_next_analysis_request` function, which blocks until work is available or the analysis reaches time out.
 
 ### Root Analysis Request Processing
 
-New analysis requests are submitted to the core system by submitting a **root analysis request**. The analysis is tracked and new **observable analysis requests** are generated for each observable that requires analysis by any registered analysis module. These requests are placed into the work queues assigned to each analysis module type. The requests are then picked up by the analysis modules through these queues.
+New analysis requests are submitted to the core system by submitting a **root analysis request**. The analysis is tracked, and new *observable analysis requests* are generated for each observable that requires analysis by any registered analysis module. These requests are placed into the work queues assigned to each analysis module type. The requests are then picked up by the analysis modules through these queues.
 
 ### Analysis Result Processing
 
-Analysis modules post the results of the analysis by submitting an **observable analysis result** which includes both the original request as well as the results of the analysis.
+Analysis modules post the results of the analysis by submitting an *observable analysis result*, which includes both the original request, as well as the results of the analysis.
 
-The *difference* between the original request and the generated analysis is computed and applied to the tracked analysis objects.
+The *difference* between the original request and the generated analysis is computed. Then the difference is applied to the tracked analysis objects.
 
 Any additional observations are analyzed as before, generating new observable analysis requests. This process continues until all analysis modules have completed analysis for all observables they accept.
 
 ### Alerting
 
-Any root analysis that has one or more detection points are submitted to the alert management system. This can occur multiple times for the same root analysis.
+Any root analysis that has one or more detection points is submitted to the alert management system. This can occur multiple times for the same root analysis.
 
 ### Analysis Result Cache
 
-The result of the analysis of an observation can be *cached* if analysis module is registered with a time-to-live value set for the cache. If the module types has this value, then it looks up results in the cache *before* making any analysis requests. This prevents duplicate analysis work in the cases where the results can be cached.
+The result of the analysis of an observation can be *cached* if an analysis module is registered with a time-to-live value set for the cache. If the module types has this value, then it looks up results in the cache *before* making any analysis requests. This prevents duplicate analysis work in the cases where the results can be cached.
 
 ### Storage
 
@@ -113,25 +107,25 @@ ACE provides a very generic way to store any binary content. Data is stored as b
 
 ### Locking
 
-ACE provides a generic way to obtain a lock on anything that can be identified by a simple string. Locks
+ACE provides a generic way to obtain a lock on anything that can be identified by a simple string. Locks:
 
-- are reentrant.
-- are distributed.
-- have time outs.
+- are reentrant
+- are distributed
+- have time outs
 
-The core system uses the locking capability extensively to provide concurrency between all the different interfaces.
+The core system uses the **locking** capability extensively to provide concurrency between all the different interfaces.
 
 ### Work Queues
 
-When an new analysis module type is registered a new work queue is created for that type. When the core system generates analysis requests for that type, those requests are sent to the work queue. The external analysis module instances then acquire these analysis requests through the work queue.
+When a new analysis module type is registered, a new **work queue** is created for that type. When the core system generates analysis requests for that type, those requests are sent to the work queue. The external analysis module instances then acquire these analysis requests through the work queue.
 
 A single analysis request cannot be acquired by multiple analysis module instances. The queues are FIFO.
 
 ## Workflow Example
 
-This walks you through a really simple of example of pretending to analyze an observable of type "test". Note that we are showing pseudo code for different components of ACE.
+This walks you through a really simple example of pretending to analyze an observable of type "test." Note that we are showing pseudo code for different components of ACE.
 
-Note that we never actually assume the role of the core system because the core system simply responds to and processes requests from the other systems.
+Also, observe that we never actually assume the role of the core system because the core system simply responds to and processes requests from the other systems.
 
 
 ```python
@@ -143,7 +137,7 @@ initialize_system()
 # ----------------------------------------
 
 # register a basic analysis module
-# in this case we register analysis module of type "test" which accepts observable of type "test"
+# in this case we register an analysis module of type "test" which accepts observables of type "test"
 amt = AnalysisModuleType("test", "this is a test analysis module", ['test'])
 register_analysis_module_type(amt)
 

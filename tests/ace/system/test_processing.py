@@ -473,6 +473,53 @@ def test_cancel_analysis():
 
 
 @pytest.mark.integration
+def test_analyze_canceled_analysis():
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+
+    request = root.create_analysis_request()
+    process_analysis_request(request)
+
+    # before we work the queue we update the root to cancel analysis
+    root = get_root_analysis(root)
+    root.cancel_analysis("test")
+    process_analysis_request(root.create_analysis_request())
+
+    root = get_root_analysis(root)
+    assert root.analysis_cancelled
+    assert root.analysis_cancelled_reason == "test"
+
+    # now work the queue
+    request = get_next_analysis_request(OWNER_UUID, amt, 0)
+    # now it doesn't say it's cancelled here because this was created before we cancelled it
+    assert not request.root.analysis_cancelled
+    # post our results
+    request.initialize_result()
+    analysis = request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
+    request.result.cancel_analysis("test")
+    process_analysis_request(request)
+
+    # root analysis should be cancelled here since this a fresh request
+    root = get_root_analysis(root.uuid)
+    assert root.analysis_cancelled
+    assert root.analysis_cancelled_reason == "test"
+
+    # now resubmit the root with a new observable and the canceled flag reset
+    root.analysis_cancelled = False
+    root.analysis_cancelled_reason = None
+    other_observable = root.add_observable("test", "other")
+    process_analysis_request(root.create_analysis_request())
+
+    # we should have a request here even though this root was previously canceled
+    request = get_next_analysis_request(OWNER_UUID, amt, 0)
+    assert not request.root.analysis_cancelled
+    assert request.observable == other_observable
+
+
+@pytest.mark.integration
 def test_root_analysis_default_expiration():
     # by default a root should not expire
     root = RootAnalysis()

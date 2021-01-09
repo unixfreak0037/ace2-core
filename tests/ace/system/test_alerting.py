@@ -3,8 +3,9 @@
 import pytest
 
 from ace.analysis import RootAnalysis, AnalysisModuleType
+from ace.system import get_system
 from ace.system.analysis_module import register_analysis_module_type
-from ace.system.alerting import track_alert, get_alert
+from ace.system.alerting import track_alert
 from ace.system.processing import process_analysis_request
 from ace.system.work_queue import get_next_analysis_request
 
@@ -20,7 +21,7 @@ def test_root_detection():
     root = RootAnalysis()
     root.add_detection_point("test")
     process_analysis_request(root.create_analysis_request())
-    assert get_alert(root)
+    assert get_system().alerting.get_alert(root.uuid)
 
 
 @pytest.mark.integration
@@ -29,7 +30,7 @@ def test_observable_detection():
     observable = root.add_observable("test", "test")
     observable.add_detection_point("test")
     process_analysis_request(root.create_analysis_request())
-    assert get_alert(root)
+    assert get_system().alerting.get_alert(root.uuid)
 
 
 @pytest.mark.integration
@@ -40,7 +41,7 @@ def test_analysis_detection():
     analysis = observable.add_analysis(type=amt)
     analysis.add_detection_point("test")
     process_analysis_request(root.create_analysis_request())
-    assert get_alert(root)
+    assert get_system().alerting.get_alert(root.uuid)
 
 
 @pytest.mark.integration
@@ -50,7 +51,7 @@ def test_no_detection():
     observable = root.add_observable("test", "test")
     analysis = observable.add_analysis(type=amt)
     process_analysis_request(root.create_analysis_request())
-    assert get_alert(root) is None
+    assert get_system().alerting.get_alert(root.uuid) is None
 
 
 @pytest.mark.integration
@@ -60,9 +61,9 @@ def test_analysis_result_detection():
     root = RootAnalysis()
     observable = root.add_observable("test", "test")
     process_analysis_request(root.create_analysis_request())
-    assert get_alert(root) is None
+    assert get_system().alerting.get_alert(root.uuid) is None
     request = get_next_analysis_request("test", amt, 0)
     request.initialize_result()
     request.modified_observable.add_analysis(type=amt).add_detection_point("test")
     process_analysis_request(request)
-    assert get_alert(root)
+    assert get_system().alerting.get_alert(root.uuid)

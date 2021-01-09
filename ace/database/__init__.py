@@ -1,103 +1,26 @@
 # vim: sw=4:ts=4:et:cc=120
 
-import datetime
 import functools
-import json
 import logging
 import os
 import os.path
 import random
-import re
 import sys
 import threading
 import time
-import uuid
 import warnings
 
-from contextlib import closing, contextmanager
-from typing import Set
-from urllib.parse import urlsplit
-
 import ace
-import ace.analysis
 
-from ace.analysis import RootAnalysis
-
-# from ace.error import report_exception
-
-from sqlalchemy import (
-    BigInteger,
-    Column,
-    DATE,
-    DATETIME,
-    DateTime,
-    Enum,
-    ForeignKey,
-    Index,
-    Integer,
-    LargeBinary,
-    String,
-    TIMESTAMP,
-    Text,
-    UniqueConstraint,
-    create_engine,
-    event,
-    exc,
-    func,
-    text,
-)
-
-# XXX get rid of these
-from sqlalchemy.dialects.mysql import BOOLEAN, VARBINARY, BLOB
-
+from sqlalchemy import create_engine, event
 from sqlalchemy.exc import DBAPIError, IntegrityError
-from sqlalchemy.orm import sessionmaker, relationship, reconstructor, backref, validates, scoped_session, aliased
-from sqlalchemy.orm.exc import NoResultFound, DetachedInstanceError
+from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.sql.expression import Executable
-from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import and_, or_
-from sqlalchemy.ext.hybrid import hybrid_property, hybrid_method
 
 DatabaseSession = None
 Base = declarative_base()
 engine = None
-
-
-def get_session():
-    return DatabaseSession
-
-
-@contextmanager
-def get_db_connection():
-    try:
-        connection = engine.connect()
-        # return the raw db api connection object
-        yield connection.connection
-    finally:
-        connection.close()
-
-
-def use_db(method=None):
-    """Utility decorator to pass an opened database connection and cursor object as keyword
-    parameters db and c respectively. Execute is wrapped in a try/catch for database errors.
-    Returns None on error and logs error message and stack trace."""
-
-    if method is None:
-        return functools.partial(use_db)
-
-    @functools.wraps(method)
-    def wrapper(*args, **kwargs):
-        try:
-            with get_db_connection() as db:
-                c = db.cursor()
-                return method(db=db, c=c, *args, **kwargs)
-        except DBAPIError as e:
-            logging.error("database error: {}".format(e))
-            et, ei, tb = sys.exc_info()
-            raise e.with_traceback(tb)
-
-    return wrapper
 
 
 def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=False):
@@ -300,8 +223,6 @@ def initialize_database():
     # see https://github.com/PyMySQL/PyMySQL/issues/644
     # /usr/local/lib/python3.6/dist-packages/pymysql/cursors.py:170: Warning: (1300, "Invalid utf8mb4 character string: '800363'")
     warnings.filterwarnings(action="ignore", message=".*Invalid utf8mb4 character string.*")
-
-    import ace
 
     # engine = create_engine(
     # get_sqlalchemy_database_uri('ace'),

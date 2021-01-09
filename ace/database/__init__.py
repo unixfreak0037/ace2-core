@@ -22,7 +22,7 @@ import ace
 import ace.analysis
 import ace.constants
 
-from ace.analysis import RootAnalysis, Indicator, IndicatorList
+from ace.analysis import RootAnalysis
 from ace.constants import *
 
 # from ace.error import report_exception

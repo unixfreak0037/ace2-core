@@ -4,7 +4,7 @@ import json
 import logging
 
 from dataclasses import dataclass, field
-from typing import List, Union, Optional
+from typing import Union, Optional
 
 from ace.analysis import Observable, RootAnalysis, AnalysisModuleType
 from ace.system import ACESystemInterface, get_system
@@ -20,7 +20,7 @@ class UnknownAnalysisModuleTypeError(Exception):
 class CircularDependencyError(Exception):
     """Raised when there is an attempt to register a type that would cause a circular dependency."""
 
-    def __init__(self, chain: List[AnalysisModuleType]):
+    def __init__(self, chain: list[AnalysisModuleType]):
         super().__init__("circular dependency error: {}".format(" -> ".join([_.name for _ in chain])))
 
 
@@ -37,7 +37,7 @@ class AnalysisModuleTrackingInterface(ACESystemInterface):
     def get_analysis_module_type(self, name: str) -> Union[AnalysisModuleType, None]:
         raise NotImplementedError()
 
-    def get_all_analysis_module_types(self) -> List[AnalysisModuleType]:
+    def get_all_analysis_module_types(self) -> list[AnalysisModuleType]:
         raise NotImplementedError()
 
 
@@ -93,6 +93,6 @@ def get_analysis_module_type(name: str) -> Union[AnalysisModuleType, None]:
     return get_system().module_tracking.get_analysis_module_type(name)
 
 
-def get_all_analysis_module_types() -> List[AnalysisModuleType]:
+def get_all_analysis_module_types() -> list[AnalysisModuleType]:
     """Returns the full list of all registered analysis module types."""
     return get_system().module_tracking.get_all_analysis_module_types()

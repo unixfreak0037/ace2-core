@@ -18,7 +18,6 @@ from typing import Union, Optional, Any
 
 import ace
 from ace.constants import F_FILE
-from ace.indicators import Indicator, IndicatorList
 
 # from ace.json import JSONEncoder
 from ace.system.exceptions import UnknownObservableError
@@ -450,9 +449,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         # load all the details of the alert
         self._summary = summary or None
 
-        # List of IOCs that the analysis contains
-        self._iocs = IndicatorList()
-
     #
     # Lockable interface
     #
@@ -580,17 +576,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     def from_json(value: str, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
         assert isinstance(value, str)
         return Analysis.from_dict(AnalysisModel.parse_raw(value).dict(), root, analysis)
-
-    @property
-    def iocs(self):
-        return self._iocs
-
-    @iocs.setter
-    def iocs(self, value):
-        assert isinstance(value, list)
-        self._iocs = IndicatorList()
-        for i in value:
-            self._iocs.append(i)
 
     @property
     def observable(self):
@@ -775,9 +760,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         from ace.system.storage import store_file
 
         return self.add_observable(F_FILE, store_file(path, roots=[self.uuid], **kwargs))
-
-    def add_ioc(self, type_: str, value: str, status: str = "New", tags: list[str] = []):
-        self.iocs.append(Indicator(type_, value, status=status, tags=tags))
 
     def __str__(self):
         return f"Analysis({self.uuid},{self.type},{self.observable})"
@@ -1944,16 +1926,6 @@ class RootAnalysis(Analysis, MergableObject):
                     result.append(analysis)
 
         return result
-
-    @property
-    def all_iocs(self) -> list:
-        iocs = IndicatorList()
-
-        for analysis in self.all_analysis:
-            for ioc in analysis.iocs:
-                iocs.append(ioc)
-
-        return iocs
 
     @property
     def all_observables(self):

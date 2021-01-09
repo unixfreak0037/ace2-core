@@ -5,7 +5,6 @@ import uuid
 import pytest
 
 from ace.analysis import RootAnalysis
-from ace.constants import *
 from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
 from ace.system.analysis_request import (
     AnalysisRequest,
@@ -58,7 +57,7 @@ def test_reference_invalid_work_queue():
 def test_get_next_analysis_request():
     add_work_queue(amt_1)
     root = RootAnalysis()
-    observable = root.add_observable(F_TEST, TEST_1)
+    observable = root.add_observable("test", TEST_1)
     request = AnalysisRequest(root, observable, amt_1)
     submit_analysis_request(request)
 
@@ -78,7 +77,7 @@ def test_get_next_analysis_request_expired():
 
     add_work_queue(amt)
     root = RootAnalysis()
-    observable = root.add_observable(F_TEST, TEST_1)
+    observable = root.add_observable("test", TEST_1)
     request = AnalysisRequest(root, observable, amt)
     submit_analysis_request(request)
 

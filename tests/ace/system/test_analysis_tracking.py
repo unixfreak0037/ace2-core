@@ -5,7 +5,6 @@ import uuid
 import pytest
 
 from ace.analysis import RootAnalysis, Observable, Analysis, AnalysisModuleType
-from ace.constants import F_TEST
 from ace.system import get_system
 from ace.system.analysis_module import register_analysis_module_type
 from ace.system.analysis_tracking import (
@@ -65,9 +64,9 @@ def test_track_analysis_details():
 @pytest.mark.integration
 def test_analysis_details_deleted_with_root():
     # any details associated to a root are deleted when the root is deleted
-    register_analysis_module_type(amt := AnalysisModuleType(F_TEST, ""))
+    register_analysis_module_type(amt := AnalysisModuleType("test", ""))
     root = RootAnalysis(details=TEST_DETAILS)
-    observable = root.add_observable(F_TEST, "test")
+    observable = root.add_observable("test", "test")
     observable.add_analysis(analysis := Analysis(root=root, type=amt, details=TEST_DETAILS))
     root.save()
 

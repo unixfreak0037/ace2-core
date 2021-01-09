@@ -5,7 +5,6 @@ import datetime
 import pytest
 
 from ace.analysis import RootAnalysis, Observable
-from ace.constants import F_TEST
 
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.caching import generate_cache_key, cache_analysis_result, get_cached_analysis_result
@@ -53,9 +52,9 @@ amt_multiple_cache_keys_2 = AnalysisModuleType(
 TEST_1 = "test_1"
 TEST_2 = "test_2"
 
-observable_1 = Observable(F_TEST, TEST_1)
-observable_2 = Observable(F_TEST, TEST_2)
-observable_1_with_time = Observable(F_TEST, TEST_2, time=datetime.datetime.now())
+observable_1 = Observable("test", TEST_1)
+observable_2 = Observable("test", TEST_2)
+observable_1_with_time = Observable("test", TEST_2, time=datetime.datetime.now())
 
 
 @pytest.mark.unit

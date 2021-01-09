@@ -4,10 +4,19 @@
 import datetime
 import re
 
-from ace.constants import event_time_format_tz, event_time_format, event_time_format_json_tz, event_time_format_json
-
 import pytz
 import tzlocal
+
+# the expected format of the event_time of an alert
+event_time_format_tz = "%Y-%m-%d %H:%M:%S %z"
+# the old time format before we started storing timezones
+event_time_format = "%Y-%m-%d %H:%M:%S"
+# the "ISO 8601" format that ACE uses to store datetime objects in JSON with a timezone
+# NOTE this is the preferred format
+event_time_format_json_tz = "%Y-%m-%dT%H:%M:%S.%f%z"
+# the "ISO 8601" format that ACE uses to store datetime objects in JSON without a timezone
+event_time_format_json = "%Y-%m-%dT%H:%M:%S.%f"
+
 
 LOCAL_TIMEZONE = pytz.timezone(tzlocal.get_localzone().zone)
 

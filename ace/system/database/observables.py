@@ -7,7 +7,6 @@ import os.path
 from typing import Union
 
 from ace.analysis import Observable
-from ace.constants import F_FILE
 from ace.system import get_system
 from ace.system.observables import ObservableInterface
 from ace.system.storage import get_file

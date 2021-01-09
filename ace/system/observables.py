@@ -6,7 +6,6 @@ import datetime
 from typing import Union
 
 from ace.analysis import Observable
-from ace.constants import F_FILE
 from ace.system import get_system, ACESystemInterface
 
 #

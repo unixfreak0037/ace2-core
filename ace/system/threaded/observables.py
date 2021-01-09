@@ -7,7 +7,6 @@ import os.path
 from typing import Union
 
 from ace.analysis import Observable
-from ace.constants import F_FILE
 from ace.system import get_system
 from ace.system.observables import ObservableInterface
 from ace.system.storage import get_file
@@ -15,7 +14,7 @@ from ace.system.storage import get_file
 
 class FileObservable(Observable):
     def __init__(self, *args, **kwargs):
-        super().__init__(F_FILE, *args, **kwargs)
+        super().__init__("file", *args, **kwargs)
         self._loaded = False
         self.path = None
 
@@ -36,7 +35,7 @@ class ThreadedObservableInterface(ObservableInterface):
     """A default implementation that returns the basic Observables appropriate for testing."""
 
     def create_observable(self, type: str, *args, **kwargs) -> Observable:
-        if type == F_FILE:
+        if type == "file":
             return FileObservable(*args, **kwargs)
         else:
             return Observable(type, *args, **kwargs)

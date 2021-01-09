@@ -20,7 +20,6 @@ from ace.analysis import (
 from ace.system.analysis_module import register_analysis_module_type
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.exceptions import UnknownObservableError
-from ace.constants import F_TEST
 from ace.system.analysis_tracking import (
     get_analysis_details,
     get_root_analysis,
@@ -407,7 +406,7 @@ def test_analysis_save():
 def test_analysis_load():
     amt = AnalysisModuleType("test", "")
     root = RootAnalysis(details=TEST_DETAILS)
-    observable = root.add_observable(F_TEST, "test")
+    observable = root.add_observable("test", "test")
     analysis = observable.add_analysis(type=amt, details=TEST_DETAILS)
     root.save()
 
@@ -429,7 +428,7 @@ def test_analysis_load():
 
 @pytest.mark.unit
 def test_analysis_completed():
-    register_analysis_module_type(amt := AnalysisModuleType("test", "test", [F_TEST]))
+    register_analysis_module_type(amt := AnalysisModuleType("test", "test", ["test"]))
 
     root = RootAnalysis()
     observable = root.add_observable("test", "test")
@@ -445,7 +444,7 @@ def test_analysis_completed():
 
 @pytest.mark.unit
 def test_analysis_tracked():
-    register_analysis_module_type(amt := AnalysisModuleType("test", "test", [F_TEST]))
+    register_analysis_module_type(amt := AnalysisModuleType("test", "test", ["test"]))
 
     root = RootAnalysis()
     observable = root.add_observable("test", "test")
@@ -462,7 +461,7 @@ def test_analysis_tracked():
 
 @pytest.mark.integration
 def test_analysis_flush():
-    register_analysis_module_type(amt := AnalysisModuleType("test", "test", [F_TEST]))
+    register_analysis_module_type(amt := AnalysisModuleType("test", "test", ["test"]))
     root = RootAnalysis()
     observable = root.add_observable("test", "test")
     analysis = observable.add_analysis(type=amt, details=TEST_DETAILS)
@@ -481,9 +480,9 @@ def test_analysis_flush():
 @pytest.mark.unit
 def test_has_observable():
     root = RootAnalysis()
-    observable = root.add_observable(F_TEST, "test")
-    assert root.has_observable(F_TEST, "test")
-    assert not root.has_observable(F_TEST, "t3st")
+    observable = root.add_observable("test", "test")
+    assert root.has_observable("test", "test")
+    assert not root.has_observable("test", "t3st")
     assert root.has_observable(Observable("test", "test"))
     assert not root.has_observable(Observable("t3st", "test"))
     assert not root.has_observable(Observable("test", "t3st"))
@@ -492,19 +491,19 @@ def test_has_observable():
 @pytest.mark.unit
 def test_root_find_observables():
     root = RootAnalysis()
-    o1 = root.add_observable(F_TEST, "test_1")
-    o2 = root.add_observable(F_TEST, "test_2")
+    o1 = root.add_observable("test", "test_1")
+    o2 = root.add_observable("test", "test_2")
     o_all = sorted([o1, o2])
 
     # search by type, single observable
-    assert root.find_observable(F_TEST).uuid in [o.uuid for o in o_all]
+    assert root.find_observable("test").uuid in [o.uuid for o in o_all]
     # search by type, multi observable
-    assert sorted(root.find_observables(F_TEST)) == o_all
+    assert sorted(root.find_observables("test")) == o_all
 
     # search by lambda, single observable
-    assert root.find_observable(lambda o: o.type == F_TEST).uuid in [o.uuid for o in o_all]
+    assert root.find_observable(lambda o: o.type == "test").uuid in [o.uuid for o in o_all]
     # search by lambda, multi observable
-    assert sorted(root.find_observables(lambda o: o.type == F_TEST)) == o_all
+    assert sorted(root.find_observables(lambda o: o.type == "test")) == o_all
 
 
 @pytest.mark.unit

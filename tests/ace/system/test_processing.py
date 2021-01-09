@@ -1,7 +1,6 @@
 import uuid
 
 from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis
-from ace.constants import *
 from ace.system.analysis_module import (
     register_analysis_module_type,
     UnknownAnalysisModuleTypeError,
@@ -27,7 +26,7 @@ def test_process_root_analysis_request():
     assert register_analysis_module_type(amt) == amt
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, "test")
+    test_observable = root.add_observable("test", "test")
 
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
@@ -59,7 +58,7 @@ def test_process_duplicate_root_analysis_request():
     assert register_analysis_module_type(amt) == amt
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, "test")
+    test_observable = root.add_observable("test", "test")
 
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
@@ -88,7 +87,7 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
     assert register_analysis_module_type(amt) == amt
 
     original_root = RootAnalysis()
-    test_observable = original_root.add_observable(F_TEST, "test")
+    test_observable = original_root.add_observable("test", "test")
 
     original_request = original_root.create_analysis_request()
     process_analysis_request(original_request)
@@ -98,7 +97,7 @@ def test_process_duplicate_observable_analysis_request(cache_ttl):
 
     # make another request for the same observable but from a different root analysis
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, "test")
+    test_observable = root.add_observable("test", "test")
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
@@ -141,7 +140,7 @@ def test_process_analysis_result(cache_ttl):
     assert register_analysis_module_type(amt) == amt
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, "test")
+    test_observable = root.add_observable("test", "test")
 
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
@@ -184,7 +183,7 @@ def test_cached_analysis_result():
     assert register_analysis_module_type(amt) == amt
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, "test")
+    test_observable = root.add_observable("test", "test")
 
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
@@ -211,7 +210,7 @@ def test_cached_analysis_result():
 
     # make another request for the same observable
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, "test")
+    test_observable = root.add_observable("test", "test")
 
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
@@ -244,7 +243,7 @@ def test_process_existing_analysis_merge():
     register_analysis_module_type(amt_2)
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, "test")
+    test_observable = root.add_observable("test", "test")
     root.submit()
 
     # act like these two modules are running at the same time
@@ -287,7 +286,7 @@ def test_known_dependency():
     assert register_analysis_module_type(amt_dep)
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, "test")
+    test_observable = root.add_observable("test", "test")
 
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
@@ -322,7 +321,7 @@ def test_chained_dependency():
     assert register_analysis_module_type(amt_3)
 
     root = RootAnalysis()
-    test_observable = root.add_observable(F_TEST, "test")
+    test_observable = root.add_observable("test", "test")
 
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)

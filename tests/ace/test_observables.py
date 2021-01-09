@@ -6,7 +6,6 @@ import shutil
 import pytest
 
 from ace.analysis import RootAnalysis, AnalysisModuleType, Analysis
-from ace.constants import R_DOWNLOADED_FROM
 from ace.system.analysis_tracking import get_root_analysis
 from ace.time import utc_now
 
@@ -424,11 +423,11 @@ def test_apply_merge_relationships():
     target_root = RootAnalysis()
     target_observable = target_root.add_observable("some_type", "some_value")
     r_observable = target_root.add_observable("other_type", "other_value")
-    target_observable.add_relationship(R_DOWNLOADED_FROM, r_observable)
+    target_observable.add_relationship("downloaded_from", r_observable)
 
     assert not observable.relationships
     observable.apply_merge(target_observable)
-    assert observable.relationships[R_DOWNLOADED_FROM] == [r_observable]
+    assert observable.relationships["downloaded_from"] == [r_observable]
 
     # also test the case where the relationship target already exists in the root analysis
 
@@ -441,11 +440,11 @@ def test_apply_merge_relationships():
     target_root = RootAnalysis()
     target_observable = target_root.add_observable("some_type", "some_value")
     r_observable = target_root.add_observable("other_type", "other_value")
-    target_observable.add_relationship(R_DOWNLOADED_FROM, r_observable)
+    target_observable.add_relationship("downloaded_from", r_observable)
 
     assert not observable.relationships
     observable.apply_merge(target_observable)
-    assert observable.relationships[R_DOWNLOADED_FROM] == [r_observable]
+    assert observable.relationships["downloaded_from"] == [r_observable]
 
 
 @pytest.mark.unit
@@ -456,14 +455,14 @@ def test_apply_diff_merge_relationships():
     modified_root = copy.deepcopy(original_root)
     modified_observable = modified_root.get_observable(original_observable)
     target_observable = modified_root.add_observable("target", "target")
-    modified_observable.add_relationship(R_DOWNLOADED_FROM, target_observable)
+    modified_observable.add_relationship("downloaded_from", target_observable)
 
     target_root = RootAnalysis()
     observable = target_root.add_observable("test", "test")
     assert not observable.relationships
     observable.apply_diff_merge(original_observable, modified_observable)
     target_observable = target_root.get_observable(target_observable)
-    assert observable.relationships[R_DOWNLOADED_FROM] == [target_observable]
+    assert observable.relationships["downloaded_from"] == [target_observable]
 
     # exists before but not after
     original_root = RootAnalysis()
@@ -472,7 +471,7 @@ def test_apply_diff_merge_relationships():
     modified_observable = modified_root.get_observable(original_observable)
 
     target_observable = original_root.add_observable("target", "target")
-    original_observable.add_relationship(R_DOWNLOADED_FROM, target_observable)
+    original_observable.add_relationship("downloaded_from", target_observable)
 
     target_root = RootAnalysis()
     observable = target_root.add_observable("test", "test")
@@ -485,7 +484,7 @@ def test_apply_diff_merge_relationships():
     original_root = RootAnalysis()
     original_observable = original_root.add_observable("test", "test")
     target_observable = original_root.add_observable("target", "target")
-    original_observable.add_relationship(R_DOWNLOADED_FROM, target_observable)
+    original_observable.add_relationship("downloaded_from", target_observable)
 
     modified_root = copy.deepcopy(original_root)
     modified_observable = modified_root.get_observable(original_observable)

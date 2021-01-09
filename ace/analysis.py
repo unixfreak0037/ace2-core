@@ -17,7 +17,6 @@ from dataclasses import dataclass, field, asdict
 from typing import Union, Optional, Any
 
 import ace
-from ace.constants import F_FILE
 
 # from ace.json import JSONEncoder
 from ace.system.exceptions import UnknownObservableError
@@ -756,10 +755,10 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         return observable
 
     def add_file(self, path: str, **kwargs) -> "Observable":
-        """Utility function that adds a F_FILE observable to the root analysis by passing a path to the file."""
+        """Utility function that adds a file observable to the root analysis by passing a path to the file."""
         from ace.system.storage import store_file
 
-        return self.add_observable(F_FILE, store_file(path, roots=[self.uuid], **kwargs))
+        return self.add_observable("file", store_file(path, roots=[self.uuid], **kwargs))
 
     def __str__(self):
         return f"Analysis({self.uuid},{self.type},{self.observable})"

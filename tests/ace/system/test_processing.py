@@ -600,3 +600,25 @@ def test_root_analysis_expiration_processing_outstanding_root_dependency():
     # now they should both be gone because they were both set to expire
     assert not get_root_analysis(root.uuid)
     assert not get_root_analysis(root_2.uuid)
+
+
+@pytest.mark.integration
+def test_manual_analysis_module_type():
+    # analysis modules that have the manual flag set to True do not execute unless the
+    # target observable has a directive with a value of manual:type_name
+    # where type_name is the name of the analysis module type
+    amt = register_analysis_module_type(AnalysisModuleType(name="test", description="", manual=True))
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    # there should not be any analysis requests since the module is a manual type
+    assert get_queue_size(amt) == 0
+
+    root = get_root_analysis(root)
+    # request manual analysis
+    root.get_observable(observable).request_analysis(amt)
+    root.submit()
+
+    # and now there should be 1 since added the required directive with the request_manual_analysis function
+    assert get_queue_size(amt) == 1

@@ -308,6 +308,8 @@ class AnalysisModuleType:
     # what kind of analysis module does this classify as?
     # examples: [ 'sandbox' ], [ 'splunk' ], etc...
     types: list[str] = field(default_factory=list)
+    # if set to True then this analysis module only executes manually
+    manual: bool = False
 
     def version_matches(self, amt) -> bool:
         """Returns True if the given amt is the same version as this amt."""
@@ -337,10 +339,26 @@ class AnalysisModuleType:
         assert isinstance(value, str)
         return AnalysisModuleType.from_dict(AnalysisModuleTypeModel.parse_raw(value).dict())
 
+    @property
+    def required_manual_directive(self) -> Union[str, None]:
+        """Returns the directive that is required on the observable if manual is set to True."""
+        if not self.manual:
+            return None
+
+        return f"manual:{self.name}"
+
     def accepts(self, observable: Observable) -> bool:
         from ace.system.analysis_module import get_analysis_module_type
 
         assert isinstance(observable, Observable)
+
+        # has this module been requested?
+        if observable.is_requested(self):
+            return True
+
+        # if this module is manual and it wasn't requested then we don't execute it
+        if self.manual:
+            return False
 
         # has this analysis type been excluded from this observable?
         if self.name in observable.excluded_analysis:
@@ -800,6 +818,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         links: Optional[list[str]] = None,
         limited_analysis: Optional[list[str]] = None,
         excluded_analysis: Optional[list[str]] = None,
+        requested_analysis: Optional[list[str]] = None,
         relationships: Optional[dict[str, str]] = None,
         *args,
         **kwargs,
@@ -817,6 +836,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         self._links = links or []  # [ str ]
         self._limited_analysis = limited_analysis or []  # [ str ]
         self._excluded_analysis = excluded_analysis or []  # [ str ]
+        self._requested_analysis = requested_analysis or []  # [ str ]
         self._relationships = relationships or {}  # key = name, value = [ Observable.uuid ]
         self._grouping_target = False
         self._request_tracking = {}  # key = AnalysisModuleType.name, value = AnalysisRequest.id
@@ -855,6 +875,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             links=self.links,
             limited_analysis=self.limited_analysis,
             excluded_analysis=self.excluded_analysis,
+            requested_analysis=self.requested_analysis,
             relationships=self.relationships,
             grouping_target=self.grouping_target,
             request_tracking=self.request_tracking,
@@ -892,6 +913,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         observable.links = data.links
         observable.limited_analysis = data.limited_analysis
         observable.excluded_analysis = data.excluded_analysis
+        observable.requested_analysis = data.requested_analysis
         observable.relationships = data.relationships
         observable.grouping_target = data.grouping_target
         observable.request_tracking = data.request_tracking
@@ -1044,6 +1066,16 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         if amt not in self.excluded_analysis:
             self.excluded_analysis.append(amt)
 
+    @property
+    def requested_analysis(self) -> list[str]:
+        """Returns a list of analysis modules types that have been requested for this Observable."""
+        return self._requested_analysis
+
+    @requested_analysis.setter
+    def requested_analysis(self, value: list[str]):
+        assert isinstance(value, list)
+        self._requested_analysis = value
+
     def is_excluded(self, amt: Union[AnalysisModuleType, str]) -> bool:
         """Returns True if this Observable has been excluded from analysis by this AnalysisModuleType."""
         assert isinstance(amt, str) or isinstance(amt, AnalysisModuleType)
@@ -1051,6 +1083,25 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             amt = amt.name
 
         return amt in self.excluded_analysis
+
+    def is_requested(self, amt: Union[AnalysisModuleType, str]):
+        """Returns True if this Observable has requested analysis for the given type."""
+        assert isinstance(amt, str) or isinstance(amt, AnalysisModuleType)
+        if isinstance(amt, AnalysisModuleType):
+            amt = amt.name
+
+        return amt in self.requested_analysis
+
+    def request_analysis(self, amt: Union[AnalysisModuleType, str]):
+        """Requests that the given analysis module executes on this observable.
+        This is used for analysis modules that are set to manual execution."""
+        assert isinstance(amt, str) or isinstance(amt, AnalysisModuleType)
+
+        if isinstance(amt, AnalysisModuleType):
+            amt = amt.name
+
+        if amt not in self.requested_analysis:
+            self.requested_analysis.append(amt)
 
     #
     # relationships

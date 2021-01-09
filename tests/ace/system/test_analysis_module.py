@@ -168,6 +168,18 @@ class TempAnalysisModuleType(AnalysisModuleType):
             RootAnalysis().add_observable(Observable("test", "test", excluded_analysis=["other"])),
             True,
         ),
+        # manual analysis, no directive
+        (
+            TempAnalysisModuleType(manual=True),
+            RootAnalysis().add_observable(Observable("test", "test")),
+            False,
+        ),
+        # manual analysis, with directive
+        (
+            TempAnalysisModuleType(manual=True),
+            RootAnalysis().add_observable(Observable("test", "test", requested_analysis=["test"])),
+            True,
+        ),
         # valid dependency TODO
         # TODO need to start making modifications to RootAnalysis, Analysis and Observable to support this new system
         # (TempAnalysisModuleType(dependencies=['analysis_module']), RootAnalysis().add_observable(F_IPV4, '1.2.3.4'), True),

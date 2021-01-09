@@ -96,6 +96,9 @@ class AnalysisModuleTypeModel(BaseModel):
         which would automatically invalidate cache results when it changed.""",
     )
     types: list[str] = Field(default_factory=list, description="""Optional list of module catagorization types.""")
+    manual: Optional[bool] = Field(
+        description="""If set to True then this analysis module only execute when requested."""
+    )
 
 
 class AnalysisModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
@@ -171,6 +174,13 @@ class ObservableModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
         description="""The list of analysis modules that are excluded by
             this observable. Modules in this list are not executed against this
             observable. An empty list means nothing is excluded.""",
+    )
+    requested_analysis: Optional[list[str]] = Field(
+        default_factory=list,
+        description="""The list of analysis modules that have been requested
+        for this observable.  This is the only means of executing manual
+        analysis modules. An empty list means nothing is specifically
+        requested.""",
     )
     relationships: Optional[dict[str, list[str]]] = Field(
         default_factory=dict,

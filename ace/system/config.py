@@ -2,7 +2,7 @@
 #
 # global system components
 
-from typing import Any
+from typing import Any, Optional
 
 from ace.system import get_system, ACESystemInterface
 
@@ -15,9 +15,9 @@ class ConfigurationInterface(ACESystemInterface):
         raise NotImplementedError()
 
 
-def get_config(self, key: str) -> Any:
-    return get_system().config.get_config(key)
+def get_config(key: str, default: Optional[Any] = None) -> Any:
+    return get_system().config.get_config(key, default)
 
 
-def set_config(self, key: str, value: Any):
+def set_config(key: str, value: Any):
     return get_system().config.set_config(key, value)

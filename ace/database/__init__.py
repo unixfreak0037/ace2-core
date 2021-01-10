@@ -114,14 +114,8 @@ def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=Fa
                     raise e
 
 
-# new school database connections
-# from flask_login import UserMixin
-# from werkzeug.security import generate_password_hash, check_password_hash
-
 # if target is an executable, then *args is to session.execute function
 # if target is a callable, then *args is to the callable function (whatever that is)
-
-
 def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
     """Executes the given targets, in order. If a deadlock condition is detected, the database session
     is rolled back and the targets are executed in order, again. This can happen up to :param:attempts times
@@ -218,25 +212,17 @@ def initialize_database():
     """Initializes database connections by creating the SQLAlchemy engine and session objects."""
 
     global DatabaseSession, engine
+    from ace.system.config import get_config
+
     # from config import config, get_sqlalchemy_database_uri, get_sqlalchemy_database_options
 
     # see https://github.com/PyMySQL/PyMySQL/issues/644
     # /usr/local/lib/python3.6/dist-packages/pymysql/cursors.py:170: Warning: (1300, "Invalid utf8mb4 character string: '800363'")
     warnings.filterwarnings(action="ignore", message=".*Invalid utf8mb4 character string.*")
 
-    # engine = create_engine(
-    # get_sqlalchemy_database_uri('ace'),
-    # **get_sqlalchemy_database_options('ace'))
-
-    # TODO get this from configuration?
-    if os.path.exists("ace.db"):
-        os.remove("ace.db")
-    engine = create_engine("sqlite:///ace.db")
-
-    # running this out of memory does not work due to the multithreading
-    # each connection gets its own thread (thanks to session scoping)
-    # and this in-memory db only exists for the connection its on
-    # engine = create_engine("sqlite://")
+    url = get_config("/ace/core/sqlalchemy/url")
+    kwargs = get_config("/ace/core/sqlalchemy/kargs", {})
+    engine = create_engine(url, **kwargs)
 
     @event.listens_for(engine, "connect")
     def connect(dbapi_connection, connection_record):

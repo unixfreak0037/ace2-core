@@ -1,8 +1,11 @@
 import logging
+import os
+import os.path
 
 import ace.database
 
 from ace.system import ACESystem, get_system, set_system
+from ace.system.config import set_config
 from ace.system.database.analysis_module import DatabaseAnalysisModuleTrackingInterface
 from ace.system.database.analysis_request import DatabaseAnalysisRequestTrackingInterface
 from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterface
@@ -54,6 +57,15 @@ class DatabaseACESystem(ACESystem):
     work_queue = ThreadedWorkQueueManagerInterface()
 
     def _rebuild_database(self):
+        # running this out of memory does not work due to the multithreading
+        # each connection gets its own thread (thanks to session scoping)
+        # and this in-memory db only exists for the connection its on
+        # engine = create_engine("sqlite://")
+
+        if os.path.exists("ace.db"):
+            os.remove("ace.db")
+
+        set_config("/ace/core/sqlalchemy/url", "sqlite:///ace.db")
         ace.database.initialize_database()
         ace.database.Base.metadata.bind = ace.database.engine
         ace.database.Base.metadata.create_all()

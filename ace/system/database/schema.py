@@ -164,6 +164,8 @@ class AnalysisResultCache(Base):
 
     expiration_date = Column(TimeStamp, nullable=True, index=True)
 
+    analysis_module_type = Column(String, nullable=False, index=True)
+
     json_data = Column(Text, nullable=False)
 
 

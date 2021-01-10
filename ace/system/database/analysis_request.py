@@ -79,7 +79,10 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
 
     # this is called when an analysis module type is removed (or expired)
     def clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
-        raise NotImplementedError()
+        get_db().execute(
+            AnalysisRequestTracking.__table__.delete().where(AnalysisRequestTracking.analysis_module_type == amt.name)
+        )
+        get_db().commit()
 
     def get_analysis_request_by_request_id(self, key: str) -> Union[AnalysisRequest, None]:
         result = get_db().query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == key).one_or_none()

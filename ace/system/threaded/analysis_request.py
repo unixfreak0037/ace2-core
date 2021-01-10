@@ -152,17 +152,13 @@ class ThreadedAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
     def clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
         with self.sync_lock:
             target_list = []  # the list of request.id that we need to get rid of
-            for request_id, json_data in self.request_tracking.items():
+            for request_id, json_data in self.analysis_requests.items():
                 request = AnalysisRequest.from_json(json_data)
-                if request.type.name == amt.name:
+                if request.type and request.type.name == amt.name:
                     target_list.append(request_id)
 
             for request_id in target_list:
                 self.delete_analysis_request(request_id)
-
-            # also delete the entire dict for the analysis module type
-            if amt.name in self.amt_exp_tracking:
-                del self.amt_exp_tracking[amt.name]
 
     def get_analysis_request_by_request_id(self, key: str) -> Union[AnalysisRequest, None]:
         with self.sync_lock:

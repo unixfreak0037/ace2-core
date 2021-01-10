@@ -241,6 +241,11 @@ class AnalysisRequestTrackingInterface(ACESystemInterface):
 def track_analysis_request(request: AnalysisRequest):
     """Begins tracking the given AnalysisRequest."""
     assert isinstance(request, AnalysisRequest)
+    from ace.system.analysis_module import get_analysis_module_type
+
+    if request.type and get_analysis_module_type(request.type.name) is None:
+        raise UnknownAnalysisModuleTypeError(request.type.name)
+
     return get_system().request_tracking.track_analysis_request(request)
 
 

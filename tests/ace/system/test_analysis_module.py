@@ -2,13 +2,15 @@
 
 import pytest
 
-from ace.analysis import RootAnalysis, Observable
+from ace.analysis import RootAnalysis, Observable, Analysis
 from ace.system.analysis_module import (
     AnalysisModuleType,
     AnalysisModuleTypeVersionError,
-    register_analysis_module_type,
+    delete_analysis_module_type,
     get_analysis_module_type,
+    register_analysis_module_type,
 )
+from ace.system.caching import get_cached_analysis_result
 from ace.system.work_queue import get_queue_size, get_next_analysis_request
 
 amt_1 = AnalysisModuleType(
@@ -64,6 +66,16 @@ def test_register_existing_analysis_module_type():
     with pytest.raises(AnalysisModuleTypeVersionError):
         get_next_analysis_request("test", amt_1, 0)  # now this request is invalid because am1 is an older version
     assert get_next_analysis_request("test", amt_1_upgraded_version, 0) is None  # but this works
+
+
+@pytest.mark.integration
+def test_delete_analysis_module_type():
+    amt = AnalysisModuleType("test", "", cache_ttl=300)
+    register_analysis_module_type(amt)
+
+    assert get_analysis_module_type(amt.name)
+    delete_analysis_module_type(amt)
+    assert get_analysis_module_type(amt.name) is None
 
 
 class TempAnalysisModuleType(AnalysisModuleType):

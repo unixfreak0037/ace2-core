@@ -20,6 +20,11 @@ class DatabaseAnalysisModuleTrackingInterface(AnalysisModuleTrackingInterface):
         get_db().merge(db_amt)
         get_db().commit()
 
+    def delete_analysis_module_type(self, amt: AnalysisModuleType):
+        assert isinstance(amt, AnalysisModuleType)
+        get_db().execute(AnalysisModuleTracking.__table__.delete().where(AnalysisModuleTracking.name == amt.name))
+        get_db().commit()
+
     def get_analysis_module_type(self, name: str) -> Union[AnalysisModuleType, None]:
         db_amt = get_db().query(AnalysisModuleTracking).filter(AnalysisModuleTracking.name == name).one_or_none()
 

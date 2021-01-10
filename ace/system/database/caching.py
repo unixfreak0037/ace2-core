@@ -7,11 +7,14 @@ from typing import Union, Optional
 
 import ace
 
+from ace.analysis import AnalysisModuleType
 from ace.system.database import get_db
 from ace.system.database.schema import AnalysisResultCache
 from ace.system.caching import CachingInterface
 from ace.system.analysis_request import AnalysisRequest
 from ace.time import utc_now
+
+from sqlalchemy import func
 
 
 class DatabaseCachingInterface(CachingInterface):
@@ -34,9 +37,34 @@ class DatabaseCachingInterface(CachingInterface):
         cache_result = AnalysisResultCache(
             cache_key=cache_key,
             expiration_date=expiration_date,
+            analysis_module_type=request.type.name,
             json_data=request.to_json(),
         )
 
         get_db().merge(cache_result)
         get_db().commit()
         return cache_key
+
+    def delete_expired_cached_analysis_results(self):
+        get_db().execute(AnalysisResultCache.__table__.delete().where(AnalysisResultCache.expiration_date < utc_now()))
+        get_db().commit()
+
+    def delete_cached_analysis_results_by_module_type(self, amt: AnalysisModuleType):
+        get_db().execute(
+            AnalysisResultCache.__table__.delete().where(AnalysisResultCache.analysis_module_type == amt.name)
+        )
+        get_db().commit()
+
+    def get_total_cache_size(self, amt: Optional[AnalysisModuleType] = None) -> int:
+        if amt:
+            return (
+                get_db()
+                .query(
+                    func.count(AnalysisResultCache.cache_key).filter(
+                        AnalysisResultCache.analysis_module_type == amt.name
+                    )
+                )
+                .scalar()
+            )
+        else:
+            return get_db().query(func.count(AnalysisResultCache.cache_key)).scalar()

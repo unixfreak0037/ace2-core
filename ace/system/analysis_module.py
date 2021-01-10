@@ -34,6 +34,9 @@ class AnalysisModuleTrackingInterface(ACESystemInterface):
     def track_analysis_module_type(self, amt: AnalysisModuleType):
         raise NotImplementedError()
 
+    def delete_analysis_module_type(self, name: str):
+        raise NotImplementedError()
+
     def get_analysis_module_type(self, name: str) -> Union[AnalysisModuleType, None]:
         raise NotImplementedError()
 
@@ -91,6 +94,26 @@ def get_analysis_module_type(name: str) -> Union[AnalysisModuleType, None]:
     """Returns the registered AnalysisModuleType by name, or None if it has not been or is no longer registered."""
     assert isinstance(name, str)
     return get_system().module_tracking.get_analysis_module_type(name)
+
+
+def delete_analysis_module_type(amt: Union[AnalysisModuleType, str]):
+    """Deletes (unregisters) the given AnalysisModuleType from the system.
+    Any outstanding requests for this type are discarded."""
+    from ace.system.analysis_request import clear_tracking_by_analysis_module_type
+    from ace.system.work_queue import delete_work_queue
+    from ace.system.caching import delete_cached_analysis_results_by_module_type
+
+    if isinstance(amt, str):
+        amt = get_analysis_module_type(amt)
+
+    # remove the work queue for the module
+    delete_work_queue(amt.name)
+    # remove the module
+    get_system().module_tracking.delete_analysis_module_type(amt)
+    # remove any outstanding requests from tracking
+    clear_tracking_by_analysis_module_type(amt)
+    # remove any cached analysis results for this type
+    delete_cached_analysis_results_by_module_type(amt)
 
 
 def get_all_analysis_module_types() -> list[AnalysisModuleType]:

@@ -5,9 +5,10 @@ import uuid
 import pytest
 
 from ace.analysis import RootAnalysis
-from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
+from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError, register_analysis_module_type
 from ace.system.analysis_request import (
     AnalysisRequest,
+    delete_analysis_request,
     get_analysis_request_by_request_id,
     process_expired_analysis_requests,
     submit_analysis_request,
@@ -55,7 +56,7 @@ def test_reference_invalid_work_queue():
 
 @pytest.mark.integration
 def test_get_next_analysis_request():
-    add_work_queue(amt_1)
+    register_analysis_module_type(amt_1)
     root = RootAnalysis()
     observable = root.add_observable("test", TEST_1)
     request = AnalysisRequest(root, observable, amt_1)
@@ -75,7 +76,7 @@ def test_get_next_analysis_request_expired():
         name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600  # immediately expire
     )
 
-    add_work_queue(amt)
+    register_analysis_module_type(amt)
     root = RootAnalysis()
     observable = root.add_observable("test", TEST_1)
     request = AnalysisRequest(root, observable, amt)
@@ -102,3 +103,18 @@ def test_get_next_analysis_request_expired():
     # and then we should get it again
     next_ar = get_next_analysis_request(TEST_OWNER, amt, 0)
     assert next_ar == request
+
+
+@pytest.mark.integration
+def test_get_next_analysis_request_deleted():
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+    root = RootAnalysis()
+    observable = root.add_observable("test", TEST_1)
+    request = AnalysisRequest(root, observable, amt)
+    submit_analysis_request(request)
+    delete_analysis_request(request)
+    assert get_analysis_request_by_request_id(request.id) is None
+
+    # should be nothing there to get since the request was deleted
+    assert get_next_analysis_request("owner", amt, 0) is None

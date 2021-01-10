@@ -7,6 +7,7 @@ import pytest
 from ace.analysis import RootAnalysis, Analysis
 from ace.system.analysis_request import (
     AnalysisRequest,
+    clear_tracking_by_analysis_module_type,
     delete_analysis_request,
     get_analysis_request_by_observable,
     get_analysis_request_by_request_id,
@@ -15,11 +16,16 @@ from ace.system.analysis_request import (
     process_expired_analysis_requests,
     track_analysis_request,
 )
-from ace.system.analysis_module import AnalysisModuleType, register_analysis_module_type
+from ace.system.analysis_module import (
+    AnalysisModuleType,
+    register_analysis_module_type,
+    UnknownAnalysisModuleTypeError,
+    delete_analysis_module_type,
+)
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.constants import *
 from ace.system.exceptions import InvalidWorkQueueError
-from ace.system.work_queue import add_work_queue
+from ace.system.work_queue import add_work_queue, get_next_analysis_request
 
 amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600)
 
@@ -138,6 +144,7 @@ def test_track_analysis_request():
 
 @pytest.mark.integration
 def test_get_analysis_request_by_observable():
+    register_analysis_module_type(amt)
     root = RootAnalysis()
     observable = root.add_observable("test", TEST_1)
     request = observable.create_analysis_request(amt)
@@ -148,8 +155,19 @@ def test_get_analysis_request_by_observable():
 
 
 @pytest.mark.integration
+def test_track_analysis_request_unknown_amt():
+    unknown_amt = AnalysisModuleType("other", "")
+    root = RootAnalysis()
+    observable = root.add_observable("test", TEST_1)
+    request = observable.create_analysis_request(unknown_amt)
+    with pytest.raises(UnknownAnalysisModuleTypeError):
+        track_analysis_request(request)
+
+
+@pytest.mark.integration
 def test_get_expired_analysis_request():
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
+    register_analysis_module_type(amt)
 
     root = RootAnalysis()
     observable = root.add_observable("test", TEST_1)
@@ -163,6 +181,7 @@ def test_get_expired_analysis_request():
 @pytest.mark.integration
 def test_process_expired_analysis_request():
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
+    register_analysis_module_type(amt)
 
     root = RootAnalysis()
     observable = root.add_observable("test", TEST_1)
@@ -181,6 +200,7 @@ def test_process_expired_analysis_request():
 @pytest.mark.integration
 def test_process_expired_analysis_request_invalid_work_queue():
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
+    register_analysis_module_type(amt)
 
     root = RootAnalysis()
     observable = root.add_observable("test", TEST_1)
@@ -189,6 +209,7 @@ def test_process_expired_analysis_request_invalid_work_queue():
     request.status = TRACKING_STATUS_ANALYZING
     track_analysis_request(request)
     assert get_expired_analysis_requests() == [request]
+    delete_analysis_module_type(amt)
     process_expired_analysis_requests()
     assert get_analysis_request_by_request_id(request.id) is None
     assert not get_expired_analysis_requests()
@@ -202,3 +223,18 @@ def test_is_cachable():
     observable = root.add_observable("test", TEST_1)
     assert observable.create_analysis_request(amt).is_cachable
     assert not root.create_analysis_request().is_cachable
+
+
+@pytest.mark.integration
+def test_clear_tracking_by_analysis_module_type():
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    request = observable.create_analysis_request(amt)
+    track_analysis_request(request)
+
+    assert get_analysis_request_by_request_id(request.id)
+    clear_tracking_by_analysis_module_type(amt)
+    assert get_analysis_request_by_request_id(request.id) is None

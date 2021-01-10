@@ -12,6 +12,9 @@ class ThreadedAnalysisModuleTrackingInterface(AnalysisModuleTrackingInterface):
     def track_analysis_module_type(self, amt: AnalysisModuleType):
         self.amt_tracking[amt.name] = amt
 
+    def delete_analysis_module_type(self, amt: AnalysisModuleType):
+        self.amt_tracking.pop(amt.name, None)
+
     def get_analysis_module_type(self, name: str) -> Union[AnalysisModuleType, None]:
         return self.amt_tracking.get(name)
 

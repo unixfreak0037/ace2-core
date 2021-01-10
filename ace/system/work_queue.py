@@ -122,22 +122,29 @@ def get_next_analysis_request(
     if existing_amt and not existing_amt.version_matches(amt):
         raise AnalysisModuleTypeVersionError(amt, existing_amt)
 
-    next_ar = get_work(amt, timeout)
+    while True:
+        next_ar = get_work(amt, timeout)
 
-    if next_ar:
-        # TODO how long do we wait for this?
-        # so there's an assumption here that this AnalysisRequest will not be grabbed by another process
-        try:
-            with next_ar.lock():
-                # get the most recent copy of the analysis request
-                next_ar = get_analysis_request_by_request_id(next_ar.id)
-                # set the owner, status then update
-                next_ar.owner = owner_uuid
-                next_ar.status = TRACKING_STATUS_ANALYZING
-                track_analysis_request(next_ar)
-        except LockAcquireFailed as e:
-            # if we are unable to get the lock on the request then put it back into the queue
-            put_work(amt, next_ar)
-            raise e
+        if next_ar:
+            # TODO how long do we wait for this?
+            # so there's an assumption here that this AnalysisRequest will not be grabbed by another process
+            try:
+                with next_ar.lock():
+                    # get the most recent copy of the analysis request
+                    next_ar = get_analysis_request_by_request_id(next_ar.id)
+                    # if it was deleted then we ignore it and move on to the next one
+                    # this can happen if the request is deleted while it's waiting in the queue
+                    if not next_ar:
+                        continue
 
-    return next_ar
+                    # set the owner, status then update
+                    next_ar.owner = owner_uuid
+                    next_ar.status = TRACKING_STATUS_ANALYZING
+                    track_analysis_request(next_ar)
+
+            except LockAcquireFailed as e:
+                # if we are unable to get the lock on the request then put it back into the queue
+                put_work(amt, next_ar)
+                raise e
+
+        return next_ar

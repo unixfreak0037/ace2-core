@@ -9,8 +9,19 @@ import uuid
 import threading
 
 from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis, Observable
-from ace.system.analysis_module import register_analysis_module_type, AnalysisModuleTypeVersionError
-from ace.system.analysis_request import AnalysisRequest, submit_analysis_request, get_analysis_request
+from ace.system.analysis_module import (
+    register_analysis_module_type,
+    AnalysisModuleTypeVersionError,
+    delete_analysis_module_type,
+    UnknownAnalysisModuleTypeError,
+)
+from ace.system.analysis_request import (
+    AnalysisRequest,
+    submit_analysis_request,
+    get_analysis_request,
+    get_analysis_request_by_request_id,
+    get_linked_analysis_requests,
+)
 from ace.system.analysis_tracking import get_root_analysis, track_root_analysis
 from ace.system.constants import *
 from ace.system.processing import process_analysis_request
@@ -323,3 +334,81 @@ def test_amt_version_upgrade():
 
     # and the work queue should still have one entry
     assert get_queue_size(amt_upgraded) == 1
+
+
+@pytest.mark.system
+def test_delete_analysis_module_type_outstanding_requests():
+    amt = register_analysis_module_type(AnalysisModuleType("test", ""))
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    # should have one request outstanding
+    assert get_queue_size(amt) == 1
+
+    delete_analysis_module_type(amt)
+
+    # this should fail because the queue has been delete
+    with pytest.raises(UnknownAnalysisModuleTypeError):
+        get_next_analysis_request("owner", amt, 0)
+
+
+@pytest.mark.system
+def test_delete_analysis_module_type_while_processing_request():
+    amt = register_analysis_module_type(AnalysisModuleType("test", ""))
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    # go get the request for processing
+    request = get_next_analysis_request("owner", amt, 0)
+
+    # delete the amt while we're processing the request
+    delete_analysis_module_type(amt)
+
+    request.initialize_result()
+    request.modified_observable.add_analysis(Analysis(type=amt, details={"test": "test"}))
+
+    # should fail since the amt has been removed
+    with pytest.raises(UnknownAnalysisModuleTypeError):
+        request.submit()
+
+    # and the request should already be deleted as well
+    assert get_analysis_request_by_request_id(request.id) is None
+
+
+@pytest.mark.system
+def test_delete_analysis_module_type_linked_results():
+    amt = AnalysisModuleType("test", "", cache_ttl=300)
+    register_analysis_module_type(amt)
+
+    original_root = RootAnalysis()
+    test_observable = original_root.add_observable("test", "test")
+
+    original_request = original_root.create_analysis_request()
+    process_analysis_request(original_request)
+
+    # we should have a single work entry in the work queue
+    assert get_queue_size(amt) == 1
+
+    # make another request for the same observable but from a different root analysis
+    root = RootAnalysis()
+    test_observable = root.add_observable("test", "test")
+    root_request = root.create_analysis_request()
+    process_analysis_request(root_request)
+
+    # there should still only be one outbound request
+    assert get_queue_size(amt) == 1
+
+    # the first analysis request should now be linked to a new analysis request
+    request = get_next_analysis_request("owner", amt, 0)
+    linked_requests = get_linked_analysis_requests(request)
+
+    # analysis module type gets deleted
+    delete_analysis_module_type(amt)
+
+    # both the original request and the linked request should be gone
+    assert get_analysis_request_by_request_id(original_request.id) is None
+    assert get_analysis_request_by_request_id(request.id) is None

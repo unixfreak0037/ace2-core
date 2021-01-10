@@ -3,7 +3,7 @@ import hashlib
 
 from typing import Union, Optional
 
-from ace.analysis import Observable
+from ace.analysis import Observable, AnalysisModuleType
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.analysis_request import AnalysisRequest
@@ -46,6 +46,24 @@ class CachingInterface(ACESystemInterface):
         """Caches the AnalysisRequest to the cache key and returns the cache id."""
         raise NotImplementedError()
 
+    def delete_expired_cached_analysis_results(self):
+        """Deletes all cache results that have expired."""
+        raise NotImplementedError()
+
+    def delete_cached_analysis_results_by_module_type(self, amt: AnalysisModuleType):
+        """Deletes all cache results for the given type."""
+        raise NotImplementedError()
+
+    #
+    # instrumentation
+    #
+
+    def get_cache_size(self, amt: Optional[AnalysisModuleType] = None) -> int:
+        """Returns the total number of cached results. If no type is specified
+        then the total size of all cached results are returned.  Otherwise the
+        total size of all cached results for the given type are returned."""
+        raise NotImplementedError()
+
 
 def get_cached_analysis_result(observable: Observable, amt: AnalysisModuleType) -> Union[AnalysisRequest, None]:
     cache_key = generate_cache_key(observable, amt)
@@ -64,3 +82,20 @@ def cache_analysis_result(request: AnalysisRequest) -> Union[str, None]:
         return None
 
     return get_system().caching.cache_analysis_result(cache_key, request, request.type.cache_ttl)
+
+
+def delete_expired_cached_analysis_results():
+    get_system().caching.delete_expired_cached_analysis_results()
+
+
+def delete_cached_analysis_results_by_module_type(amt: AnalysisModuleType):
+    get_system().caching.delete_cached_analysis_results_by_module_type(amt)
+
+
+#
+# instrumentation
+#
+
+
+def get_total_cache_size(amt: Optional[AnalysisModuleType] = None):
+    return get_system().caching.get_total_cache_size(amt)

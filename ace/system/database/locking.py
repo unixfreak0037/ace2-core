@@ -10,7 +10,8 @@ from functools import wraps
 from typing import Union, Optional
 
 import ace
-from ace.database.schema import Lock as DBLock, LockOwnerWaitTarget
+from ace.system.database import get_db
+from ace.system.database.schema import Lock as DBLock, LockOwnerWaitTarget
 from ace.system.threaded.locking import ThreadedLockingInterface, TimeoutRLock, Lock
 from ace.system.locking import LockingInterface
 
@@ -27,7 +28,7 @@ class DatabaseTimeoutRLock(TimeoutRLock):
         return result
 
     def _update_db(self):
-        ace.db.merge(
+        get_db().merge(
             DBLock(
                 id=self.lock_id,
                 owner=self.owner,
@@ -36,7 +37,7 @@ class DatabaseTimeoutRLock(TimeoutRLock):
                 count=self.count,
             )
         )
-        ace.db.commit()
+        get_db().commit()
 
 
 class DatabaseLockingInterface(ThreadedLockingInterface):
@@ -46,10 +47,10 @@ class DatabaseLockingInterface(ThreadedLockingInterface):
     def track_wait_target(self, lock_id: str, owner_id: str):
         super().track_wait_target(lock_id, owner_id)
         wait_target = LockOwnerWaitTarget(owner=owner_id, lock_id=lock_id)
-        ace.db.merge(wait_target)
-        ace.db.commit()
+        get_db().merge(wait_target)
+        get_db().commit()
 
     def clear_wait_target(self, owner_id: str):
         super().clear_wait_target(owner_id)
-        ace.db.execute(LockOwnerWaitTarget.__table__.delete().where(LockOwnerWaitTarget.owner == owner_id))
-        ace.db.commit()
+        get_db().execute(LockOwnerWaitTarget.__table__.delete().where(LockOwnerWaitTarget.owner == owner_id))
+        get_db().commit()

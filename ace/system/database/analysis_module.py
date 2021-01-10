@@ -5,10 +5,10 @@ import json
 from typing import Union, List
 
 import ace
-import ace.database.schema
 
 from ace.analysis import AnalysisModuleType
-from ace.database.schema import AnalysisModuleTracking
+from ace.system.database import get_db
+from ace.system.database.schema import AnalysisModuleTracking
 from ace.system.analysis_module import AnalysisModuleTrackingInterface
 
 
@@ -17,11 +17,11 @@ class DatabaseAnalysisModuleTrackingInterface(AnalysisModuleTrackingInterface):
         assert isinstance(amt, AnalysisModuleType)
         db_amt = AnalysisModuleTracking(name=amt.name, json_data=amt.to_json())
 
-        ace.db.merge(db_amt)
-        ace.db.commit()
+        get_db().merge(db_amt)
+        get_db().commit()
 
     def get_analysis_module_type(self, name: str) -> Union[AnalysisModuleType, None]:
-        db_amt = ace.db.query(AnalysisModuleTracking).filter(AnalysisModuleTracking.name == name).one_or_none()
+        db_amt = get_db().query(AnalysisModuleTracking).filter(AnalysisModuleTracking.name == name).one_or_none()
 
         if db_amt is None:
             return None
@@ -30,5 +30,5 @@ class DatabaseAnalysisModuleTrackingInterface(AnalysisModuleTrackingInterface):
 
     def get_all_analysis_module_types(self) -> list[AnalysisModuleType]:
         return [
-            AnalysisModuleType.from_dict(json.loads(_.json_data)) for _ in ace.db.query(AnalysisModuleTracking).all()
+            AnalysisModuleType.from_dict(json.loads(_.json_data)) for _ in get_db().query(AnalysisModuleTracking).all()
         ]

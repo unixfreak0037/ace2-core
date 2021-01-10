@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from ace.database import Base
+from ace.system.database import Base
 
 from sqlalchemy import (
     BigInteger,
@@ -197,3 +197,16 @@ class LockOwnerWaitTarget(Base):
     owner = Column(String, primary_key=True)
 
     lock_id = Column(String, nullable=False)
+
+
+class Config(Base):
+
+    __tablename__ = "config"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+    }
+
+    key = Column(String, primary_key=True)
+
+    value = Column(String, nullable=True)

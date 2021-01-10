@@ -7,7 +7,8 @@ from typing import Any, Union
 import ace
 
 from ace.analysis import RootAnalysis
-from ace.database.schema import RootAnalysisTracking, AnalysisDetailsTracking
+from ace.system.database import get_db
+from ace.system.database.schema import RootAnalysisTracking, AnalysisDetailsTracking
 from ace.system.analysis_tracking import AnalysisTrackingInterface, UnknownRootAnalysisError
 
 import sqlalchemy.exc
@@ -16,7 +17,7 @@ import sqlalchemy.exc
 class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
     def get_root_analysis(self, uuid: str) -> Union[RootAnalysisTracking, None]:
         """Returns the root for the given uuid or None if it does not exist.."""
-        result = ace.db.query(RootAnalysisTracking).filter(RootAnalysisTracking.uuid == uuid).one_or_none()
+        result = get_db().query(RootAnalysisTracking).filter(RootAnalysisTracking.uuid == uuid).one_or_none()
         if not result:
             return None
 
@@ -29,18 +30,18 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
             json_data=root.to_json(exclude_analysis_details=True),
         )
 
-        ace.db.merge(tracking)
-        ace.db.commit()
+        get_db().merge(tracking)
+        get_db().commit()
 
     def delete_root_analysis(self, uuid: str) -> bool:
         """Deletes the given RootAnalysis JSON data by uuid, and any associated analysis details."""
-        result = ace.db.execute(RootAnalysisTracking.__table__.delete().where(RootAnalysisTracking.uuid == uuid))
-        ace.db.commit()
+        result = get_db().execute(RootAnalysisTracking.__table__.delete().where(RootAnalysisTracking.uuid == uuid))
+        get_db().commit()
         return result.rowcount > 0
 
     def get_analysis_details(self, uuid: str) -> Any:
         """Returns the details for the given Analysis object, or None if is has not been set."""
-        result = ace.db.query(AnalysisDetailsTracking).filter(AnalysisDetailsTracking.uuid == uuid).one_or_none()
+        result = get_db().query(AnalysisDetailsTracking).filter(AnalysisDetailsTracking.uuid == uuid).one_or_none()
         if not result:
             return None
 
@@ -53,13 +54,15 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
                 uuid=uuid, root_uuid=root_uuid, json_data=json.dumps(value, sort_keys=True)
             )
 
-            ace.db.merge(tracking)
-            ace.db.commit()
+            get_db().merge(tracking)
+            get_db().commit()
         except sqlalchemy.exc.IntegrityError:
             raise UnknownRootAnalysisError(root_uuid)
 
     def delete_analysis_details(self, uuid: str) -> bool:
         """Deletes the analysis details for the given Analysis referenced by id."""
-        result = ace.db.execute(AnalysisDetailsTracking.__table__.delete().where(AnalysisDetailsTracking.uuid == uuid))
-        ace.db.commit()
+        result = get_db().execute(
+            AnalysisDetailsTracking.__table__.delete().where(AnalysisDetailsTracking.uuid == uuid)
+        )
+        get_db().commit()
         return result.rowcount > 0

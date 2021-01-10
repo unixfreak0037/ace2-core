@@ -7,7 +7,8 @@ from typing import Union, Optional
 
 import ace
 
-from ace.database.schema import AnalysisResultCache
+from ace.system.database import get_db
+from ace.system.database.schema import AnalysisResultCache
 from ace.system.caching import CachingInterface
 from ace.system.analysis_request import AnalysisRequest
 from ace.time import utc_now
@@ -15,7 +16,7 @@ from ace.time import utc_now
 
 class DatabaseCachingInterface(CachingInterface):
     def get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
-        result = ace.db.query(AnalysisResultCache).filter(AnalysisResultCache.cache_key == cache_key).one_or_none()
+        result = get_db().query(AnalysisResultCache).filter(AnalysisResultCache.cache_key == cache_key).one_or_none()
         if result is None:
             return None
 
@@ -36,6 +37,6 @@ class DatabaseCachingInterface(CachingInterface):
             json_data=request.to_json(),
         )
 
-        ace.db.merge(cache_result)
-        ace.db.commit()
+        get_db().merge(cache_result)
+        get_db().commit()
         return cache_key

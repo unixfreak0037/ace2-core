@@ -9,7 +9,8 @@ from typing import Optional, Union
 import ace
 
 from ace.analysis import Observable
-from ace.database.schema import AnalysisRequestTracking
+from ace.system.database import get_db
+from ace.system.database.schema import AnalysisRequestTracking
 from ace.system.constants import TRACKING_STATUS_ANALYZING
 from ace.system.analysis_request import AnalysisRequestTrackingInterface, AnalysisRequest
 from ace.system.analysis_module import AnalysisModuleType
@@ -33,26 +34,28 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             json_data=request.to_json(),
         )
 
-        ace.db.merge(db_request)
-        ace.db.commit()
+        get_db().merge(db_request)
+        get_db().commit()
 
     def link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest):
         source_request = (
-            ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
+            get_db().query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
         )
         if source_request is None:
             return
 
-        dest_request = ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == dest.id).one_or_none()
+        dest_request = (
+            get_db().query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == dest.id).one_or_none()
+        )
         if dest_request is None:
             return
 
         source_request.linked_requests.append(dest_request)
-        ace.db.commit()
+        get_db().commit()
 
     def get_linked_analysis_requests(self, source: AnalysisRequest) -> list[AnalysisRequest]:
         source_request = (
-            ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
+            get_db().query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
         )
         if source_request is None:
             return None
@@ -60,14 +63,15 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         return [AnalysisRequest.from_dict(json.loads(_.json_data)) for _ in source_request.linked_requests]
 
     def delete_analysis_request(self, key: str) -> bool:
-        ace.db.execute(AnalysisRequestTracking.__table__.delete().where(AnalysisRequestTracking.id == key))
-        ace.db.commit()
+        get_db().execute(AnalysisRequestTracking.__table__.delete().where(AnalysisRequestTracking.id == key))
+        get_db().commit()
         # TODO return correct result
         return True
 
     def get_expired_analysis_requests(self) -> list[AnalysisRequest]:
         result = (
-            ace.db.query(AnalysisRequestTracking)
+            get_db()
+            .query(AnalysisRequestTracking)
             .filter(datetime.datetime.now() > AnalysisRequestTracking.expiration_date)
             .all()
         )
@@ -78,7 +82,7 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         raise NotImplementedError()
 
     def get_analysis_request_by_request_id(self, key: str) -> Union[AnalysisRequest, None]:
-        result = ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == key).one_or_none()
+        result = get_db().query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == key).one_or_none()
         if result is None:
             return None
 
@@ -87,13 +91,13 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
     def get_analysis_requests_by_root(self, key: str) -> list[AnalysisRequest]:
         return [
             AnalysisRequest.from_dict(json.loads(_.json_data))
-            for _ in ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.root_uuid == key).all()
+            for _ in get_db().query(AnalysisRequestTracking).filter(AnalysisRequestTracking.root_uuid == key).all()
         ]
 
     def get_analysis_request_by_cache_key(self, key: str) -> Union[AnalysisRequest, None]:
         assert isinstance(key, str)
 
-        result = ace.db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.cache_key == key).one_or_none()
+        result = get_db().query(AnalysisRequestTracking).filter(AnalysisRequestTracking.cache_key == key).one_or_none()
         if result is None:
             return None
 

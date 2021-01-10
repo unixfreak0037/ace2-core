@@ -6,6 +6,7 @@ import ace.database
 
 from ace.system import ACESystem, get_system, set_system
 from ace.system.config import set_config
+from ace.system.database import DatabaseACESystem
 from ace.system.database.analysis_module import DatabaseAnalysisModuleTrackingInterface
 from ace.system.database.analysis_request import DatabaseAnalysisRequestTrackingInterface
 from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterface
@@ -29,7 +30,7 @@ import fastapi.testclient
 import pytest
 
 
-class ThreadedACESystem(ACESystem):
+class ThreadedACETestSystem(ACESystem):
     work_queue = ThreadedWorkQueueManagerInterface()
     request_tracking = ThreadedAnalysisRequestTrackingInterface()
     module_tracking = ThreadedAnalysisModuleTrackingInterface()
@@ -43,7 +44,7 @@ class ThreadedACESystem(ACESystem):
     events = ThreadedEventInterafce()
 
 
-class DatabaseACESystem(ACESystem):
+class DatabaseACETestSystem(DatabaseACESystem):
     alerting = ThreadedAlertTrackingInterface()
     analysis_tracking = DatabaseAnalysisTrackingInterface()
     caching = DatabaseCachingInterface()
@@ -56,29 +57,34 @@ class DatabaseACESystem(ACESystem):
     storage = ThreadedStorageInterface()
     work_queue = ThreadedWorkQueueManagerInterface()
 
-    def _rebuild_database(self):
+    def reset(self):
+        super().reset()
+
+        # remove the temporary file we used
+        if os.path.exists("ace.db"):
+            os.remove("ace.db")
+
+        # re-initialize and create the database
+        self.initialize()
+        self.create_database()
+
+    def initialize(self):
         # running this out of memory does not work due to the multithreading
         # each connection gets its own thread (thanks to session scoping)
         # and this in-memory db only exists for the connection its on
         # engine = create_engine("sqlite://")
 
+        set_config("/ace/core/sqlalchemy/url", "sqlite:///ace.db")
+        super().initialize()
+
+    def stop(self):
+        super().stop()
+
         if os.path.exists("ace.db"):
             os.remove("ace.db")
 
-        set_config("/ace/core/sqlalchemy/url", "sqlite:///ace.db")
-        ace.database.initialize_database()
-        ace.database.Base.metadata.bind = ace.database.engine
-        ace.database.Base.metadata.create_all()
 
-    def start(self):
-        self._rebuild_database()
-
-    def reset(self):
-        self._rebuild_database()
-        super().reset()
-
-
-class DistributedACESystem(ACESystem):
+class DistributedACETestSystem(ACESystem):
     alerting = ThreadedAlertTrackingInterface()
     analysis_tracking = ThreadedAnalysisTrackingInterface()
     caching = ThreadedCachingInterface()
@@ -100,14 +106,15 @@ ace.system.distributed.locking.distributed_interface = ThreadedLockingInterface(
     autouse=True,
     scope="session",
     params=[
-        ThreadedACESystem,
-        DatabaseACESystem,
-        DistributedACESystem,
+        ThreadedACETestSystem,
+        DatabaseACETestSystem,
+        DistributedACETestSystem,
     ],
 )
 def initialize_ace_system(request):
     logging.getLogger().setLevel(logging.DEBUG)
     set_system(request.param())
+    get_system().initialize()
     get_system().start()
 
     yield

@@ -35,6 +35,9 @@ class ACESystem:
         self.storage.reset()
         self.work_queue.reset()
 
+    def initialize(self):
+        pass
+
     def start(self):
         pass
 

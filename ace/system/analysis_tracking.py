@@ -56,12 +56,17 @@ def get_root_analysis(root: Union[RootAnalysis, str]) -> Union[RootAnalysis, Non
 
 def track_root_analysis(root: RootAnalysis):
     assert isinstance(root, RootAnalysis)
+    from ace.system.storage import track_content_root
 
     if root.uuid is None:
         raise ValueError(f"uuid property of {root} is None in track_root_analysis")
 
     logging.debug(f"tracking {root}")
     get_system().analysis_tracking.track_root_analysis(root)
+
+    # make sure storage content is tracked to their roots
+    for observable in root.get_observables_by_type("file"):
+        track_content_root(observable.value, root)
 
 
 def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:

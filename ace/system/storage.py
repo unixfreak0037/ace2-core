@@ -37,6 +37,8 @@ class ContentMetadata:
     custom: dict = field(default_factory=dict)
     # the list of RootAnalysis UUIDs that reference this content
     # an empty list indicates that nothing references it anymore
+    # NOTE this list can reference non-existant root analysis objects
+    # this can happen if the file is uploaded before the root is tracked
     roots: list = field(default_factory=list)
 
 
@@ -79,6 +81,10 @@ class StorageInterface(ACESystemInterface):
         """Deletes the given content. Returns True if content was actually deleted."""
         raise NotImplementedError()
 
+    def track_content_root(self, sha256: str, uuid: str):
+        """Associates stored content to a root analysis."""
+        raise NotImplementedError()
+
 
 def store_content(content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
     assert isinstance(content, bytes) or isinstance(content, str) or isinstance(content, io.IOBase)
@@ -105,6 +111,16 @@ def iter_expired_content() -> Iterator[ContentMetadata]:
 
 def delete_content(sha256: str) -> bool:
     return get_system().storage.delete_content(sha256)
+
+
+def track_content_root(sha256: str, root: Union[RootAnalysis, str]):
+    assert isinstance(sha256, str)
+    assert isinstance(root, RootAnalysis) or isinstance(root, str)
+
+    if isinstance(root, RootAnalysis):
+        root = root.uuid
+
+    get_system().storage.track_content_root(sha256, root)
 
 
 #

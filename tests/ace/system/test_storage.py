@@ -4,6 +4,7 @@ import os.path
 
 import pytest
 
+from ace.analysis import RootAnalysis
 from ace.system.analysis_tracking import RootAnalysis, delete_root_analysis
 from ace.system.storage import (
     delete_content,
@@ -17,6 +18,7 @@ from ace.system.storage import (
     store_file,
     ContentMetadata,
 )
+from ace.time import utc_now
 
 TEST_STRING = lambda: "hello world"
 TEST_BYTES = lambda: b"hello world"
@@ -112,7 +114,7 @@ def test_file_expiration(tmpdir):
         fp.write("Hello, world!")
 
     # store the file and have it expire right away
-    sha256 = store_file(path, expiration_date=datetime.datetime.now())
+    sha256 = store_file(path, expiration_date=utc_now())
     assert sha256
 
     # we should have a single expired file now
@@ -162,7 +164,7 @@ def test_file_expiration_with_root_reference(tmpdir):
 
     root = RootAnalysis()
     # have the file expire right away
-    file_observable = root.add_file(path, expiration_date=datetime.datetime.now())
+    file_observable = root.add_file(path, expiration_date=utc_now())
     root.save()
     root.discard()
 
@@ -200,13 +202,13 @@ def test_file_expiration_with_multiple_root_reference(tmpdir):
 
     # add a root with a file that expires right away
     root_1 = RootAnalysis()
-    file_observable = root_1.add_file(path, expiration_date=datetime.datetime.now())
+    file_observable = root_1.add_file(path, expiration_date=utc_now())
     root_1.save()
     root_1.discard()
 
     # do it again but reference the same file
     root_2 = RootAnalysis()
-    file_observable = root_2.add_file(path, expiration_date=datetime.datetime.now())
+    file_observable = root_2.add_file(path, expiration_date=utc_now())
     root_2.save()
     root_2.discard()
 
@@ -246,3 +248,34 @@ def test_file_expiration_with_multiple_root_reference(tmpdir):
 
     # and the content is gone
     assert get_content_meta(file_observable.value) is None
+
+
+@pytest.mark.integration
+def test_root_analysis_association(tmp_path):
+    target_path = tmp_path / "test.txt"
+    target_path.write_text("test")
+    target_path = str(target_path)
+
+    # we store the file with no initial root analysis set to expire now
+    sha256 = store_file(target_path, expiration_date=utc_now())
+    assert get_content_meta(sha256)
+
+    # submit a root analysis with the given file *after* we upload it
+    root = RootAnalysis()
+    observable = root.add_observable("file", sha256)
+    root.submit()
+
+    # now attempt to delete all expired content
+    delete_expired_content()
+
+    # we should still have the content
+    assert get_content_meta(sha256)
+
+    # delete the root
+    delete_root_analysis(root)
+
+    # now attempt to delete all expired content
+    delete_expired_content()
+
+    # should be gone
+    assert get_content_meta(sha256) is None

@@ -9,6 +9,7 @@ from typing import Union, Optional, Iterator
 
 from ace.system import ACESystemInterface
 from ace.system.storage import StorageInterface, ContentMetadata, has_valid_root_reference
+from ace.time import utc_now
 
 
 class ThreadedStorageInterface(ACESystemInterface):
@@ -92,7 +93,7 @@ class ThreadedStorageInterface(ACESystemInterface):
                 continue
 
             # is this content not expired yet?
-            if meta.expiration_date > datetime.datetime.now():
+            if meta.expiration_date > utc_now():
                 continue
 
             # are there still valid root analysis references?
@@ -103,6 +104,16 @@ class ThreadedStorageInterface(ACESystemInterface):
             expired_meta.append(meta)
 
         return iter(expired_meta)
+
+    def track_content_root(self, sha256: str, root_uuid: str):
+        meta = self.get_content_meta(sha256)
+        if not meta:
+            return
+
+        if root_uuid in meta.roots:
+            return
+
+        meta.roots.append(root_uuid)
 
     def reset(self):
         self.content = {}

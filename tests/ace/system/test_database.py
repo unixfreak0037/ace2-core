@@ -4,7 +4,6 @@ import sqlite3
 import uuid
 
 import ace
-import ace.database
 
 from ace.system import get_system
 from ace.system.database import (

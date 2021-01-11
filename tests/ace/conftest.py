@@ -2,7 +2,7 @@ import logging
 import os
 import os.path
 
-import ace.database
+import ace.system.distributed
 
 from ace.system import ACESystem, get_system, set_system
 from ace.system.config import set_config

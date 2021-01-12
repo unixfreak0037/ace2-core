@@ -1,6 +1,7 @@
 SQLAlchemy
+fastapi[all]
 python-dateutil
 pytz
+redis
 tld
 tzlocal
-fastapi[all]

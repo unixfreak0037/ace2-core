@@ -1,5 +1,6 @@
 black
 coverage
+fakeredis
 flake8
 mkdocs
 mkdocs-awesome-pages-plugin

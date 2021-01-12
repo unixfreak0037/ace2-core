@@ -25,6 +25,7 @@ from ace.system.threaded.locking import ThreadedLockingInterface
 from ace.system.threaded.observables import ThreadedObservableInterface
 from ace.system.threaded.storage import ThreadedStorageInterface
 from ace.system.threaded.work_queue import ThreadedWorkQueueManagerInterface
+from ace.system.redis.work_queue import RedisWorkQueueManagerInterface
 
 import fastapi.testclient
 import pytest
@@ -95,8 +96,22 @@ class DistributedACETestSystem(ACESystem):
     observable = ThreadedObservableInterface()
     request_tracking = ThreadedAnalysisRequestTrackingInterface()
     storage = ThreadedStorageInterface()
-    work_queue = ThreadedWorkQueueManagerInterface()
+    work_queue = RedisWorkQueueManagerInterface()
     locking.client = fastapi.testclient.TestClient(ace.system.distributed.locking.app)
+
+    def initialize(self):
+        import fakeredis
+
+        rc = fakeredis.FakeStrictRedis()
+        self.work_queue.redis_connection = lambda: rc
+
+    def reset(self):
+        super().reset()
+
+        import fakeredis
+
+        rc = fakeredis.FakeStrictRedis()
+        self.work_queue.redis_connection = lambda: rc
 
 
 ace.system.distributed.locking.distributed_interface = ThreadedLockingInterface()

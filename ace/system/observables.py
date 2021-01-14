@@ -24,7 +24,7 @@ class ObservableInterface(ACESystemInterface):
 
 
 def create_observable(type: str, *args, **kwargs) -> Observable:
-    if get_system().observable is None:
+    if get_system() is None or get_system().observable is None:
         return Observable(type, *args, **kwargs)
 
     return get_system().observable.create_observable(type, *args, **kwargs)

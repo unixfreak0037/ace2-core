@@ -119,7 +119,7 @@ def check_deadlock(lock_id: str, requestor_id: str, chain=None):
     chain.append(lock_id)
 
     if len(chain) > 10:
-        print(f"lock_id = {lock_id} requestor_id = {requestor_id} lock_owner_id = {lock_owner_id} chain = {chain}")
+        logging.warning(f"deadlock chain length: lock_id = {lock_id} requestor_id = {requestor_id} lock_owner_id = {lock_owner_id} chain = {chain}")
 
     check_deadlock(get_owner_wait_target(lock_owner_id), requestor_id, chain)
 
@@ -170,11 +170,13 @@ def get_owner_wait_target(owner_id: str) -> Union[str, None]:
 def track_wait_target(lock_id: Union[str, None], owner_id: str):
     assert lock_id is None or isinstance(lock_id, str)
     assert isinstance(owner_id, str)
+    logging.debug(f"tracking wait target lock {lock_id} owner {owner_id}")
     get_system().locking.track_wait_target(lock_id, owner_id)
 
 
 def clear_wait_target(owner_id: str):
     assert isinstance(owner_id, str)
+    logging.debug(f"clearing wait target owner {owner_id}")
     get_system().locking.clear_wait_target(owner_id)
 
 
@@ -242,6 +244,7 @@ def acquire(
 
     # and we are no longer waiting
     clear_wait_target(owner_id)
+    logging.debug(f"lock {lock_id} acquired by {owner_id}")
     return True
 
 
@@ -252,7 +255,11 @@ def release(lock_id: str, owner_id: Optional[str] = None) -> bool:
         owner_id = default_owner_id()
 
     # actually release the lock
-    return get_system().locking.release(lock_id, owner_id)
+    result = get_system().locking.release(lock_id, owner_id)
+    if result:
+        logging.debug(f"lock {lock_id} released by {owner_id}")
+
+    return result
 
 
 @contextmanager

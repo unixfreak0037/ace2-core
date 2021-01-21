@@ -1,6 +1,8 @@
 # vim: ts=4:sw=4:et:cc=120
 #
 
+import logging
+
 from typing import Union, Any
 
 from ace.analysis import RootAnalysis
@@ -21,4 +23,5 @@ def track_alert(root: Union[RootAnalysis, str]) -> Any:
     if isinstance(root, str):
         root = get_root_analysis(root)
 
+    logging.info(f"tracking alert {root}")
     return get_system().alerting.track_alert(root)

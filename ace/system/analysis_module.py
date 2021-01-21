@@ -87,6 +87,7 @@ def register_analysis_module_type(amt: AnalysisModuleType) -> AnalysisModuleType
 
 def track_analysis_module_type(amt: AnalysisModuleType):
     assert isinstance(amt, AnalysisModuleType)
+    logging.debug(f"tracking analysis module type {amt}")
     return get_system().module_tracking.track_analysis_module_type(amt)
 
 
@@ -105,6 +106,8 @@ def delete_analysis_module_type(amt: Union[AnalysisModuleType, str]):
 
     if isinstance(amt, str):
         amt = get_analysis_module_type(amt)
+
+    logging.info(f"deleting analysis module type {amt}")
 
     # remove the work queue for the module
     delete_work_queue(amt.name)

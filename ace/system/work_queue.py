@@ -1,5 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 
+import logging
 from typing import Union, Optional
 
 from ace.system import ACESystemInterface, get_system
@@ -65,6 +66,7 @@ def put_work(amt: Union[AnalysisModuleType, str], analysis_request: AnalysisRequ
     if isinstance(amt, AnalysisModuleType):
         amt = amt.name
 
+    logging.debug(f"adding request {analysis_request} to work queue for {amt}")
     return get_system().work_queue.put_work(amt, analysis_request)
 
 
@@ -83,6 +85,7 @@ def delete_work_queue(amt: Union[AnalysisModuleType, str]) -> bool:
     if isinstance(amt, AnalysisModuleType):
         amt = amt.name
 
+    logging.debug(f"deleting work queue for {amt}")
     return get_system().work_queue.delete_work_queue(amt)
 
 
@@ -91,6 +94,7 @@ def add_work_queue(amt: Union[AnalysisModuleType, str]):
     if isinstance(amt, AnalysisModuleType):
         amt = amt.name
 
+    logging.debug(f"adding work queue for {amt}")
     get_system().work_queue.add_work_queue(amt)
 
 
@@ -120,6 +124,7 @@ def get_next_analysis_request(
     # if that's the case then the request fails and the requestor needs to update to the new version
     existing_amt = get_analysis_module_type(amt.name)
     if existing_amt and not existing_amt.version_matches(amt):
+        logging.info(f"requested amt {amt} version mismatch against {existing_amt}")
         raise AnalysisModuleTypeVersionError(amt, existing_amt)
 
     while True:
@@ -140,6 +145,7 @@ def get_next_analysis_request(
                     # set the owner, status then update
                     next_ar.owner = owner_uuid
                     next_ar.status = TRACKING_STATUS_ANALYZING
+                    logging.debug(f"assigned analysis request {next_ar} to {owner_uuid}")
                     track_analysis_request(next_ar)
 
             except LockAcquireFailed as e:

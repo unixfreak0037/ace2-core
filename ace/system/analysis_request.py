@@ -1,6 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 
 import copy
+import logging
 import uuid
 from typing import Union, List, Optional, Any
 
@@ -246,6 +247,7 @@ def track_analysis_request(request: AnalysisRequest):
     if request.type and get_analysis_module_type(request.type.name) is None:
         raise UnknownAnalysisModuleTypeError(request.type.name)
 
+    logging.debug(f"tracking analysis request {request}")
     return get_system().request_tracking.track_analysis_request(request)
 
 
@@ -253,6 +255,7 @@ def link_analysis_requests(source: AnalysisRequest, dest: AnalysisRequest):
     assert isinstance(source, AnalysisRequest)
     assert isinstance(dest, AnalysisRequest)
     assert source != dest
+    logging.debug(f"linking analysis request source {source} to dest {dest}")
     get_system().request_tracking.link_analysis_requests(source, dest)
 
 
@@ -288,6 +291,7 @@ def delete_analysis_request(target: Union[AnalysisRequest, str]) -> bool:
     if isinstance(target, AnalysisRequest):
         target = target.id
 
+    logging.debug(f"deleting analysis request {target}")
     return get_system().request_tracking.delete_analysis_request(target)
 
 
@@ -303,6 +307,7 @@ def get_analysis_requests_by_root(key: str) -> list[AnalysisRequest]:
 
 def clear_tracking_by_analysis_module_type(amt: AnalysisModuleType):
     """Deletes tracking for any requests assigned to the given analysis module type."""
+    logging.debug(f"clearing analysis request tracking for analysis module type {amt}")
     return get_system().request_tracking.clear_tracking_by_analysis_module_type(amt)
 
 
@@ -333,12 +338,15 @@ def process_expired_analysis_requests():
     if not acquire(SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS, timeout=0):
         return
 
+    logging.debug(f"processing expired analysis requests")
+
     try:
         for request in get_expired_analysis_requests():
             if request.acquire(timeout=0):
                 try:
                     # re-submit the analysis request
                     # this changes the status and thus takes it out of expiration
+                    logging.info(f"re-submitting expired analysis request {request}")
                     submit_analysis_request(request)
                 except UnknownAnalysisModuleTypeError:
                     delete_analysis_request(request.id)

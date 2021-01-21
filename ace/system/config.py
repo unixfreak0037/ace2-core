@@ -2,6 +2,7 @@
 #
 # global system components
 
+import logging
 from typing import Any, Optional
 
 from ace.system import get_system, ACESystemInterface
@@ -20,4 +21,5 @@ def get_config(key: str, default: Optional[Any] = None) -> Any:
 
 
 def set_config(key: str, value: Any):
+    logging.debug(f"modified config key {key}")
     return get_system().config.set_config(key, value)

@@ -61,7 +61,7 @@ def track_root_analysis(root: RootAnalysis):
     if root.uuid is None:
         raise ValueError(f"uuid property of {root} is None in track_root_analysis")
 
-    logging.debug(f"tracking {root}")
+    logging.debug(f"tracking root {root}")
     get_system().analysis_tracking.track_root_analysis(root)
 
     # make sure storage content is tracked to their roots
@@ -75,14 +75,13 @@ def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:
     if isinstance(root, RootAnalysis):
         root = root.uuid
 
-    logging.debug(f"deleting RootAnalysis with uuid {root}")
+    logging.debug(f"deleting root {root}")
     return get_system().analysis_tracking.delete_root_analysis(root)
 
 
 def get_analysis_details(uuid: str) -> Any:
     assert isinstance(uuid, str)
 
-    logging.debug(f"loading analysis details {uuid}")
     return get_system().analysis_tracking.get_analysis_details(uuid)
 
 
@@ -102,5 +101,5 @@ def track_analysis_details(root: RootAnalysis, uuid: str, value: Any) -> bool:
 def delete_analysis_details(uuid: str) -> bool:
     assert isinstance(uuid, str)
 
-    logging.debug(f"deleting analysis detqials {uuid}")
+    logging.debug(f"deleting analysis detials {uuid}")
     return get_system().analysis_tracking.delete_analysis_details(uuid)

@@ -1,5 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 import hashlib
+import logging
 
 from typing import Union, Optional
 
@@ -81,14 +82,17 @@ def cache_analysis_result(request: AnalysisRequest) -> Union[str, None]:
     if cache_key is None:
         return None
 
+    logging.debug(f"caching analysis request {request} with key {cache_key} ttl {request.type.cache_ttl}")
     return get_system().caching.cache_analysis_result(cache_key, request, request.type.cache_ttl)
 
 
 def delete_expired_cached_analysis_results():
+    logging.debug(f"deleting expired cached analysis results")
     get_system().caching.delete_expired_cached_analysis_results()
 
 
 def delete_cached_analysis_results_by_module_type(amt: AnalysisModuleType):
+    logging.debug(f"deleting cached analysis results for analysis module type {amt}")
     get_system().caching.delete_cached_analysis_results_by_module_type(amt)
 
 

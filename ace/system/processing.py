@@ -48,15 +48,18 @@ def process_analysis_request(ar: AnalysisRequest):
 
             # is this analysis request gone?
             if not existing_ar:
+                logging.info(f"requested unknown analysis request {ar.id}")
                 raise UnknownAnalysisRequest(ar)
 
             # did the ownership change?
             if existing_ar.owner != ar.owner:
+                logging.info(f"requested expired analysis request {ar.id}")
                 raise ExpiredAnalysisRequest(ar)
 
             # get the existing root analysis
             target_root = get_root_analysis(ar.root)
             if not target_root:
+                logging.info(f"analysis request {ar.id} referenced unknown root {ar.root}")
                 raise UnknownRootAnalysisError(ar)
 
             # should we cache these results?
@@ -94,6 +97,7 @@ def process_analysis_request(ar: AnalysisRequest):
                 linked_request.initialize_result()
                 linked_request.original_root = ar.original_root
                 linked_request.modified_root = ar.modified_root
+                logging.debug(f"processing linked analysis request {linked_request} from {ar}")
                 process_analysis_request(linked_request)
 
         elif ar.is_root_analysis_request:
@@ -109,6 +113,7 @@ def process_analysis_request(ar: AnalysisRequest):
 
         # this should never fire
         if target_root is None:
+            logging.critical("hit unexpected code branch")
             raise RuntimeError("target_root is None")
 
         # did we generate an alert?
@@ -117,6 +122,7 @@ def process_analysis_request(ar: AnalysisRequest):
 
         # for each observable that needs to be analyzed
         if not target_root.analysis_cancelled:
+            logging.debug(f"processing {target_root}")
             for observable in ar.observables:
                 for amt in get_all_analysis_module_types():
                     # does this analysis module accept this observable?
@@ -184,6 +190,7 @@ def process_analysis_request(ar: AnalysisRequest):
                         continue
 
                     # otherwise we need to request it
+                    logging.info(f"creating new analysis request for observable {observable} amt {amt} root {target_root}")
                     new_ar = observable.create_analysis_request(amt)
                     # (we also track the request inside the RootAnalysis object)
                     observable.track_analysis_request(new_ar)

@@ -1,5 +1,9 @@
 # vim: ts=4:sw=4:et:cc=120
 
+CONFIG_REDIS_HOST = "/ace/core/redis/host"
+CONFIG_REDIS_PORT = "/ace/core/redis/port"
+CONFIG_REDIS_DB = "/ace/core/redis/db"
+
 import json
 
 from typing import Union, Optional
@@ -30,9 +34,9 @@ def get_queue_name(name: str) -> str:
 def get_redis_connection():
     """Returns a redis connection to use."""
     return redis.Redis(
-        host=get_config("/ace/core/redis/host", default="localhost"),
-        port=get_config("/ace/core/redis/port", default=6379),
-        db=get_config("/ace/core/redis/db", default=0),
+        host=get_config(CONFIG_REDIS_HOST, default="localhost"),
+        port=get_config(CONFIG_REDIS_PORT, default=6379),
+        db=get_config(CONFIG_REDIS_DB, default=0),
     )
 
 

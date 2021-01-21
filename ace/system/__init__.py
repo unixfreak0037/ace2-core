@@ -35,12 +35,15 @@ class ACESystem:
         self.storage.reset()
         self.work_queue.reset()
 
+    # should be called before start() is called
     def initialize(self):
         pass
 
+    # called to start the system
     def start(self):
         pass
 
+    # called to stop the system
     def stop(self):
         pass
 

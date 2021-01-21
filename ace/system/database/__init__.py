@@ -1,5 +1,8 @@
 # vim: sw=4:ts=4:et:cc=120
 
+CONFIG_DB_URL = "/ace/core/sqlalchemy/url"
+CONFIG_DB_KWARGS = "/ace/core/sqlalchemy/kwargs"
+
 import functools
 import logging
 import os
@@ -14,7 +17,6 @@ import sqlite3
 import ace
 
 from ace.system import ACESystem, get_system
-from ace.system.config import get_config
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import DBAPIError, IntegrityError
@@ -25,7 +27,34 @@ from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
 
 
-class DatabaseACESystem(ACESystem):
+def get_db() -> scoped_session:
+    """Returns the global scoped_session object."""
+    return get_system().db
+
+
+from ace.system.config import get_config
+from ace.system.database.analysis_module import DatabaseAnalysisModuleTrackingInterface
+from ace.system.database.analysis_request import DatabaseAnalysisRequestTrackingInterface
+from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterface
+from ace.system.database.caching import DatabaseCachingInterface
+from ace.system.database.locking import DatabaseLockingInterface
+from ace.system.database.observables import DatabaseObservableInterface
+
+
+class DatabaseACESystem:
+    """A partial ACE core system that uses SQLAlchemy to manage data."""
+
+    # the URL to use to connect to the database (first argument to create_engine)
+    db_url: str = None
+    # optional args to create_engine
+    db_kwargs: dict = {}
+
+    analysis_tracking = DatabaseAnalysisTrackingInterface()
+    caching = DatabaseCachingInterface()
+    locking = DatabaseLockingInterface()
+    module_tracking = DatabaseAnalysisModuleTrackingInterface()
+    observable = DatabaseObservableInterface()
+    request_tracking = DatabaseAnalysisRequestTrackingInterface()
 
     DatabaseSession = None
     db: scoped_session = None
@@ -38,9 +67,9 @@ class DatabaseACESystem(ACESystem):
         # /usr/local/lib/python3.6/dist-packages/pymysql/cursors.py:170: Warning: (1300, "Invalid utf8mb4 character string: '800363'")
         warnings.filterwarnings(action="ignore", message=".*Invalid utf8mb4 character string.*")
 
-        url = get_config("/ace/core/sqlalchemy/url")
-        kwargs = get_config("/ace/core/sqlalchemy/kargs", {})
-        self.engine = create_engine(url, **kwargs)
+        self.db_url = get_config(CONFIG_DB_URL, default=self.db_url)
+        self.db_kwargs = get_config(CONFIG_DB_KWARGS, default=self.db_kwargs)
+        self.engine = create_engine(self.db_url, **self.db_kwargs)
 
         @event.listens_for(self.engine, "connect")
         def connect(dbapi_connection, connection_record):
@@ -72,15 +101,6 @@ class DatabaseACESystem(ACESystem):
 
         self.DatabaseSession = sessionmaker(bind=self.engine)
         self.db = scoped_session(self.DatabaseSession)
-
-    def create_database(self):
-        Base.metadata.bind = self.engine
-        Base.metadata.create_all()
-
-
-def get_db() -> scoped_session:
-    """Returns the global scoped_session object."""
-    return get_system().db
 
 
 def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=False):

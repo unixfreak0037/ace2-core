@@ -18,3 +18,11 @@ TRACKING_STATUS_EXPIRED = "expired"
 # system-level locks
 # TODO these locks should not be acquire-able externally
 SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS = "ace:expired_analysis_requests"
+
+# supported events
+EVENT_ANALYSIS_ROOT_NEW = "/core/analysis/root/new"
+EVENT_ANALYSIS_ROOT_MODIFIED = "/core/analysis/root/modified"
+EVENT_ANALYSIS_ROOT_DELETED = "/core/analysis/root/deleted"
+EVENT_ANALYSIS_DETAILS_NEW = "/core/analysis/details/new"
+EVENT_ANALYSIS_DETAILS_MODIFIED = "/core/analysis/details/modified"
+EVENT_ANALYSIS_DETAILS_DELETED = "/core/analysis/details/deleted"

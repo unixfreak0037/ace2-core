@@ -7,6 +7,8 @@ from typing import Union, Any, Optional
 
 from ace.analysis import RootAnalysis, Observable, Analysis
 from ace.system import get_system, ACESystemInterface
+from ace.system.constants import EVENT_ANALYSIS_ROOT_NEW, EVENT_ANALYSIS_ROOT_MODIFIED, EVENT_ANALYSIS_ROOT_DELETED
+from ace.system.events import fire_event
 from ace.system.locking import lock
 
 
@@ -62,12 +64,17 @@ def track_root_analysis(root: RootAnalysis):
         raise ValueError(f"uuid property of {root} is None in track_root_analysis")
 
     logging.debug(f"tracking root {root}")
+    exists = get_root_analysis(root) is not None
     get_system().analysis_tracking.track_root_analysis(root)
 
     # make sure storage content is tracked to their roots
     for observable in root.get_observables_by_type("file"):
         track_content_root(observable.value, root)
 
+    if not exists:
+        fire_event(EVENT_ANALYSIS_ROOT_NEW, root)
+    else:
+        fire_event(EVENT_ANALYSIS_ROOT_MODIFIED, root)
 
 def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:
     assert isinstance(root, RootAnalysis) or isinstance(root, str)
@@ -76,7 +83,11 @@ def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:
         root = root.uuid
 
     logging.debug(f"deleting root {root}")
-    return get_system().analysis_tracking.delete_root_analysis(root)
+    result = get_system().analysis_tracking.delete_root_analysis(root)
+    if result:
+        fire_event(EVENT_ANALYSIS_ROOT_DELETED, root)
+
+    return result
 
 
 def get_analysis_details(uuid: str) -> Any:

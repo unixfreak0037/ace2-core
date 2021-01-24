@@ -190,7 +190,9 @@ def process_analysis_request(ar: AnalysisRequest):
                         continue
 
                     # otherwise we need to request it
-                    logging.info(f"creating new analysis request for observable {observable} amt {amt} root {target_root}")
+                    logging.info(
+                        f"creating new analysis request for observable {observable} amt {amt} root {target_root}"
+                    )
                     new_ar = observable.create_analysis_request(amt)
                     # (we also track the request inside the RootAnalysis object)
                     observable.track_analysis_request(new_ar)

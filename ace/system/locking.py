@@ -119,7 +119,9 @@ def check_deadlock(lock_id: str, requestor_id: str, chain=None):
     chain.append(lock_id)
 
     if len(chain) > 10:
-        logging.warning(f"deadlock chain length: lock_id = {lock_id} requestor_id = {requestor_id} lock_owner_id = {lock_owner_id} chain = {chain}")
+        logging.warning(
+            f"deadlock chain length: lock_id = {lock_id} requestor_id = {requestor_id} lock_owner_id = {lock_owner_id} chain = {chain}"
+        )
 
     check_deadlock(get_owner_wait_target(lock_owner_id), requestor_id, chain)
 

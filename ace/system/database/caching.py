@@ -59,11 +59,8 @@ class DatabaseCachingInterface(CachingInterface):
         if amt:
             return (
                 get_db()
-                .query(
-                    func.count(AnalysisResultCache.cache_key).filter(
-                        AnalysisResultCache.analysis_module_type == amt.name
-                    )
-                )
+                .query(func.count(AnalysisResultCache.cache_key))
+                .filter(AnalysisResultCache.analysis_module_type == amt.name)
                 .scalar()
             )
         else:

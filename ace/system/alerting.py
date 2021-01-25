@@ -8,6 +8,8 @@ from typing import Union, Any
 from ace.analysis import RootAnalysis
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_tracking import get_root_analysis
+from ace.system.constants import EVENT_ALERT
+from ace.system.events import fire_event
 
 
 class AlertTrackingInterface(ACESystemInterface):
@@ -24,4 +26,6 @@ def track_alert(root: Union[RootAnalysis, str]) -> Any:
         root = get_root_analysis(root)
 
     logging.info(f"tracking alert {root}")
-    return get_system().alerting.track_alert(root)
+    result = get_system().alerting.track_alert(root)
+    fire_event(EVENT_ALERT, root)
+    return result

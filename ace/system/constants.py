@@ -20,9 +20,13 @@ TRACKING_STATUS_EXPIRED = "expired"
 SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS = "ace:expired_analysis_requests"
 
 # supported events
+# analysis tracking
 EVENT_ANALYSIS_ROOT_NEW = "/core/analysis/root/new"
 EVENT_ANALYSIS_ROOT_MODIFIED = "/core/analysis/root/modified"
 EVENT_ANALYSIS_ROOT_DELETED = "/core/analysis/root/deleted"
+# analysis details tracking
 EVENT_ANALYSIS_DETAILS_NEW = "/core/analysis/details/new"
 EVENT_ANALYSIS_DETAILS_MODIFIED = "/core/analysis/details/modified"
 EVENT_ANALYSIS_DETAILS_DELETED = "/core/analysis/details/deleted"
+# alerting
+EVENT_ALERT = "/core/alert"

@@ -3,6 +3,7 @@
 import pytest
 
 from ace.analysis import RootAnalysis
+from ace.system.alerting import track_alert
 from ace.system.analysis_tracking import (
     track_root_analysis,
     delete_root_analysis,
@@ -10,8 +11,9 @@ from ace.system.analysis_tracking import (
     delete_analysis_details,
 )
 from ace.system.constants import (
-    EVENT_ANALYSIS_ROOT_NEW,
+    EVENT_ALERT,
     EVENT_ANALYSIS_ROOT_MODIFIED,
+    EVENT_ANALYSIS_ROOT_NEW,
     EVENT_ANALYSIS_ROOT_DELETED,
     EVENT_ANALYSIS_DETAILS_NEW,
     EVENT_ANALYSIS_DETAILS_MODIFIED,
@@ -162,3 +164,25 @@ def test_EVENT_ANALYSIS_DETAILS_DELETED():
 
     assert handler.event is None
     assert handler.args is None
+
+
+@pytest.mark.integration
+def test_EVENT_ALERT():
+    root = RootAnalysis()
+    track_root_analysis(root)
+    root.add_detection_point("test")
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ALERT, handler)
+    track_alert(root)
+
+    assert handler.event == EVENT_ALERT
+    assert handler.args[0] == root
+
+    # event fires every time
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ALERT, handler)
+    track_alert(root)
+
+    assert handler.event == EVENT_ALERT
+    assert handler.args[0] == root

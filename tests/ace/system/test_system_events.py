@@ -3,7 +3,12 @@
 import pytest
 
 from ace.analysis import RootAnalysis
-from ace.system.analysis_tracking import track_root_analysis, delete_root_analysis
+from ace.system.analysis_tracking import (
+    track_root_analysis,
+    delete_root_analysis,
+    track_analysis_details,
+    delete_analysis_details,
+)
 from ace.system.constants import (
     EVENT_ANALYSIS_ROOT_NEW,
     EVENT_ANALYSIS_ROOT_MODIFIED,
@@ -99,19 +104,61 @@ def test_EVENT_ANALYSIS_ROOT_DELETED():
 
 @pytest.mark.integration
 def test_EVENT_ANALYSIS_DETAILS_NEW():
-    # no details are added so this event should not fire
     handler = TestEventHandler()
     register_event_handler(EVENT_ANALYSIS_DETAILS_NEW, handler)
-    root = RootAnalysis()
+    root = RootAnalysis(details={"test": "test"})
     track_root_analysis(root)
+    track_analysis_details(root, root.uuid, root.details)
+
+    assert handler.event == EVENT_ANALYSIS_DETAILS_NEW
+    assert handler.args[0] == root
+    assert handler.args[1] == root.uuid
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ANALYSIS_DETAILS_NEW, handler)
+    # already tracked
+    track_analysis_details(root, root.uuid, root.details)
+
+    assert handler.event is None
+    assert handler.args is None
+
+
+@pytest.mark.integration
+def test_EVENT_ANALYSIS_DETAILS_MODIFIED():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ANALYSIS_DETAILS_MODIFIED, handler)
+    root = RootAnalysis(details={"test": "test"})
+    track_root_analysis(root)
+    track_analysis_details(root, root.uuid, root.details)
 
     assert handler.event is None
     assert handler.args is None
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_ROOT_NEW, handler)
-    # already tracked
+    register_event_handler(EVENT_ANALYSIS_DETAILS_MODIFIED, handler)
+    track_analysis_details(root, root.uuid, root.details)
+
+    assert handler.event == EVENT_ANALYSIS_DETAILS_MODIFIED
+    assert handler.args[0] == root
+    assert handler.args[1] == root.uuid
+
+
+@pytest.mark.integration
+def test_EVENT_ANALYSIS_DETAILS_DELETED():
+    handler = TestEventHandler()
+    root = RootAnalysis(details={"test": "test"})
     track_root_analysis(root)
+    track_analysis_details(root, root.uuid, root.details)
+
+    register_event_handler(EVENT_ANALYSIS_DETAILS_DELETED, handler)
+    delete_analysis_details(root.uuid)
+
+    assert handler.event == EVENT_ANALYSIS_DETAILS_DELETED
+    assert handler.args[0] == root.uuid
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ANALYSIS_DETAILS_DELETED, handler)
+    delete_analysis_details(root.uuid)
 
     assert handler.event is None
     assert handler.args is None

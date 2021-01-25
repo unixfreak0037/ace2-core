@@ -44,6 +44,9 @@ class ThreadedAnalysisTrackingInterface(AnalysisTrackingInterface):
 
         return True
 
+    def root_analysis_exists(self, uuid: str) -> bool:
+        return uuid in self.root_analysis
+
     def get_analysis_details(self, uuid: dict) -> Any:
         details_json = self.analysis_details.get(uuid)
         if details_json is None:
@@ -61,6 +64,9 @@ class ThreadedAnalysisTrackingInterface(AnalysisTrackingInterface):
 
     def delete_analysis_details(self, uuid: str) -> bool:
         return self.analysis_details.pop(uuid, None) is not None
+
+    def analysis_details_exists(self, uuid: str) -> bool:
+        return uuid in self.analysis_details
 
     def reset(self):
         self.root_analysis = {}

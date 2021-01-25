@@ -7,7 +7,14 @@ from typing import Union, Any, Optional
 
 from ace.analysis import RootAnalysis, Observable, Analysis
 from ace.system import get_system, ACESystemInterface
-from ace.system.constants import EVENT_ANALYSIS_ROOT_NEW, EVENT_ANALYSIS_ROOT_MODIFIED, EVENT_ANALYSIS_ROOT_DELETED
+from ace.system.constants import (
+    EVENT_ANALYSIS_ROOT_NEW,
+    EVENT_ANALYSIS_ROOT_MODIFIED,
+    EVENT_ANALYSIS_ROOT_DELETED,
+    EVENT_ANALYSIS_DETAILS_NEW,
+    EVENT_ANALYSIS_DETAILS_MODIFIED,
+    EVENT_ANALYSIS_DETAILS_DELETED,
+)
 from ace.system.events import fire_event
 from ace.system.locking import lock
 
@@ -32,6 +39,10 @@ class AnalysisTrackingInterface(ACESystemInterface):
         """Deletes the given RootAnalysis JSON data by uuid, and any associated analysis details."""
         raise NotImplementedError()
 
+    def root_analysis_exists(self, uuid: str) -> bool:
+        """Returns True if the given root analysis exists, False otherwise."""
+        raise NotImplementedError()
+
     def get_analysis_details(self, uuid: str) -> Any:
         """Returns the details for the given Analysis object, or None if is has not been set."""
         raise NotImplementedError()
@@ -42,6 +53,10 @@ class AnalysisTrackingInterface(ACESystemInterface):
 
     def delete_analysis_details(self, uuid: str) -> bool:
         """Deletes the analysis details for the given Analysis referenced by id."""
+        raise NotImplementedError()
+
+    def analysis_details_exists(self, uuid: str) -> bool:
+        """Returns True if the given analysis details exist, False otherwise."""
         raise NotImplementedError()
 
 
@@ -64,7 +79,7 @@ def track_root_analysis(root: RootAnalysis):
         raise ValueError(f"uuid property of {root} is None in track_root_analysis")
 
     logging.debug(f"tracking root {root}")
-    exists = get_root_analysis(root) is not None
+    exists = root_analysis_exists(root)
     get_system().analysis_tracking.track_root_analysis(root)
 
     # make sure storage content is tracked to their roots
@@ -91,6 +106,15 @@ def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:
     return result
 
 
+def root_analysis_exists(root: Union[RootAnalysis, str]) -> bool:
+    assert isinstance(root, RootAnalysis) or isinstance(root, str)
+
+    if isinstance(root, RootAnalysis):
+        root = root.uuid
+
+    return get_system().analysis_tracking.root_analysis_exists(root)
+
+
 def get_analysis_details(uuid: str) -> Any:
     assert isinstance(uuid, str)
 
@@ -106,7 +130,13 @@ def track_analysis_details(root: RootAnalysis, uuid: str, value: Any) -> bool:
         return False
 
     logging.debug(f"tracking {root} analysis details {uuid}")
+    exists = analysis_details_exists(root.uuid)
     get_system().analysis_tracking.track_analysis_details(root.uuid, uuid, value)
+    if not exists:
+        fire_event(EVENT_ANALYSIS_DETAILS_NEW, root, root.uuid)
+    else:
+        fire_event(EVENT_ANALYSIS_DETAILS_MODIFIED, root, root.uuid)
+
     return True
 
 
@@ -114,4 +144,13 @@ def delete_analysis_details(uuid: str) -> bool:
     assert isinstance(uuid, str)
 
     logging.debug(f"deleting analysis detials {uuid}")
-    return get_system().analysis_tracking.delete_analysis_details(uuid)
+    result = get_system().analysis_tracking.delete_analysis_details(uuid)
+    if result:
+        fire_event(EVENT_ANALYSIS_DETAILS_DELETED, uuid)
+
+    return result
+
+
+def analysis_details_exists(uuid: str) -> bool:
+    assert isinstance(uuid, str)
+    return get_system().analysis_tracking.analysis_details_exists(uuid)

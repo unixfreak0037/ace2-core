@@ -12,6 +12,7 @@ from ace.system.database.schema import RootAnalysisTracking, AnalysisDetailsTrac
 from ace.system.analysis_tracking import AnalysisTrackingInterface, UnknownRootAnalysisError
 
 import sqlalchemy.exc
+from sqlalchemy.sql import exists
 
 
 class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
@@ -32,6 +33,9 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
 
         get_db().merge(tracking)
         get_db().commit()
+
+    def root_analysis_exists(self, root: str) -> bool:
+        return get_db().query(exists().where(RootAnalysisTracking.uuid == root)).scalar()
 
     def delete_root_analysis(self, uuid: str) -> bool:
         """Deletes the given RootAnalysis JSON data by uuid, and any associated analysis details."""
@@ -66,3 +70,6 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
         )
         get_db().commit()
         return result.rowcount > 0
+
+    def analysis_details_exists(self, uuid: str) -> bool:
+        return get_db().query(exists().where(AnalysisDetailsTracking.uuid == uuid)).scalar()

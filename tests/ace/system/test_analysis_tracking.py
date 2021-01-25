@@ -8,13 +8,15 @@ from ace.analysis import RootAnalysis, Observable, Analysis, AnalysisModuleType
 from ace.system import get_system
 from ace.system.analysis_module import register_analysis_module_type
 from ace.system.analysis_tracking import (
-    get_analysis_details,
-    track_root_analysis,
-    get_root_analysis,
-    delete_root_analysis,
-    track_analysis_details,
-    get_analysis_details,
+    analysis_details_exists,
     delete_analysis_details,
+    delete_root_analysis,
+    get_analysis_details,
+    get_analysis_details,
+    get_root_analysis,
+    root_analysis_exists,
+    track_analysis_details,
+    track_root_analysis,
     UnknownRootAnalysisError,
 )
 
@@ -33,6 +35,16 @@ def test_track_root_analysis():
     assert delete_root_analysis(root.uuid)
     # make sure it's gone
     assert get_root_analysis(root.uuid) is None
+
+
+@pytest.mark.unit
+def test_root_analysis_exists():
+    root = RootAnalysis()
+    assert not root_analysis_exists(root)
+    track_root_analysis(root)
+    assert root_analysis_exists(root)
+    delete_root_analysis(root)
+    assert not root_analysis_exists(root)
 
 
 @pytest.mark.integration
@@ -59,6 +71,18 @@ def test_track_analysis_details():
     assert delete_analysis_details(root.uuid)
     # make sure it's gone
     assert get_analysis_details(root.uuid) is None
+
+
+@pytest.mark.unit
+def test_analysis_details_exists():
+    root = RootAnalysis()
+    root.details = TEST_DETAILS
+    assert not analysis_details_exists(root.uuid)
+    track_root_analysis(root)
+    track_analysis_details(root, root.uuid, root.details)
+    assert analysis_details_exists(root.uuid)
+    delete_root_analysis(root)
+    assert not analysis_details_exists(root.uuid)
 
 
 @pytest.mark.integration

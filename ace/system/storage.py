@@ -13,7 +13,7 @@ from typing import Union, Optional, Iterator
 from ace.analysis import RootAnalysis
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_tracking import get_root_analysis
-from ace.system.constants import EVENT_STORAGE_NEW, EVENT_STORAGE_DELETE
+from ace.system.constants import EVENT_STORAGE_NEW, EVENT_STORAGE_DELETED
 from ace.system.events import fire_event
 from ace.time import utc_now
 
@@ -119,7 +119,7 @@ def delete_content(sha256: str) -> bool:
     logging.debug(f"deleting content {sha256}")
     result = get_system().storage.delete_content(sha256)
     if result:
-        fire_event(EVENT_STORAGE_DELETE, sha256)
+        fire_event(EVENT_STORAGE_DELETED, sha256)
 
     return result
 

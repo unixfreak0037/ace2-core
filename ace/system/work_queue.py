@@ -4,7 +4,6 @@ import logging
 from typing import Union, Optional
 
 from ace.system import ACESystemInterface, get_system
-from ace.system.constants import TRACKING_STATUS_ANALYZING
 from ace.system.analysis_module import (
     AnalysisModuleType,
     AnalysisModuleTypeVersionError,
@@ -17,6 +16,14 @@ from ace.system.analysis_request import (
     track_analysis_request,
     get_analysis_request_by_request_id,
 )
+from ace.system.constants import (
+    TRACKING_STATUS_ANALYZING,
+    EVENT_WORK_QUEUE_NEW,
+    EVENT_WORK_QUEUE_DELETED,
+    EVENT_WORK_ADD,
+    EVENT_WORK_REMOVE,
+)
+from ace.system.events import fire_event
 from ace.system.locking import LockAcquireFailed
 
 
@@ -26,8 +33,10 @@ class WorkQueueManagerInterface(ACESystemInterface):
         A deleted work queue is removed from the system, and all work items in the queue are also deleted."""
         raise NotImplementedError()
 
-    def add_work_queue(self, name: str):
-        """Creates a new work queue for the given analysis module type."""
+    def add_work_queue(self, name: str) -> bool:
+        """Creates a new work queue for the given analysis module type.
+        Returns True if a new queue was actually created, False otherwise.
+        If the work queue already exists then this function returns False."""
         raise NotImplementedError()
 
     def put_work(self, amt: str, analysis_request: AnalysisRequest):
@@ -56,7 +65,11 @@ def get_work(amt: Union[AnalysisModuleType, str], timeout: int) -> Union[Analysi
     if isinstance(amt, AnalysisModuleType):
         amt = amt.name
 
-    return get_system().work_queue.get_work(amt, timeout)
+    result = get_system().work_queue.get_work(amt, timeout)
+    if result:
+        fire_event(EVENT_WORK_REMOVE, amt, result)
+
+    return result
 
 
 def put_work(amt: Union[AnalysisModuleType, str], analysis_request: AnalysisRequest):
@@ -67,7 +80,9 @@ def put_work(amt: Union[AnalysisModuleType, str], analysis_request: AnalysisRequ
         amt = amt.name
 
     logging.debug(f"adding request {analysis_request} to work queue for {amt}")
-    return get_system().work_queue.put_work(amt, analysis_request)
+    result = get_system().work_queue.put_work(amt, analysis_request)
+    fire_event(EVENT_WORK_ADD, amt, analysis_request)
+    return result
 
 
 def get_queue_size(amt: Union[AnalysisModuleType, str]) -> int:
@@ -86,16 +101,24 @@ def delete_work_queue(amt: Union[AnalysisModuleType, str]) -> bool:
         amt = amt.name
 
     logging.debug(f"deleting work queue for {amt}")
-    return get_system().work_queue.delete_work_queue(amt)
+    result = get_system().work_queue.delete_work_queue(amt)
+    if result:
+        fire_event(EVENT_WORK_QUEUE_DELETED, amt)
+
+    return result
 
 
-def add_work_queue(amt: Union[AnalysisModuleType, str]):
+def add_work_queue(amt: Union[AnalysisModuleType, str]) -> bool:
     assert isinstance(amt, AnalysisModuleType) or isinstance(amt, str)
     if isinstance(amt, AnalysisModuleType):
         amt = amt.name
 
     logging.debug(f"adding work queue for {amt}")
-    get_system().work_queue.add_work_queue(amt)
+    result = get_system().work_queue.add_work_queue(amt)
+    if result:
+        fire_event(EVENT_WORK_QUEUE_NEW, amt)
+
+    return result
 
 
 def get_next_analysis_request(

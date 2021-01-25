@@ -44,4 +44,9 @@ EVENT_CACHE_NEW = "/core/cache/new"
 EVENT_CONFIG_SET = "/core/config/set"
 # storage
 EVENT_STORAGE_NEW = "/core/storage/new"
-EVENT_STORAGE_DELETE = "/core/storage/delete"
+EVENT_STORAGE_DELETED = "/core/storage/deleted"
+# work queues
+EVENT_WORK_QUEUE_NEW = "/core/work/queue/new"
+EVENT_WORK_QUEUE_DELETED = "/core/work/queue/deleted"
+EVENT_WORK_ADD = "/core/work/add"
+EVENT_WORK_REMOVE = "/core/work/remove"

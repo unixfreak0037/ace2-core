@@ -53,10 +53,10 @@ class RedisWorkQueueManagerInterface(WorkQueueManagerInterface):
 
         return result == 1
 
-    def add_work_queue(self, name: str):
+    def add_work_queue(self, name: str) -> bool:
         with self.redis_connection() as rc:
             # this has to exist for the queue to exist
-            rc.set(get_marker_name(name), str(utc_now()))
+            return rc.setnx(get_marker_name(name), str(utc_now())) == 1
             # NOTE we don't add the actual queue because you can't add an empty list
 
     def put_work(self, amt: str, analysis_request: AnalysisRequest):

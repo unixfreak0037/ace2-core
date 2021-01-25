@@ -122,4 +122,29 @@ Every significant event that the core does can be subscribed to. Subscribers rec
     <td><code>sha256:str</code></td>
     <td>Content deleted.</td>
 </tr>
+<tr>
+    <td colspan="3"><b>Work Queue Events</b></td>
+</tr>
+<tr>
+    <td><code>/core/work/queue/new</code></td>
+    <td><code>amt:str</td>
+    <td>New work queue created.</td>
+</tr>
+<tr>
+    <td><code>/core/work/queue/deleted</code></td>
+    <td><code>amt:str</td>
+    <td>Work queue deleted.</td>
+</tr>
+<tr>
+    <td><code>/core/work/add</code></td>
+    <td><code>amt:str<br>
+    request:AnalysisRequest</td>
+    <td>Work assigned to queue.</td>
+</tr>
+<tr>
+    <td><code>/core/work/remove</code></td>
+    <td><code>amt:str<br>
+    request:AnalysisRequest</td>
+    <td>Removed work previously assigned to queue.</td>
+</tr>
 </table>

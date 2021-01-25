@@ -15,6 +15,7 @@ from ace.system.analysis_request import (
     track_analysis_request,
     delete_analysis_request,
     process_expired_analysis_requests,
+    AnalysisRequest,
 )
 from ace.system.caching import generate_cache_key, cache_analysis_result
 from ace.system.config import set_config
@@ -34,12 +35,18 @@ from ace.system.constants import (
     EVENT_AR_NEW,
     EVENT_CACHE_NEW,
     EVENT_CONFIG_SET,
+    EVENT_STORAGE_DELETED,
     EVENT_STORAGE_NEW,
-    EVENT_STORAGE_DELETE,
+    EVENT_WORK_ADD,
+    EVENT_WORK_QUEUE_DELETED,
+    EVENT_WORK_QUEUE_NEW,
+    EVENT_WORK_REMOVE,
     TRACKING_STATUS_ANALYZING,
 )
 from ace.system.events import register_event_handler, remove_event_handler, get_event_handlers, fire_event, EventHandler
+from ace.system.processing import submit_analysis_request
 from ace.system.storage import delete_content, store_content, ContentMetadata
+from ace.system.work_queue import add_work_queue, delete_work_queue, put_work, get_work
 
 
 class TestEventHandler(EventHandler):
@@ -415,19 +422,100 @@ def test_EVENT_STORAGE_NEW():
 
 
 @pytest.mark.integration
-def test_EVENT_STORAGE_DELETE():
+def test_EVENT_STORAGE_DELETED():
     handler = TestEventHandler()
-    register_event_handler(EVENT_STORAGE_DELETE, handler)
+    register_event_handler(EVENT_STORAGE_DELETED, handler)
     meta = ContentMetadata("test")
     sha256 = store_content("test", meta)
     delete_content(sha256)
 
-    assert handler.event == EVENT_STORAGE_DELETE
+    assert handler.event == EVENT_STORAGE_DELETED
     assert handler.args[0] == sha256
 
     # duplicate does not fire event (already gone)
     handler = TestEventHandler()
-    register_event_handler(EVENT_STORAGE_DELETE, handler)
+    register_event_handler(EVENT_STORAGE_DELETED, handler)
     delete_content(sha256)
+    assert handler.event is None
+    assert handler.args is None
+
+
+@pytest.mark.integration
+def test_EVENT_WORK_QUEUE_NEW():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_WORK_QUEUE_NEW, handler)
+
+    add_work_queue("test")
+    assert handler.event == EVENT_WORK_QUEUE_NEW
+    assert handler.args[0] == "test"
+
+    # duplicate should not fire
+    handler = TestEventHandler()
+    register_event_handler(EVENT_WORK_QUEUE_NEW, handler)
+
+    add_work_queue("test")
+    assert handler.event is None
+    assert handler.args is None
+
+
+@pytest.mark.integration
+def test_EVENT_WORK_QUEUE_DELETED():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_WORK_QUEUE_DELETED, handler)
+
+    add_work_queue("test")
+    delete_work_queue("test")
+    assert handler.event == EVENT_WORK_QUEUE_DELETED
+    assert handler.args[0] == "test"
+
+    # duplicate should not fire
+    handler = TestEventHandler()
+    register_event_handler(EVENT_WORK_QUEUE_DELETED, handler)
+
+    delete_work_queue("test")
+    assert handler.event is None
+    assert handler.args is None
+
+
+@pytest.mark.integration
+def test_EVENT_WORK_ADD():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_WORK_ADD, handler)
+
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    request = AnalysisRequest(root, observable, amt)
+    submit_analysis_request(request)
+
+    assert handler.event == EVENT_WORK_ADD
+    assert handler.args[0] == amt.name
+    assert handler.args[1] == request
+
+
+@pytest.mark.integration
+def test_EVENT_WORK_REMOVE():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_WORK_REMOVE, handler)
+
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    request = AnalysisRequest(root, observable, amt)
+    submit_analysis_request(request)
+    work = get_work(amt, 0)
+
+    assert handler.event == EVENT_WORK_REMOVE
+    assert handler.args[0] == amt.name
+    assert handler.args[1] == work
+
+    # can't get fired if you ain't got no work
+    handler = TestEventHandler()
+    register_event_handler(EVENT_WORK_REMOVE, handler)
+
+    work = get_work(amt, 0)
+
     assert handler.event is None
     assert handler.args is None

@@ -19,9 +19,12 @@ class ThreadedWorkQueueManagerInterface(WorkQueueManagerInterface):
         except KeyError:
             return False
 
-    def add_work_queue(self, analysis_module_name: str):
+    def add_work_queue(self, analysis_module_name: str) -> bool:
         if analysis_module_name not in self.work_queues:
             self.work_queues[analysis_module_name] = queue.Queue()
+            return True
+
+        return False
 
     def get_work(self, amt: str, timeout: int) -> Union[AnalysisRequest, None]:
         assert isinstance(amt, str)

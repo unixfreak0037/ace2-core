@@ -34,9 +34,12 @@ from ace.system.constants import (
     EVENT_AR_NEW,
     EVENT_CACHE_NEW,
     EVENT_CONFIG_SET,
+    EVENT_STORAGE_NEW,
+    EVENT_STORAGE_DELETE,
     TRACKING_STATUS_ANALYZING,
 )
 from ace.system.events import register_event_handler, remove_event_handler, get_event_handlers, fire_event, EventHandler
+from ace.system.storage import delete_content, store_content, ContentMetadata
 
 
 class TestEventHandler(EventHandler):
@@ -374,6 +377,7 @@ def test_EVENT_CONFIG_SET():
     register_event_handler(EVENT_CONFIG_SET, handler)
 
     set_config("test", "value")
+    assert handler.event == EVENT_CONFIG_SET
     assert handler.args[0] == "test"
     assert handler.args[1] == "value"
 
@@ -381,5 +385,49 @@ def test_EVENT_CONFIG_SET():
     handler = TestEventHandler()
     register_event_handler(EVENT_CONFIG_SET, handler)
     set_config("test", "value")
+    assert handler.event == EVENT_CONFIG_SET
     assert handler.args[0] == "test"
     assert handler.args[1] == "value"
+
+
+@pytest.mark.integration
+def test_EVENT_STORAGE_NEW():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_STORAGE_NEW, handler)
+
+    meta = ContentMetadata("test")
+    sha256 = store_content("test", meta)
+
+    assert handler.event == EVENT_STORAGE_NEW
+    assert handler.args[0] == sha256
+    assert handler.args[1] == meta
+
+    # duplicates are OK
+    handler = TestEventHandler()
+    register_event_handler(EVENT_STORAGE_NEW, handler)
+
+    meta = ContentMetadata("test")
+    sha256 = store_content("test", meta)
+
+    assert handler.event == EVENT_STORAGE_NEW
+    assert handler.args[0] == sha256
+    assert handler.args[1] == meta
+
+
+@pytest.mark.integration
+def test_EVENT_STORAGE_DELETE():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_STORAGE_DELETE, handler)
+    meta = ContentMetadata("test")
+    sha256 = store_content("test", meta)
+    delete_content(sha256)
+
+    assert handler.event == EVENT_STORAGE_DELETE
+    assert handler.args[0] == sha256
+
+    # duplicate does not fire event (already gone)
+    handler = TestEventHandler()
+    register_event_handler(EVENT_STORAGE_DELETE, handler)
+    delete_content(sha256)
+    assert handler.event is None
+    assert handler.args is None

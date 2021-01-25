@@ -13,6 +13,8 @@ from typing import Union, Optional, Iterator
 from ace.analysis import RootAnalysis
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_tracking import get_root_analysis
+from ace.system.constants import EVENT_STORAGE_NEW, EVENT_STORAGE_DELETE
+from ace.system.events import fire_event
 from ace.time import utc_now
 
 
@@ -91,7 +93,9 @@ def store_content(content: Union[bytes, str, io.IOBase], meta: ContentMetadata) 
     assert isinstance(content, bytes) or isinstance(content, str) or isinstance(content, io.IOBase)
     assert isinstance(meta, ContentMetadata)
     logging.debug(f"storing content {meta}")
-    return get_system().storage.store_content(content, meta)
+    sha256 = get_system().storage.store_content(content, meta)
+    fire_event(EVENT_STORAGE_NEW, sha256, meta)
+    return sha256
 
 
 def get_content_bytes(sha256: str) -> Union[bytes, None]:
@@ -113,7 +117,11 @@ def iter_expired_content() -> Iterator[ContentMetadata]:
 
 def delete_content(sha256: str) -> bool:
     logging.debug(f"deleting content {sha256}")
-    return get_system().storage.delete_content(sha256)
+    result = get_system().storage.delete_content(sha256)
+    if result:
+        fire_event(EVENT_STORAGE_DELETE, sha256)
+
+    return result
 
 
 def track_content_root(sha256: str, root: Union[RootAnalysis, str]):

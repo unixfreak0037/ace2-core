@@ -108,4 +108,18 @@ Every significant event that the core does can be subscribed to. Subscribers rec
     value:Any</code></td>
     <td>Configuration value set.</td>
 </tr>
+<tr>
+    <td colspan="3"><b>Storage Events</b></td>
+</tr>
+<tr>
+    <td><code>/core/storage/new</code></td>
+    <td><code>sha256:str<br>
+    meta:ContentMetadata</code></td>
+    <td>Content stored.</td>
+</tr>
+<tr>
+    <td><code>/core/storage/deleted</code></td>
+    <td><code>sha256:str</code></td>
+    <td>Content deleted.</td>
+</tr>
 </table>

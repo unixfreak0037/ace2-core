@@ -76,6 +76,7 @@ def track_root_analysis(root: RootAnalysis):
     else:
         fire_event(EVENT_ANALYSIS_ROOT_MODIFIED, root)
 
+
 def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:
     assert isinstance(root, RootAnalysis) or isinstance(root, str)
 

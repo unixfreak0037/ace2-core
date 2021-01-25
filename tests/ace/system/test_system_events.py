@@ -4,8 +4,16 @@ import pytest
 
 from ace.analysis import RootAnalysis
 from ace.system.analysis_tracking import track_root_analysis, delete_root_analysis
-from ace.system.constants import EVENT_ANALYSIS_ROOT_NEW, EVENT_ANALYSIS_ROOT_MODIFIED, EVENT_ANALYSIS_ROOT_DELETED, EVENT_ANALYSIS_DETAILS_NEW, EVENT_ANALYSIS_DETAILS_MODIFIED, EVENT_ANALYSIS_DETAILS_DELETED
+from ace.system.constants import (
+    EVENT_ANALYSIS_ROOT_NEW,
+    EVENT_ANALYSIS_ROOT_MODIFIED,
+    EVENT_ANALYSIS_ROOT_DELETED,
+    EVENT_ANALYSIS_DETAILS_NEW,
+    EVENT_ANALYSIS_DETAILS_MODIFIED,
+    EVENT_ANALYSIS_DETAILS_DELETED,
+)
 from ace.system.events import register_event_handler, remove_event_handler, get_event_handlers, fire_event, EventHandler
+
 
 class TestEventHandler(EventHandler):
     event = None
@@ -30,6 +38,7 @@ class TestEventHandler(EventHandler):
         self.args = None
         self.kwargs = None
 
+
 @pytest.mark.integration
 def test_EVENT_ANALYSIS_ROOT_NEW():
     handler = TestEventHandler()
@@ -47,6 +56,7 @@ def test_EVENT_ANALYSIS_ROOT_NEW():
 
     assert handler.event is None
     assert handler.args is None
+
 
 @pytest.mark.integration
 def test_EVENT_ANALYSIS_ROOT_MODIFIED():
@@ -66,6 +76,7 @@ def test_EVENT_ANALYSIS_ROOT_MODIFIED():
     assert handler.event == EVENT_ANALYSIS_ROOT_MODIFIED
     assert handler.args[0] == root
 
+
 @pytest.mark.integration
 def test_EVENT_ANALYSIS_ROOT_DELETED():
     root = RootAnalysis()
@@ -84,6 +95,7 @@ def test_EVENT_ANALYSIS_ROOT_DELETED():
 
     assert handler.event is None
     assert handler.args is None
+
 
 @pytest.mark.integration
 def test_EVENT_ANALYSIS_DETAILS_NEW():

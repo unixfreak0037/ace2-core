@@ -75,5 +75,3 @@ def test_event_handle_exception():
     assert handler.exception is not None
     assert handler.args[0] == "test"
     assert handler.kwargs["kwarg1"] == "test"
-
-

@@ -10,7 +10,15 @@ from ace.data_model import AnalysisRequestModel, RootAnalysisModel
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
-from ace.system.constants import TRACKING_STATUS_NEW, TRACKING_STATUS_QUEUED, SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS
+from ace.system.constants import (
+    TRACKING_STATUS_NEW,
+    TRACKING_STATUS_QUEUED,
+    SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS,
+    EVENT_AR_NEW,
+    EVENT_AR_DELETED,
+    EVENT_AR_EXPIRED,
+)
+from ace.system.events import fire_event
 from ace.system.locking import Lockable, acquire, release
 
 
@@ -248,7 +256,9 @@ def track_analysis_request(request: AnalysisRequest):
         raise UnknownAnalysisModuleTypeError(request.type.name)
 
     logging.debug(f"tracking analysis request {request}")
-    return get_system().request_tracking.track_analysis_request(request)
+    result = get_system().request_tracking.track_analysis_request(request)
+    fire_event(EVENT_AR_NEW, request)
+    return result
 
 
 def link_analysis_requests(source: AnalysisRequest, dest: AnalysisRequest):
@@ -292,7 +302,10 @@ def delete_analysis_request(target: Union[AnalysisRequest, str]) -> bool:
         target = target.id
 
     logging.debug(f"deleting analysis request {target}")
-    return get_system().request_tracking.delete_analysis_request(target)
+    result = get_system().request_tracking.delete_analysis_request(target)
+    if result:
+        fire_event(EVENT_AR_DELETED, target)
+    return result
 
 
 def get_expired_analysis_requests() -> List[AnalysisRequest]:
@@ -347,6 +360,7 @@ def process_expired_analysis_requests():
                     # re-submit the analysis request
                     # this changes the status and thus takes it out of expiration
                     logging.info(f"re-submitting expired analysis request {request}")
+                    fire_event(EVENT_AR_EXPIRED, request)
                     submit_analysis_request(request)
                 except UnknownAnalysisModuleTypeError:
                     delete_analysis_request(request.id)

@@ -11,6 +11,11 @@ from ace.system.analysis_tracking import (
     track_analysis_details,
     delete_analysis_details,
 )
+from ace.system.analysis_request import (
+    track_analysis_request,
+    delete_analysis_request,
+    process_expired_analysis_requests,
+)
 from ace.system.constants import (
     EVENT_ALERT,
     EVENT_AMT_DELETED,
@@ -22,6 +27,10 @@ from ace.system.constants import (
     EVENT_ANALYSIS_ROOT_DELETED,
     EVENT_ANALYSIS_ROOT_MODIFIED,
     EVENT_ANALYSIS_ROOT_NEW,
+    EVENT_AR_DELETED,
+    EVENT_AR_EXPIRED,
+    EVENT_AR_NEW,
+    TRACKING_STATUS_ANALYZING,
 )
 from ace.system.events import register_event_handler, remove_event_handler, get_event_handlers, fire_event, EventHandler
 
@@ -264,3 +273,65 @@ def test_EVENT_AMT_DELETED():
 
     assert handler.event is None
     assert handler.args is None
+
+
+@pytest.mark.integration
+def test_EVENT_AR_NEW():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AR_NEW, handler)
+
+    root = RootAnalysis()
+    request = root.create_analysis_request()
+    track_analysis_request(request)
+
+    assert handler.event == EVENT_AR_NEW
+    assert handler.args[0] == request
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AR_NEW, handler)
+    track_analysis_request(request)
+
+    # you can re-track a request without harm
+    assert handler.event == EVENT_AR_NEW
+    assert handler.args[0] == request
+
+
+@pytest.mark.integration
+def test_EVENT_AR_DELETED():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AR_DELETED, handler)
+
+    root = RootAnalysis()
+    request = root.create_analysis_request()
+    track_analysis_request(request)
+    delete_analysis_request(request)
+
+    assert handler.event == EVENT_AR_DELETED
+    assert handler.args[0] == request.id
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AR_DELETED, handler)
+    delete_analysis_request(request)
+    assert handler.event is None
+    assert handler.args is None
+
+
+@pytest.mark.integration
+def test_EVENT_AR_EXPIRED():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AR_EXPIRED, handler)
+
+    amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
+    register_analysis_module_type(amt)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    request = observable.create_analysis_request(amt)
+    track_analysis_request(request)
+    request.status = TRACKING_STATUS_ANALYZING
+    track_analysis_request(request)
+
+    process_expired_analysis_requests()
+
+    assert handler.event == EVENT_AR_EXPIRED
+    assert handler.args[0] == request

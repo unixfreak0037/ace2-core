@@ -34,3 +34,7 @@ EVENT_ALERT = "/core/alert"
 EVENT_AMT_NEW = "/core/module/new"
 EVENT_AMT_MODIFIED = "/core/module/modified"
 EVENT_AMT_DELETED = "/core/module/deleted"
+# analysis request tracking
+EVENT_AR_NEW = "/core/request/new"
+EVENT_AR_DELETED = "/core/request/deleted"
+EVENT_AR_EXPIRED = "/core/request/expired"

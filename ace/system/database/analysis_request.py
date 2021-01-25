@@ -63,10 +63,13 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         return [AnalysisRequest.from_dict(json.loads(_.json_data)) for _ in source_request.linked_requests]
 
     def delete_analysis_request(self, key: str) -> bool:
-        get_db().execute(AnalysisRequestTracking.__table__.delete().where(AnalysisRequestTracking.id == key))
+        count = (
+            get_db()
+            .execute(AnalysisRequestTracking.__table__.delete().where(AnalysisRequestTracking.id == key))
+            .rowcount
+        )
         get_db().commit()
-        # TODO return correct result
-        return True
+        return count == 1
 
     def get_expired_analysis_requests(self) -> list[AnalysisRequest]:
         result = (

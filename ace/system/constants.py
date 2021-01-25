@@ -40,3 +40,5 @@ EVENT_AR_DELETED = "/core/request/deleted"
 EVENT_AR_EXPIRED = "/core/request/expired"
 # caching
 EVENT_CACHE_NEW = "/core/cache/new"
+# config
+EVENT_CONFIG_SET = "/core/config/set"

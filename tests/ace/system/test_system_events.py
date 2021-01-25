@@ -17,6 +17,7 @@ from ace.system.analysis_request import (
     process_expired_analysis_requests,
 )
 from ace.system.caching import generate_cache_key, cache_analysis_result
+from ace.system.config import set_config
 from ace.system.constants import (
     EVENT_ALERT,
     EVENT_AMT_DELETED,
@@ -32,6 +33,7 @@ from ace.system.constants import (
     EVENT_AR_EXPIRED,
     EVENT_AR_NEW,
     EVENT_CACHE_NEW,
+    EVENT_CONFIG_SET,
     TRACKING_STATUS_ANALYZING,
 )
 from ace.system.events import register_event_handler, remove_event_handler, get_event_handlers, fire_event, EventHandler
@@ -364,3 +366,20 @@ def test_EVENT_CACHE_NEW():
     assert handler.event == EVENT_CACHE_NEW
     assert handler.args[0] == generate_cache_key(observable, amt)
     assert handler.args[1] == request
+
+
+@pytest.mark.integration
+def test_EVENT_CONFIG_SET():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_CONFIG_SET, handler)
+
+    set_config("test", "value")
+    assert handler.args[0] == "test"
+    assert handler.args[1] == "value"
+
+    # duplicate OK
+    handler = TestEventHandler()
+    register_event_handler(EVENT_CONFIG_SET, handler)
+    set_config("test", "value")
+    assert handler.args[0] == "test"
+    assert handler.args[1] == "value"

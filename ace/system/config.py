@@ -6,6 +6,8 @@ import logging
 from typing import Any, Optional
 
 from ace.system import get_system, ACESystemInterface
+from ace.system.constants import EVENT_CONFIG_SET
+from ace.system.events import fire_event
 
 
 class ConfigurationInterface(ACESystemInterface):
@@ -22,4 +24,6 @@ def get_config(key: str, default: Optional[Any] = None) -> Any:
 
 def set_config(key: str, value: Any):
     logging.debug(f"modified config key {key}")
-    return get_system().config.set_config(key, value)
+    result = get_system().config.set_config(key, value)
+    fire_event(EVENT_CONFIG_SET, key, value)
+    return result

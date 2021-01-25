@@ -90,7 +90,7 @@ Every significant event that the core does can be subscribed to. Subscribers rec
     <td><code>request:AnalysisRequest</code></td>
     <td>Request expired.</td>
 </tr>
-tr>
+<tr>
     <td colspan="3"><b>Cache Tracking Events</b></td>
 </tr>
 <tr>
@@ -98,5 +98,14 @@ tr>
     <td><code>cache_key:str<br>
     request:AnalysisRequest</code></td>
     <td>Analysis request result cached.</td>
+</tr>
+<tr>
+    <td colspan="3"><b>Config Events</b></td>
+</tr>
+<tr>
+    <td><code>/core/config/set</code></td>
+    <td><code>key:str<br>
+    value:Any</code></td>
+    <td>Configuration value set.</td>
 </tr>
 </table>

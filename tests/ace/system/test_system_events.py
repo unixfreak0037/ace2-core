@@ -16,6 +16,7 @@ from ace.system.analysis_request import (
     delete_analysis_request,
     process_expired_analysis_requests,
 )
+from ace.system.caching import generate_cache_key, cache_analysis_result
 from ace.system.constants import (
     EVENT_ALERT,
     EVENT_AMT_DELETED,
@@ -30,6 +31,7 @@ from ace.system.constants import (
     EVENT_AR_DELETED,
     EVENT_AR_EXPIRED,
     EVENT_AR_NEW,
+    EVENT_CACHE_NEW,
     TRACKING_STATUS_ANALYZING,
 )
 from ace.system.events import register_event_handler, remove_event_handler, get_event_handlers, fire_event, EventHandler
@@ -335,3 +337,30 @@ def test_EVENT_AR_EXPIRED():
 
     assert handler.event == EVENT_AR_EXPIRED
     assert handler.args[0] == request
+
+
+@pytest.mark.integration
+def test_EVENT_CACHE_NEW():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_CACHE_NEW, handler)
+
+    amt = AnalysisModuleType(name="test", description="", cache_ttl=600)
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    request = observable.create_analysis_request(amt)
+    request.initialize_result()
+    analysis = request.modified_observable.add_analysis(type=amt)
+
+    assert cache_analysis_result(request) is not None
+
+    assert handler.event == EVENT_CACHE_NEW
+    assert handler.args[0] == generate_cache_key(observable, amt)
+    assert handler.args[1] == request
+
+    # we can potentially see duplicate cache hits
+    handler = TestEventHandler()
+    register_event_handler(EVENT_CACHE_NEW, handler)
+    assert cache_analysis_result(request) is not None
+    assert handler.event == EVENT_CACHE_NEW
+    assert handler.args[0] == generate_cache_key(observable, amt)
+    assert handler.args[1] == request

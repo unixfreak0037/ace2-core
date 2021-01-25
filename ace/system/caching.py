@@ -8,6 +8,8 @@ from ace.analysis import Observable, AnalysisModuleType
 from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.analysis_request import AnalysisRequest
+from ace.system.constants import EVENT_CACHE_NEW
+from ace.system.events import fire_event
 
 
 def generate_cache_key(observable: Observable, amt: AnalysisModuleType) -> str:
@@ -83,7 +85,9 @@ def cache_analysis_result(request: AnalysisRequest) -> Union[str, None]:
         return None
 
     logging.debug(f"caching analysis request {request} with key {cache_key} ttl {request.type.cache_ttl}")
-    return get_system().caching.cache_analysis_result(cache_key, request, request.type.cache_ttl)
+    result = get_system().caching.cache_analysis_result(cache_key, request, request.type.cache_ttl)
+    fire_event(EVENT_CACHE_NEW, cache_key, request)
+    return result
 
 
 def delete_expired_cached_analysis_results():

@@ -38,3 +38,5 @@ EVENT_AMT_DELETED = "/core/module/deleted"
 EVENT_AR_NEW = "/core/request/new"
 EVENT_AR_DELETED = "/core/request/deleted"
 EVENT_AR_EXPIRED = "/core/request/expired"
+# caching
+EVENT_CACHE_NEW = "/core/cache/new"

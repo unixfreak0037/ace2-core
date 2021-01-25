@@ -30,3 +30,7 @@ EVENT_ANALYSIS_DETAILS_MODIFIED = "/core/analysis/details/modified"
 EVENT_ANALYSIS_DETAILS_DELETED = "/core/analysis/details/deleted"
 # alerting
 EVENT_ALERT = "/core/alert"
+# analysis module tracking
+EVENT_AMT_NEW = "/core/module/new"
+EVENT_AMT_MODIFIED = "/core/module/modified"
+EVENT_AMT_DELETED = "/core/module/deleted"

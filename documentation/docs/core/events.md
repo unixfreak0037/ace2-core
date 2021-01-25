@@ -46,4 +46,30 @@ Every significant event that the core does can be subscribed to. Subscribers rec
     <td><code>uuid</code></td>
     <td>Analysis detail deleted.</td>
 </tr>
+<tr>
+    <td colspan="3"><b>Alert Events</b></td>
+</tr>
+<tr>
+    <td><code>/core/alert</code></td>
+    <td><code>root</code></td>
+    <td>Root sent to alert management system.</td>
+</tr>
+<tr>
+    <td colspan="3"><b>Analysis Module Tracking Events</b></td>
+</tr>
+<tr>
+    <td><code>/core/module/new</code></td>
+    <td><code>root, uuid</code></td>
+    <td>New analysis module type added.</td>
+</tr>
+<tr>
+    <td><code>/core/module/modified</code></td>
+    <td><code>root, uuid</code></td>
+    <td>Existing analysis module type version updated.</td>
+</tr>
+<tr>
+    <td><code>/core/module/deleted</code></td>
+    <td><code>uuid</code></td>
+    <td>Analysis module type removed.</td>
+</tr>
 </table>

@@ -2,8 +2,9 @@
 
 import pytest
 
-from ace.analysis import RootAnalysis
+from ace.analysis import RootAnalysis, AnalysisModuleType
 from ace.system.alerting import track_alert
+from ace.system.analysis_module import register_analysis_module_type, delete_analysis_module_type
 from ace.system.analysis_tracking import (
     track_root_analysis,
     delete_root_analysis,
@@ -12,12 +13,15 @@ from ace.system.analysis_tracking import (
 )
 from ace.system.constants import (
     EVENT_ALERT,
+    EVENT_AMT_DELETED,
+    EVENT_AMT_MODIFIED,
+    EVENT_AMT_NEW,
+    EVENT_ANALYSIS_DETAILS_DELETED,
+    EVENT_ANALYSIS_DETAILS_MODIFIED,
+    EVENT_ANALYSIS_DETAILS_NEW,
+    EVENT_ANALYSIS_ROOT_DELETED,
     EVENT_ANALYSIS_ROOT_MODIFIED,
     EVENT_ANALYSIS_ROOT_NEW,
-    EVENT_ANALYSIS_ROOT_DELETED,
-    EVENT_ANALYSIS_DETAILS_NEW,
-    EVENT_ANALYSIS_DETAILS_MODIFIED,
-    EVENT_ANALYSIS_DETAILS_DELETED,
 )
 from ace.system.events import register_event_handler, remove_event_handler, get_event_handlers, fire_event, EventHandler
 
@@ -186,3 +190,77 @@ def test_EVENT_ALERT():
 
     assert handler.event == EVENT_ALERT
     assert handler.args[0] == root
+
+
+@pytest.mark.integration
+def test_EVENT_AMT_NEW():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AMT_NEW, handler)
+
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    assert handler.event == EVENT_AMT_NEW
+    assert handler.args[0] == amt
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AMT_NEW, handler)
+
+    # already registered so should not be new
+    register_analysis_module_type(amt)
+
+    assert handler.event is None
+    assert handler.args is None
+
+
+@pytest.mark.integration
+def test_EVENT_AMT_MODIFIED():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AMT_MODIFIED, handler)
+
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    assert handler.event is None
+    assert handler.args is None
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AMT_MODIFIED, handler)
+
+    # still not modified yet
+    register_analysis_module_type(amt)
+
+    assert handler.event is None
+    assert handler.args is None
+
+    # modify version
+    amt.version = "1.0.1"
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AMT_MODIFIED, handler)
+
+    # modified this time
+    register_analysis_module_type(amt)
+
+    assert handler.event == EVENT_AMT_MODIFIED
+    assert handler.args[0] == amt
+
+
+@pytest.mark.integration
+def test_EVENT_AMT_DELETED():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AMT_DELETED, handler)
+
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+    delete_analysis_module_type(amt)
+
+    assert handler.event == EVENT_AMT_DELETED
+    assert handler.args[0] == amt
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_AMT_DELETED, handler)
+    delete_analysis_module_type(amt)
+
+    assert handler.event is None
+    assert handler.args is None

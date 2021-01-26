@@ -23,6 +23,7 @@ SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS = "ace:expired_analysis_requests"
 # analysis tracking
 EVENT_ANALYSIS_ROOT_NEW = "/core/analysis/root/new"
 EVENT_ANALYSIS_ROOT_MODIFIED = "/core/analysis/root/modified"
+EVENT_ANALYSIS_ROOT_EXPIRED = "/core/analysis/root/expired"
 EVENT_ANALYSIS_ROOT_DELETED = "/core/analysis/root/deleted"
 # analysis details tracking
 EVENT_ANALYSIS_DETAILS_NEW = "/core/analysis/details/new"
@@ -40,6 +41,7 @@ EVENT_AR_DELETED = "/core/request/deleted"
 EVENT_AR_EXPIRED = "/core/request/expired"
 # caching
 EVENT_CACHE_NEW = "/core/cache/new"
+EVENT_CACHE_HIT = "/core/cache/hit"
 # config
 EVENT_CONFIG_SET = "/core/config/set"
 # storage
@@ -50,3 +52,8 @@ EVENT_WORK_QUEUE_NEW = "/core/work/queue/new"
 EVENT_WORK_QUEUE_DELETED = "/core/work/queue/deleted"
 EVENT_WORK_ADD = "/core/work/add"
 EVENT_WORK_REMOVE = "/core/work/remove"
+EVENT_WORK_ASSIGNED = "/core/work/assigned" #
+# processing
+EVENT_PROCESSING_REQUEST_OBSERVABLE = "/core/processing/request/observable" #
+EVENT_PROCESSING_REQUEST_ROOT = "/core/processing/request/root" # 
+EVENT_PROCESSING_REQUEST_RESULT = "/core/processing/request/result" #

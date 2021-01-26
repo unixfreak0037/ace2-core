@@ -28,25 +28,31 @@ from ace.system.constants import (
     EVENT_ANALYSIS_DETAILS_MODIFIED,
     EVENT_ANALYSIS_DETAILS_NEW,
     EVENT_ANALYSIS_ROOT_DELETED,
+    EVENT_ANALYSIS_ROOT_EXPIRED,
     EVENT_ANALYSIS_ROOT_MODIFIED,
     EVENT_ANALYSIS_ROOT_NEW,
     EVENT_AR_DELETED,
     EVENT_AR_EXPIRED,
     EVENT_AR_NEW,
+    EVENT_PROCESSING_REQUEST_ROOT,
+    EVENT_PROCESSING_REQUEST_OBSERVABLE,
+    EVENT_PROCESSING_REQUEST_RESULT,
     EVENT_CACHE_NEW,
+    EVENT_CACHE_HIT,
     EVENT_CONFIG_SET,
     EVENT_STORAGE_DELETED,
     EVENT_STORAGE_NEW,
     EVENT_WORK_ADD,
+    EVENT_WORK_ASSIGNED,
     EVENT_WORK_QUEUE_DELETED,
     EVENT_WORK_QUEUE_NEW,
     EVENT_WORK_REMOVE,
     TRACKING_STATUS_ANALYZING,
 )
 from ace.system.events import register_event_handler, remove_event_handler, get_event_handlers, fire_event, EventHandler
-from ace.system.processing import submit_analysis_request
+from ace.system.processing import submit_analysis_request, process_analysis_request
 from ace.system.storage import delete_content, store_content, ContentMetadata
-from ace.system.work_queue import add_work_queue, delete_work_queue, put_work, get_work
+from ace.system.work_queue import add_work_queue, delete_work_queue, put_work, get_work, get_next_analysis_request
 
 
 class TestEventHandler(EventHandler):
@@ -519,3 +525,91 @@ def test_EVENT_WORK_REMOVE():
 
     assert handler.event is None
     assert handler.args is None
+
+@pytest.mark.integration
+def test_EVENT_ANALYSIS_ROOT_EXPIRED():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ANALYSIS_ROOT_EXPIRED, handler)
+
+    root = RootAnalysis(expires=True)
+    root.submit()
+
+    assert handler.event == EVENT_ANALYSIS_ROOT_EXPIRED
+    assert handler.args[0] == root
+
+@pytest.mark.integration
+def test_EVENT_CACHE_HIT():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_CACHE_HIT, handler)
+
+    amt = AnalysisModuleType("test", "", cache_ttl=60)
+    register_analysis_module_type(amt)
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root_request = root.create_analysis_request()
+    process_analysis_request(root_request)
+    request = get_next_analysis_request("owner", amt, 0)
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details={"test": "test"})
+    process_analysis_request(request)
+    assert handler.event is None
+    assert handler.args is None
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root_request = root.create_analysis_request()
+    process_analysis_request(root_request)
+
+    assert handler.event == EVENT_CACHE_HIT
+    assert handler.args[0] == root
+    assert handler.args[1] == observable
+    assert isinstance(handler.args[2], AnalysisRequest)
+
+@pytest.mark.integration
+def test_EVENT_WORK_ASSIGNED():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_WORK_ASSIGNED, handler)
+
+    amt = AnalysisModuleType("test", "", cache_ttl=60)
+    register_analysis_module_type(amt)
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root_request = root.create_analysis_request()
+    process_analysis_request(root_request)
+    request = get_next_analysis_request("owner", amt, 0)
+
+    assert handler.event == EVENT_WORK_ASSIGNED
+    assert handler.args[0] == request
+
+@pytest.mark.integration
+def test_EVENT_PROCESSING():
+    root_handler = TestEventHandler()
+    register_event_handler(EVENT_PROCESSING_REQUEST_ROOT, root_handler)
+
+    observable_request_handler = TestEventHandler()
+    register_event_handler(EVENT_PROCESSING_REQUEST_OBSERVABLE, observable_request_handler)
+
+    amt = AnalysisModuleType("test", "", cache_ttl=60)
+    register_analysis_module_type(amt)
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root_request = root.create_analysis_request()
+    process_analysis_request(root_request)
+
+    assert root_handler.event == EVENT_PROCESSING_REQUEST_ROOT
+    assert root_handler.args[0] == root_request
+
+    request = get_next_analysis_request("owner", amt, 0)
+
+    assert observable_request_handler.event == EVENT_PROCESSING_REQUEST_OBSERVABLE
+    assert observable_request_handler.args[0] == request
+
+    result_handler = TestEventHandler()
+    register_event_handler(EVENT_PROCESSING_REQUEST_RESULT, result_handler)
+
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details={"test": "test"})
+    process_analysis_request(request)
+
+    assert result_handler.event == EVENT_PROCESSING_REQUEST_RESULT
+    assert result_handler.args[0] == request

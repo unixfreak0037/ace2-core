@@ -147,4 +147,39 @@ Every significant event that the core does can be subscribed to. Subscribers rec
     request:AnalysisRequest</td>
     <td>Removed work previously assigned to queue.</td>
 </tr>
+<tr>
+    <td colspan="3"><b>Processing Events</b></td>
+</tr>
+<tr>
+    <td><code>/core/analysis/root/expired</code></td>
+    <td><code>root:RootAnalysis</td>
+    <td>Root expired after processing.</td>
+</tr>
+<tr>
+    <td><code>/core/cache/hit</code></td>
+    <td><code>root:RootAnalysis<br>
+    observable:Observable<br>
+    ar:AnalysisRequest</td>
+    <td>Cache results used for analysis.</td>
+</tr>
+<tr>
+    <td><code>/core/work/assigned</code></td>
+    <td><code>ar:AnalysisRequest</td>
+    <td>Analysis request assigned to module instance.</td>
+</tr>
+<tr>
+    <td><code>/core/processing/request/observable</code></td>
+    <td><code>ar:AnalysisRequest</td>
+    <td>Analysis request created for observable and analysis module type.</td>
+</tr>
+<tr>
+    <td><code>/core/processing/request/root</code></td>
+    <td><code>ar:AnalysisRequest</td>
+    <td>Received request to analyze root.</td>
+</tr>
+<tr>
+    <td><code>/core/processing/request/result</code></td>
+    <td><code>ar:AnalysisRequest</td>
+    <td>Received request to process analysis result.</td>
+</tr>
 </table>

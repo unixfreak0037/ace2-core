@@ -21,6 +21,7 @@ from ace.system.constants import (
     EVENT_WORK_QUEUE_NEW,
     EVENT_WORK_QUEUE_DELETED,
     EVENT_WORK_ADD,
+    EVENT_WORK_ASSIGNED,
     EVENT_WORK_REMOVE,
 )
 from ace.system.events import fire_event
@@ -170,6 +171,7 @@ def get_next_analysis_request(
                     next_ar.status = TRACKING_STATUS_ANALYZING
                     logging.debug(f"assigned analysis request {next_ar} to {owner_uuid}")
                     track_analysis_request(next_ar)
+                    fire_event(EVENT_WORK_ASSIGNED, next_ar)
 
             except LockAcquireFailed as e:
                 # if we are unable to get the lock on the request then put it back into the queue

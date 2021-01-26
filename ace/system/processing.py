@@ -26,6 +26,8 @@ from ace.system.analysis_request import (
 )
 from ace.system.analysis_module import get_all_analysis_module_types
 from ace.system.caching import cache_analysis_result, get_cached_analysis_result
+from ace.system.constants import EVENT_ANALYSIS_ROOT_EXPIRED, EVENT_CACHE_HIT, EVENT_PROCESSING_REQUEST_ROOT, EVENT_PROCESSING_REQUEST_OBSERVABLE, EVENT_PROCESSING_REQUEST_RESULT
+from ace.system.events import fire_event
 from ace.system.exceptions import (
     UnknownAnalysisRequest,
     ExpiredAnalysisRequest,
@@ -92,6 +94,8 @@ def process_analysis_request(ar: AnalysisRequest):
             target_observable.apply_diff_merge(original_observable, modified_observable, ar.type)
             target_root.save()
 
+            fire_event(EVENT_PROCESSING_REQUEST_RESULT, ar)
+
             # process any analysis request links
             for linked_request in get_linked_analysis_requests(ar):
                 linked_request.initialize_result()
@@ -110,6 +114,8 @@ def process_analysis_request(ar: AnalysisRequest):
                 target_root = ar.root
 
             target_root.save()
+
+            fire_event(EVENT_PROCESSING_REQUEST_ROOT, ar)
 
         # this should never fire
         if target_root is None:
@@ -186,6 +192,7 @@ def process_analysis_request(ar: AnalysisRequest):
                         track_analysis_request(new_ar)
                         observable.track_analysis_request(new_ar)
                         target_root.save()
+                        fire_event(EVENT_CACHE_HIT, target_root, observable, new_ar)
                         process_analysis_request(new_ar)
                         continue
 
@@ -198,6 +205,7 @@ def process_analysis_request(ar: AnalysisRequest):
                     observable.track_analysis_request(new_ar)
                     track_analysis_request(new_ar)
                     target_root.save()
+                    fire_event(EVENT_PROCESSING_REQUEST_OBSERVABLE, new_ar)
                     submit_analysis_request(new_ar)
                     continue
 
@@ -207,4 +215,5 @@ def process_analysis_request(ar: AnalysisRequest):
     # should this root expire now?
     if ar.root.is_expired():
         logging.debug(f"deleting expired root analysis {ar.root}")
+        fire_event(EVENT_ANALYSIS_ROOT_EXPIRED, ar.root)
         delete_root_analysis(ar.root)

@@ -26,7 +26,13 @@ from ace.system.analysis_request import (
 )
 from ace.system.analysis_module import get_all_analysis_module_types
 from ace.system.caching import cache_analysis_result, get_cached_analysis_result
-from ace.system.constants import EVENT_ANALYSIS_ROOT_EXPIRED, EVENT_CACHE_HIT, EVENT_PROCESSING_REQUEST_ROOT, EVENT_PROCESSING_REQUEST_OBSERVABLE, EVENT_PROCESSING_REQUEST_RESULT
+from ace.system.constants import (
+    EVENT_ANALYSIS_ROOT_EXPIRED,
+    EVENT_CACHE_HIT,
+    EVENT_PROCESSING_REQUEST_ROOT,
+    EVENT_PROCESSING_REQUEST_OBSERVABLE,
+    EVENT_PROCESSING_REQUEST_RESULT,
+)
 from ace.system.events import fire_event
 from ace.system.exceptions import (
     UnknownAnalysisRequest,

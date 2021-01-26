@@ -526,6 +526,7 @@ def test_EVENT_WORK_REMOVE():
     assert handler.event is None
     assert handler.args is None
 
+
 @pytest.mark.integration
 def test_EVENT_ANALYSIS_ROOT_EXPIRED():
     handler = TestEventHandler()
@@ -536,6 +537,7 @@ def test_EVENT_ANALYSIS_ROOT_EXPIRED():
 
     assert handler.event == EVENT_ANALYSIS_ROOT_EXPIRED
     assert handler.args[0] == root
+
 
 @pytest.mark.integration
 def test_EVENT_CACHE_HIT():
@@ -565,6 +567,7 @@ def test_EVENT_CACHE_HIT():
     assert handler.args[1] == observable
     assert isinstance(handler.args[2], AnalysisRequest)
 
+
 @pytest.mark.integration
 def test_EVENT_WORK_ASSIGNED():
     handler = TestEventHandler()
@@ -580,6 +583,7 @@ def test_EVENT_WORK_ASSIGNED():
 
     assert handler.event == EVENT_WORK_ASSIGNED
     assert handler.args[0] == request
+
 
 @pytest.mark.integration
 def test_EVENT_PROCESSING():

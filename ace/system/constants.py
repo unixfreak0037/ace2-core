@@ -52,8 +52,8 @@ EVENT_WORK_QUEUE_NEW = "/core/work/queue/new"
 EVENT_WORK_QUEUE_DELETED = "/core/work/queue/deleted"
 EVENT_WORK_ADD = "/core/work/add"
 EVENT_WORK_REMOVE = "/core/work/remove"
-EVENT_WORK_ASSIGNED = "/core/work/assigned" #
+EVENT_WORK_ASSIGNED = "/core/work/assigned"
 # processing
-EVENT_PROCESSING_REQUEST_OBSERVABLE = "/core/processing/request/observable" #
-EVENT_PROCESSING_REQUEST_ROOT = "/core/processing/request/root" # 
-EVENT_PROCESSING_REQUEST_RESULT = "/core/processing/request/result" #
+EVENT_PROCESSING_REQUEST_OBSERVABLE = "/core/processing/request/observable"
+EVENT_PROCESSING_REQUEST_ROOT = "/core/processing/request/root"
+EVENT_PROCESSING_REQUEST_RESULT = "/core/processing/request/result"

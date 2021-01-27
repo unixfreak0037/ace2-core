@@ -67,6 +67,7 @@ def _circ_dep_check(
 
 def register_analysis_module_type(amt: AnalysisModuleType) -> AnalysisModuleType:
     """Registers the given AnalysisModuleType with the system."""
+    from ace.system.work_queue import add_work_queue
 
     # make sure all the dependencies exist
     for dep in amt.dependencies:
@@ -79,7 +80,7 @@ def register_analysis_module_type(amt: AnalysisModuleType) -> AnalysisModuleType
 
     current_type = get_analysis_module_type(amt.name)
     if current_type is None:
-        get_system().work_queue.add_work_queue(amt.name)
+        add_work_queue(amt.name)
 
     # regardless we take this to be the new registration for this analysis module
     # any updates to version or cache keys would be saved here

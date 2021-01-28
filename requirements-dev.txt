@@ -6,3 +6,4 @@ mkdocs
 mkdocs-awesome-pages-plugin
 pre-commit
 pytest
+pytest-asyncio

@@ -1,5 +1,6 @@
-# vim: ts=4:sw=4:et:cc=120                                                                                              
-#                                                                                                                       
+# vim: ts=4:sw=4:et:cc=120
+#
+
 
 class AsyncAceAPI(AceAPI):
     # alerting
@@ -19,7 +20,9 @@ class AsyncAceAPI(AceAPI):
     async def delete_analysis_module_type(self, amt: Union[AnalysisModuleType, str]):
         raise NotImplementedError()
 
-    async def get_all_analysis_module_types(self, ) -> list[AnalysisModuleType]:
+    async def get_all_analysis_module_types(
+        self,
+    ) -> list[AnalysisModuleType]:
         raise NotImplementedError()
 
     # analysis request
@@ -41,13 +44,17 @@ class AsyncAceAPI(AceAPI):
     async def get_analysis_request(self, key: str) -> Union[AnalysisRequest, None]:
         raise NotImplementedError()
 
-    async def get_analysis_request_by_observable(self, observable: Observable, amt: AnalysisModuleType) -> Union[AnalysisRequest, None]:
+    async def get_analysis_request_by_observable(
+        self, observable: Observable, amt: AnalysisModuleType
+    ) -> Union[AnalysisRequest, None]:
         raise NotImplementedError()
 
     async def delete_analysis_request(self, target: Union[AnalysisRequest, str]) -> bool:
         raise NotImplementedError()
 
-    async def get_expired_analysis_requests(self, ) -> list[AnalysisRequest]:
+    async def get_expired_analysis_requests(
+        self,
+    ) -> list[AnalysisRequest]:
         raise NotImplementedError()
 
     async def get_analysis_requests_by_root(self, key: str) -> list[AnalysisRequest]:
@@ -59,7 +66,9 @@ class AsyncAceAPI(AceAPI):
     async def submit_analysis_request(self, ar: AnalysisRequest):
         raise NotImplementedError()
 
-    async def process_expired_analysis_requests(self, ):
+    async def process_expired_analysis_requests(
+        self,
+    ):
         raise NotImplementedError()
 
     # analysis tracking
@@ -82,13 +91,17 @@ class AsyncAceAPI(AceAPI):
         raise NotImplementedError()
 
     # caching
-    async def get_cached_analysis_result(self, observable: Observable, amt: AnalysisModuleType) -> Union[AnalysisRequest, None]:
+    async def get_cached_analysis_result(
+        self, observable: Observable, amt: AnalysisModuleType
+    ) -> Union[AnalysisRequest, None]:
         raise NotImplementedError()
 
     async def cache_analysis_result(self, request: AnalysisRequest) -> Union[str, None]:
         raise NotImplementedError()
 
-    async def delete_expired_cached_analysis_results(self, ):
+    async def delete_expired_cached_analysis_results(
+        self,
+    ):
         raise NotImplementedError()
 
     async def delete_cached_analysis_results_by_module_type(self, amt: AnalysisModuleType):
@@ -133,7 +146,9 @@ class AsyncAceAPI(AceAPI):
     async def is_locked(self, lock_id: str) -> bool:
         raise NotImplementedError()
 
-    async def get_lock_count(self, ) -> int:
+    async def get_lock_count(
+        self,
+    ) -> int:
         raise NotImplementedError()
 
     async def acquire(

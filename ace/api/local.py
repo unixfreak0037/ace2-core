@@ -25,6 +25,7 @@ from ace.system.analysis_request import AnalysisRequest
 from ace.system.events import EventHandler
 from ace.system.storage import ContentMetadata
 
+
 class LocalAceAPI(AceAPI):
     """Just a wrapper around calling into a local in-memory core system."""
 
@@ -45,7 +46,9 @@ class LocalAceAPI(AceAPI):
     async def delete_analysis_module_type(self, amt: Union[AnalysisModuleType, str]):
         return ace.system.analysis_module.delete_analysis_module_type(amt)
 
-    async def get_all_analysis_module_types(self, ) -> list[AnalysisModuleType]:
+    async def get_all_analysis_module_types(
+        self,
+    ) -> list[AnalysisModuleType]:
         return ace.system.analysis_module.get_all_analysis_module_types()
 
     # analysis request
@@ -67,13 +70,17 @@ class LocalAceAPI(AceAPI):
     async def get_analysis_request(self, key: str) -> Union[AnalysisRequest, None]:
         return ace.system.analysis_request.get_analysis_request(key)
 
-    async def get_analysis_request_by_observable(self, observable: Observable, amt: AnalysisModuleType) -> Union[AnalysisRequest, None]:
+    async def get_analysis_request_by_observable(
+        self, observable: Observable, amt: AnalysisModuleType
+    ) -> Union[AnalysisRequest, None]:
         return ace.system.analysis_request.get_analysis_request_by_observable(observable, amt)
 
     async def delete_analysis_request(self, target: Union[AnalysisRequest, str]) -> bool:
         return ace.system.analysis_request.delete_analysis_request(target)
 
-    async def get_expired_analysis_requests(self, ) -> list[AnalysisRequest]:
+    async def get_expired_analysis_requests(
+        self,
+    ) -> list[AnalysisRequest]:
         return ace.system.analysis_request.get_expired_analysis_requests()
 
     async def get_analysis_requests_by_root(self, key: str) -> list[AnalysisRequest]:
@@ -85,7 +92,9 @@ class LocalAceAPI(AceAPI):
     async def submit_analysis_request(self, ar: AnalysisRequest):
         return ace.system.analysis_request.submit_analysis_request(ar)
 
-    async def process_expired_analysis_requests(self, ):
+    async def process_expired_analysis_requests(
+        self,
+    ):
         return ace.system.analysis_request.process_expired_analysis_requests()
 
     # analysis tracking
@@ -108,13 +117,17 @@ class LocalAceAPI(AceAPI):
         return ace.system.analysis_tracking.delete_analysis_details(uuid)
 
     # caching
-    async def get_cached_analysis_result(self, observable: Observable, amt: AnalysisModuleType) -> Union[AnalysisRequest, None]:
+    async def get_cached_analysis_result(
+        self, observable: Observable, amt: AnalysisModuleType
+    ) -> Union[AnalysisRequest, None]:
         return ace.system.caching.get_cached_analysis_result(observable, amt)
 
     async def cache_analysis_result(self, request: AnalysisRequest) -> Union[str, None]:
         return ace.system.caching.cache_analysis_result(request)
 
-    async def delete_expired_cached_analysis_results(self, ):
+    async def delete_expired_cached_analysis_results(
+        self,
+    ):
         return ace.system.caching.delete_expired_cached_analysis_results()
 
     async def delete_cached_analysis_results_by_module_type(self, amt: AnalysisModuleType):
@@ -159,7 +172,9 @@ class LocalAceAPI(AceAPI):
     async def is_locked(self, lock_id: str) -> bool:
         return ace.system.locking.is_locked(lock_id)
 
-    async def get_lock_count(self, ) -> int:
+    async def get_lock_count(
+        self,
+    ) -> int:
         return ace.system.locking.get_lock_count()
 
     async def acquire(

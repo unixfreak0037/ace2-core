@@ -11,6 +11,7 @@ from ace.system.analysis_request import AnalysisRequest
 from ace.system.events import EventHandler
 from ace.system.storage import ContentMetadata
 
+
 class AceAPI:
     # alerting
     def track_alert(self, root: RootAnalysis):
@@ -29,7 +30,9 @@ class AceAPI:
     def delete_analysis_module_type(self, amt: Union[AnalysisModuleType, str]):
         raise NotImplementedError()
 
-    def get_all_analysis_module_types(self, ) -> list[AnalysisModuleType]:
+    def get_all_analysis_module_types(
+        self,
+    ) -> list[AnalysisModuleType]:
         raise NotImplementedError()
 
     # analysis request
@@ -51,13 +54,17 @@ class AceAPI:
     def get_analysis_request(self, key: str) -> Union[AnalysisRequest, None]:
         raise NotImplementedError()
 
-    def get_analysis_request_by_observable(self, observable: Observable, amt: AnalysisModuleType) -> Union[AnalysisRequest, None]:
+    def get_analysis_request_by_observable(
+        self, observable: Observable, amt: AnalysisModuleType
+    ) -> Union[AnalysisRequest, None]:
         raise NotImplementedError()
 
     def delete_analysis_request(self, target: Union[AnalysisRequest, str]) -> bool:
         raise NotImplementedError()
 
-    def get_expired_analysis_requests(self, ) -> list[AnalysisRequest]:
+    def get_expired_analysis_requests(
+        self,
+    ) -> list[AnalysisRequest]:
         raise NotImplementedError()
 
     def get_analysis_requests_by_root(self, key: str) -> list[AnalysisRequest]:
@@ -69,7 +76,9 @@ class AceAPI:
     def submit_analysis_request(self, ar: AnalysisRequest):
         raise NotImplementedError()
 
-    def process_expired_analysis_requests(self, ):
+    def process_expired_analysis_requests(
+        self,
+    ):
         raise NotImplementedError()
 
     # analysis tracking
@@ -92,13 +101,17 @@ class AceAPI:
         raise NotImplementedError()
 
     # caching
-    def get_cached_analysis_result(self, observable: Observable, amt: AnalysisModuleType) -> Union[AnalysisRequest, None]:
+    def get_cached_analysis_result(
+        self, observable: Observable, amt: AnalysisModuleType
+    ) -> Union[AnalysisRequest, None]:
         raise NotImplementedError()
 
     def cache_analysis_result(self, request: AnalysisRequest) -> Union[str, None]:
         raise NotImplementedError()
 
-    def delete_expired_cached_analysis_results(self, ):
+    def delete_expired_cached_analysis_results(
+        self,
+    ):
         raise NotImplementedError()
 
     def delete_cached_analysis_results_by_module_type(self, amt: AnalysisModuleType):
@@ -143,7 +156,9 @@ class AceAPI:
     def is_locked(self, lock_id: str) -> bool:
         raise NotImplementedError()
 
-    def get_lock_count(self, ) -> int:
+    def get_lock_count(
+        self,
+    ) -> int:
         raise NotImplementedError()
 
     def acquire(

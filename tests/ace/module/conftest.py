@@ -8,6 +8,7 @@ import pytest
 from ace.system import get_system, set_system
 from ace.system.threaded import ThreadedACESystem
 
+
 @pytest.fixture(autouse=True, scope="session")
 def initialize_modules():
     logging.getLogger().setLevel(logging.DEBUG)

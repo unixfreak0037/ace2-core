@@ -8,15 +8,17 @@ import inspect
 def get_default_async_limit():
     return 1
 
+
 def get_default_sync_limit():
     return 1
+
 
 class AnalysisModule:
 
     limiter: asyncio.Semaphore
-    type = None # AnalysisModuleType
+    type = None  # AnalysisModuleType
 
-    def __init__(self, *args, limit:int=None, **kwargs):
+    def __init__(self, *args, limit: int = None, **kwargs):
         super().__init__(*args, **kwargs)
         if limit is None:
             if self.is_async():

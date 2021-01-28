@@ -49,15 +49,15 @@ class ACESystem:
 
 
 # the global system object that contains references to all the interfaces
-ace = None
+global_system = None
 
 
 def get_system() -> ACESystem:
     """Returns a reference to the global ACESystem object."""
-    return ace
+    return global_system
 
 
 def set_system(system: ACESystem):
     """Sets the reference to the global ACESystem object."""
-    global ace
-    ace = system
+    global global_system
+    global_system = system

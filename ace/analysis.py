@@ -1,5 +1,6 @@
 # vim: sw=4:ts=4:et:cc=120
 
+
 import copy
 import datetime
 import hashlib
@@ -18,7 +19,6 @@ from typing import Union, Optional, Any
 
 import ace
 
-# from ace.json import JSONEncoder
 from ace.system.exceptions import UnknownObservableError
 from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
@@ -77,7 +77,7 @@ class DetectionPoint:
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, detection_point: Optional["DetectionPoint"] = None) -> "DetectionPoint":
+    def from_dict(value: dict, detection_point: Optional["DetectionPoint"] = None, _cls_map=None) -> "DetectionPoint":
         assert isinstance(value, dict)
         assert detection_point is None or isinstance(detection_point, DetectionPoint)
         data = DetectionPointModel(**value)
@@ -309,14 +309,10 @@ class AnalysisModuleType:
     # if set to True then this analysis module only executes manually
     manual: bool = False
 
-    def version_matches(self, amt) -> bool:
-        """Returns True if the given amt is the same version as this amt."""
-        return (
-            self.name == amt.name
-            and self.version == amt.version
-            and sorted(self.additional_cache_keys) == sorted(amt.additional_cache_keys)
-        )
-        # XXX should probably check the other fields as well
+
+    #
+    # json serialization
+    #
 
     def to_model(self, *args, **kwargs) -> AnalysisModuleTypeModel:
         return AnalysisModuleTypeModel(**asdict(self))
@@ -328,14 +324,32 @@ class AnalysisModuleType:
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict) -> "AnalysisModuleType":
+    def from_dict(value: dict, _cls_map=None) -> "AnalysisModuleType":
+        if _cls_map is None:
+            _cls_map = default_cls_map()
+
         data = AnalysisModuleTypeModel(**value)
-        return AnalysisModuleType(**data.dict())
+        return _cls_map["AnalysisModuleType"](**data.dict())
 
     @staticmethod
-    def from_json(value: str) -> "AnalysisModuleType":
+    def from_json(value: str, _cls_map=None) -> "AnalysisModuleType":
         assert isinstance(value, str)
-        return AnalysisModuleType.from_dict(AnalysisModuleTypeModel.parse_raw(value).dict())
+        if _cls_map is None:
+            _cls_map = default_cls_map()
+
+        return _cls_map["AnalysisModuleType"].from_dict(AnalysisModuleTypeModel.parse_raw(value).dict(), _cls_map=_cls_map)
+
+    # ========================================================================
+
+    def version_matches(self, amt) -> bool:
+        """Returns True if the given amt is the same version as this amt."""
+        return (
+            self.name == amt.name
+            and self.version == amt.version
+            and sorted(self.additional_cache_keys) == sorted(amt.additional_cache_keys)
+        )
+        # XXX should probably check the other fields as well
+
 
     @property
     def required_manual_directive(self) -> Union[str, None]:
@@ -517,6 +531,10 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             logging.error("unable to load analysis details {self.uuid}: {e}")
             raise e
 
+    #
+    # json serialization
+    #
+
     def to_model(self, *args, exclude_analysis_details=False, **kwargs) -> AnalysisModel:
         return AnalysisModel(
             tags=self.tags,
@@ -536,19 +554,22 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
+    def from_dict(value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None) -> "Analysis":
         assert isinstance(value, dict)
         assert isinstance(root, RootAnalysis)
         assert analysis is None or isinstance(analysis, Analysis)
 
-        result = analysis or Analysis(root=root)
+        if _cls_map is None:
+            _cls_map = default_cls_map()
+
+        result = analysis or _cls_map["Analysis"](root=root)
         result = TaggableObject.from_dict(value, result)
         result = DetectableObject.from_dict(value, result)
 
         data = AnalysisModel(**value)
 
         if data.type:
-            result.type = AnalysisModuleType.from_dict(data.type.dict())
+            result.type = _cls_map["AnalysisModuleType"].from_dict(data.type.dict())
 
         # if value[Analysis.KEY_TYPE]:
         # result.type = AnalysisModuleType.from_dict(value[Analysis.KEY_TYPE])
@@ -572,9 +593,14 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         return result
 
     @staticmethod
-    def from_json(value: str, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
+    def from_json(value: str, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None) -> "Analysis":
         assert isinstance(value, str)
-        return Analysis.from_dict(AnalysisModel.parse_raw(value).dict(), root, analysis)
+        if _cls_map is None:
+            _cls_map = default_cls_map()
+
+        return _cls_map["Analysis"].from_dict(AnalysisModel.parse_raw(value).dict(), root, analysis, _cls_map=_cls_map)
+
+    # =========================================================================
 
     @property
     def observable(self):
@@ -839,6 +865,10 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         """Returns True if the given value matches this value of this observable.  This can be overridden to provide more advanced matching such as CIDR for ipv4."""
         return self.value == value
 
+    #
+    # json serialization
+    #
+
     def to_model(self, *args, **kwargs) -> ObservableModel:
         return ObservableModel(
             tags=self.tags,
@@ -869,10 +899,13 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None) -> "Observable":
+    def from_dict(value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None) -> "Observable":
         assert isinstance(value, dict)
         assert isinstance(root, RootAnalysis)
         assert observable is None or isinstance(observable, Observable)
+
+        if _cls_map is None:
+            _cls_map = default_cls_map()
 
         data = ObservableModel(**value)
 
@@ -887,7 +920,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         observable.time = data.time
         observable.value = data.value
         observable.analysis = {
-            key: Analysis.from_dict(analysis.dict(), root=root) for key, analysis in data.analysis.items()
+            key: _cls_map["Analysis"].from_dict(analysis.dict(), root=root) for key, analysis in data.analysis.items()
         }
         observable.directives = data.directives
         observable._redirection = data.redirection
@@ -902,9 +935,14 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return observable
 
     @staticmethod
-    def from_json(value: str, root: "RootAnalysis", observable: Optional["Observable"] = None) -> "Observable":
+    def from_json(value: str, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None) -> "Observable":
         assert isinstance(value, str)
-        return Observable.from_dict(ObservableModel.parse_raw(value).dict(), root, observable)
+        if _cls_map is None:
+            _cls_map = default_cls_map()
+
+        return _cls_map["Observable"].from_dict(ObservableModel.parse_raw(value).dict(), root, observable, _cls_map=_cls_map)
+
+    # ========================================================================
 
     @property
     def type(self) -> str:
@@ -1550,6 +1588,10 @@ class RootAnalysis(Analysis, MergableObject):
         if expires is not None:
             self.expires = expires
 
+    #
+    # json serialization
+    #
+
     def to_model(self, *args, exclude_analysis_details=False, **kwargs) -> RootAnalysisModel:
         return RootAnalysisModel(
             tags=self.tags,
@@ -1592,17 +1634,21 @@ class RootAnalysis(Analysis, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict) -> "RootAnalysis":
+    def from_dict(value: dict, _cls_map=None) -> "RootAnalysis":
         assert isinstance(value, dict)
+
+        if _cls_map is None:
+            _cls_map = default_cls_map()
 
         data = RootAnalysisModel(**value)
 
-        root = RootAnalysis()
+        root = _cls_map["RootAnalysis"]()
         root.observable_store = {
-            id: Observable.from_dict(observable.dict(), root=root) for id, observable in data.observable_store.items()
+            # XXX should probably be using create_observable here, eh?
+            id: _cls_map["Observable"].from_dict(observable.dict(), root=root) for id, observable in data.observable_store.items()
         }
 
-        root = Analysis.from_dict(value, root, analysis=root)
+        root = _cls_map["Analysis"].from_dict(value, root, analysis=root)
 
         root._analysis_mode = data.analysis_mode
         root._uuid = data.uuid
@@ -1622,9 +1668,14 @@ class RootAnalysis(Analysis, MergableObject):
         return root
 
     @staticmethod
-    def from_json(value: str) -> "RootAnalysis":
+    def from_json(value: str, _cls_map=None) -> "RootAnalysis":
         assert isinstance(value, str)
-        return RootAnalysis.from_dict(RootAnalysisModel.parse_raw(value).dict())
+        if _cls_map is None:
+            _cls_map = default_cls_map()
+
+        return _cls_map["RootAnalysis"].from_dict(RootAnalysisModel.parse_raw(value).dict(), _cls_map=_cls_map)
+
+    # ========================================================================
 
     @property
     def analysis_mode(self):
@@ -2175,3 +2226,11 @@ def recurse_tree(target: Union[Observable, Analysis], callback):
                     _recurse(analysis, callback)
 
     _recurse(target, callback)
+
+def default_cls_map() -> dict:
+    return {
+        "Analysis": Analysis,
+        "AnalysisModuleType": AnalysisModuleType,
+        "Observable": Observable,
+        "RootAnalysis": RootAnalysis
+    }

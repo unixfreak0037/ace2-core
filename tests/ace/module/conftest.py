@@ -5,6 +5,8 @@ import logging
 
 import pytest
 
+from ace.api import set_api
+from ace.api.local import LocalAceAPI
 from ace.system import get_system, set_system
 from ace.system.threaded import ThreadedACESystem
 
@@ -13,6 +15,7 @@ from ace.system.threaded import ThreadedACESystem
 def initialize_modules():
     logging.getLogger().setLevel(logging.DEBUG)
     set_system(ThreadedACESystem())
+    set_api(LocalAceAPI())
     get_system().initialize()
     get_system().start()
 

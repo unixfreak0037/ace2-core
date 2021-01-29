@@ -309,7 +309,6 @@ class AnalysisModuleType:
     # if set to True then this analysis module only executes manually
     manual: bool = False
 
-
     #
     # json serialization
     #
@@ -337,7 +336,9 @@ class AnalysisModuleType:
         if _cls_map is None:
             _cls_map = default_cls_map()
 
-        return _cls_map["AnalysisModuleType"].from_dict(AnalysisModuleTypeModel.parse_raw(value).dict(), _cls_map=_cls_map)
+        return _cls_map["AnalysisModuleType"].from_dict(
+            AnalysisModuleTypeModel.parse_raw(value).dict(), _cls_map=_cls_map
+        )
 
     # ========================================================================
 
@@ -349,7 +350,6 @@ class AnalysisModuleType:
             and sorted(self.additional_cache_keys) == sorted(amt.additional_cache_keys)
         )
         # XXX should probably check the other fields as well
-
 
     @property
     def required_manual_directive(self) -> Union[str, None]:
@@ -447,6 +447,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
 
         # state tracker for when the details are modified
         self._details_modified = False
+
+        # state tracker for when details are loaded
+        self._details_loaded = False
 
         # if we passed the details in on the constructor then we set it here
         # which also updates the _details_modified
@@ -554,7 +557,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None) -> "Analysis":
+    def from_dict(
+        value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None
+    ) -> "Analysis":
         assert isinstance(value, dict)
         assert isinstance(root, RootAnalysis)
         assert analysis is None or isinstance(analysis, Analysis)
@@ -899,7 +904,9 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None) -> "Observable":
+    def from_dict(
+        value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None
+    ) -> "Observable":
         assert isinstance(value, dict)
         assert isinstance(root, RootAnalysis)
         assert observable is None or isinstance(observable, Observable)
@@ -935,12 +942,16 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return observable
 
     @staticmethod
-    def from_json(value: str, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None) -> "Observable":
+    def from_json(
+        value: str, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None
+    ) -> "Observable":
         assert isinstance(value, str)
         if _cls_map is None:
             _cls_map = default_cls_map()
 
-        return _cls_map["Observable"].from_dict(ObservableModel.parse_raw(value).dict(), root, observable, _cls_map=_cls_map)
+        return _cls_map["Observable"].from_dict(
+            ObservableModel.parse_raw(value).dict(), root, observable, _cls_map=_cls_map
+        )
 
     # ========================================================================
 
@@ -1645,7 +1656,8 @@ class RootAnalysis(Analysis, MergableObject):
         root = _cls_map["RootAnalysis"]()
         root.observable_store = {
             # XXX should probably be using create_observable here, eh?
-            id: _cls_map["Observable"].from_dict(observable.dict(), root=root) for id, observable in data.observable_store.items()
+            id: _cls_map["Observable"].from_dict(observable.dict(), root=root)
+            for id, observable in data.observable_store.items()
         }
 
         root = _cls_map["Analysis"].from_dict(value, root, analysis=root)
@@ -2227,10 +2239,11 @@ def recurse_tree(target: Union[Observable, Analysis], callback):
 
     _recurse(target, callback)
 
+
 def default_cls_map() -> dict:
     return {
         "Analysis": Analysis,
         "AnalysisModuleType": AnalysisModuleType,
         "Observable": Observable,
-        "RootAnalysis": RootAnalysis
+        "RootAnalysis": RootAnalysis,
     }

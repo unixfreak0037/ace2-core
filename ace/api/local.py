@@ -224,15 +224,15 @@ class LocalAceAPI(AceAPI):
         return ace.system.work_queue.put_work(amt, analysis_request)
 
     async def get_queue_size(self, amt: Union[AnalysisModuleType, str]) -> int:
-        return ace.system.work_queue.get_work(amt)
+        return ace.system.work_queue.get_queue_size(amt)
 
     async def delete_work_queue(self, amt: Union[AnalysisModuleType, str]) -> bool:
-        return ace.system.work_queue.get_work(amt)
+        return ace.system.work_queue.delete_work_queue(amt)
 
     async def add_work_queue(self, amt: Union[AnalysisModuleType, str]):
-        return ace.system.work_queue.get_work(amt)
+        return ace.system.work_queue.add_work_queue(amt)
 
     async def get_next_analysis_request(
         self, owner_uuid: str, amt: Union[AnalysisModuleType, str], timeout: Optional[int] = 0
     ) -> Union[AnalysisRequest, None]:
-        return ace.system.work_queue.get_work(owner_uuid, amt, timeout)
+        return ace.system.work_queue.get_next_analysis_request(owner_uuid, amt, timeout)

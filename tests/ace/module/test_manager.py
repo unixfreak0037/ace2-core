@@ -2,6 +2,7 @@
 #
 
 from ace.api.local import LocalAceAPI
+from ace.module.base import AnalysisModule
 from ace.module.manager import AnalysisModuleManager
 
 import pytest
@@ -10,5 +11,4 @@ import pytest
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_manager_start(event_loop):
-    manager = AnalysisModuleManager(core_api=LocalAceAPI())
-    await manager.run()
+    await AnalysisModuleManager().run()

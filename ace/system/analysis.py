@@ -1,11 +1,13 @@
 # vim: sw=4:ts=4:et:cc=120
 
+from typing import Optional
+
 import ace.analysis
 
-from ace.analysis import Observable
+from ace.analysis import Observable, Analysis
+
 
 class AnalysisModuleType(ace.analysis.AnalysisModuleType):
-
     @staticmethod
     def from_dict(value: dict, _cls_map=None) -> "AnalysisModuleType":
         return ace.analysis.from_dict(value, _cls_map=get_cls_map())
@@ -74,10 +76,12 @@ class AnalysisModuleType(ace.analysis.AnalysisModuleType):
 
         return True
 
-class Analysis(ace.analysis.Analysis):
 
+class Analysis(ace.analysis.Analysis):
     @staticmethod
-    def from_dict(value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None) -> "Analysis":
+    def from_dict(
+        value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None
+    ) -> "Analysis":
         return ace.analysis.Analysis.from_dict(value, root, analysis, _cls_map=get_cls_map())
 
     @staticmethod
@@ -150,8 +154,8 @@ class Analysis(ace.analysis.Analysis):
 
         return self.add_observable("file", store_file(path, roots=[self.uuid], **kwargs))
 
-class RootAnalysis(ace.analysis.RootAnalysis):
 
+class RootAnalysis(ace.analysis.RootAnalysis):
     @staticmethod
     def from_dict(value: dict, _cls_map=None) -> "RootAnalysis":
         return ace.analysis.RootAnalysis.from_dict(value, _cls_map=get_cls_map())
@@ -215,10 +219,11 @@ class RootAnalysis(ace.analysis.RootAnalysis):
 
         return submit_analysis_request(self.create_analysis_request())
 
+
 def get_cls_map() -> dict:
     return {
         "Analysis": Analysis,
         "AnalysisModuleType": AnalysisModuleType,
         "Observable": ace.analysis.Observable,
-        "RootAnalysis": RootAnalysis
+        "RootAnalysis": RootAnalysis,
     }

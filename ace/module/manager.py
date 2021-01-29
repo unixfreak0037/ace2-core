@@ -26,6 +26,8 @@ class AnalysisModuleManager:
         self.executions = []  # asyncio.Task
         # executor for non-async modules
         self.executor = None
+        # algorithm used for scaling
+        self.scaling_algorithm = ScalingAlgorithm()
 
     def add_module(self, module: AnalysisModule) -> AnalysisModule:
         """Adds the given AnalysisModule to this manager. Duplicate modules are ignored."""
@@ -36,7 +38,7 @@ class AnalysisModuleManager:
             return None
 
     def compute_scaling(self, module: AnalysisModule) -> int:
-        return SCALE_DOWN
+        return self.scaling_algorithm(self, module)
 
     def load_analysis_modules(self):
         # TODO
@@ -122,6 +124,17 @@ class AnalysisModuleManager:
         # TODO prepare the result...
         if request:
             await get_api().submit_analysis_request(request)
+
+
+class ScalingAlgorithm:
+    """Represents the algorithm used to scale workers up or down for a given module."""
+
+    def compute_scaling(self, manager: AnalysisModuleManager, module: AnalysisModule) -> int:
+        """Compute the scaling for the given module. Returns
+        SCALE_UP: to increase the number of workers by 1.
+        SCALE_DOWN: to decrease the number of workers by 1.
+        NO_SCALING: to keep current levels."""
+        return SCALE_DOWN
 
 
 # LIMIT

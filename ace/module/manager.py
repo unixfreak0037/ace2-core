@@ -20,17 +20,20 @@ WAIT_TIME = 0
 
 class AnalysisModuleManager:
     def __init__(self):
+        # the list of analysis modules this manager is running
         self.analysis_modules = []
-        self.limits = {}  # key = AnalysisModule, value = asyncio.Semaphore
-        self.cpu_limits = {}  # key = AnalysisModule, value = asyncio.Semaphore
+        # current list of tasks
         self.executions = []  # asyncio.Task
+        # executor for non-async modules
         self.executor = None
 
     def add_module(self, module: AnalysisModule) -> AnalysisModule:
-        if module not in self.analysis_modules:
+        """Adds the given AnalysisModule to this manager. Duplicate modules are ignored."""
+        if type(module) not in [type(_) for _ in self.analysis_modules]:
             self.analysis_modules.append(module)
-
-        return module
+            return module
+        else:
+            return None
 
     def compute_scaling(self, module: AnalysisModule) -> int:
         return SCALE_DOWN

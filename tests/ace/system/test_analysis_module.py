@@ -40,7 +40,7 @@ amt_1_upgraded_cache_keys = AnalysisModuleType(
     ],
 )
 def test_version_matches(left, right, expected):
-    assert left.version_matches(right) == expected
+    assert left.extended_version_matches(right) == expected
 
 
 @pytest.mark.integration

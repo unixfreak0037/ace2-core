@@ -3,6 +3,7 @@
 
 import asyncio
 import concurrent.futures
+import logging
 import uuid
 
 from ace.api import get_api
@@ -20,8 +21,9 @@ WAIT_TIME = 0
 
 class AnalysisModuleManager:
     def __init__(self):
-        # the list of analysis modules this manager is running
+        # the analysis modules this manager is running
         self.analysis_modules = []
+        self.analysis_module_map = {}
         # current list of tasks
         self.executions = []  # asyncio.Task
         # executor for non-async modules
@@ -33,21 +35,47 @@ class AnalysisModuleManager:
         """Adds the given AnalysisModule to this manager. Duplicate modules are ignored."""
         if type(module) not in [type(_) for _ in self.analysis_modules]:
             self.analysis_modules.append(module)
+            self.analysis_module_map[module.type.name] = module
             return module
         else:
             return None
 
-    def compute_scaling(self, module: AnalysisModule) -> int:
-        return self.scaling_algorithm(self, module)
-
     async def verify_registration(self) -> bool:
-        return True
-
-    async def register(self) -> bool:
+        """Ensure analysis modules are registered and up to date."""
+        tasks = []
         for module in self.analysis_modules:
-            result = await get_api().register_analysis_module_type(module.type)
+            async def check_type(module):
+                result = await get_api().get_analysis_module_type(module.type.name)
+                return module, result
 
-        return True
+            task = asyncio.get_event_loop().create_task(check_type(module))
+            tasks.append(task)
+
+        verification_ok = True
+        for task in asyncio.as_completed(tasks):
+            module, existing_type = await task
+            if not existing_type:
+                logging.critical(f"analysis module type {module.type.name} is not registered")
+                verification_ok = False
+                continue
+
+            # is the version we have for this module different than the version already registered?
+            if not self.analysis_module_map[existing_type.name].type.version_matches(existing_type):
+                logging.critical(f"analysis module type {module.type.name} has a different version")
+                verification_ok = False
+                continue
+
+            # is the extended version different?
+            if not self.analysis_module_map[existing_type.name].type.extended_version_matches(existing_type):
+                # try to upgrade the module
+                self.analysis_module_map[existing_type.name].upgrade()
+                # is it still different?
+                if not self.analysis_module_map[existing_type.name].type.extended_version_matches(existing_type):
+                    logging.critical(f"analysis module type {module.type.name} has a different extended version after upgrade")
+                    verification_ok = False
+                    continue
+
+        return verification_ok
 
     async def run(self) -> bool:
         # load analysis modules
@@ -57,9 +85,6 @@ class AnalysisModuleManager:
 
         # download current registration and compare
         if not await self.verify_registration():
-            return False
-
-        if not await self.register():
             return False
 
         # executor for non-async modules
@@ -83,7 +108,7 @@ class AnalysisModuleManager:
         async with module.limiter:
             request = await get_api().get_next_analysis_request(whoami, module.type, WAIT_TIME)
 
-            scale = self.compute_scaling(module)
+            scale = self.scaling_algorithm.compute_scaling(self, module)
             if scale == SCALE_UP:
                 # TODO am I allowed to scale up?
                 self.executions.append(asyncio.create_task(self.execute_module(module, str(uuid.uuid4()))))
@@ -130,9 +155,3 @@ class ScalingAlgorithm:
         NO_SCALING: to keep current levels."""
         return SCALE_DOWN
 
-
-# LIMIT
-# GET
-# SCALE
-# ANALYZE
-# RESULT

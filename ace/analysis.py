@@ -347,9 +347,16 @@ class AnalysisModuleType:
         return (
             self.name == amt.name
             and self.version == amt.version
-            and sorted(self.additional_cache_keys) == sorted(amt.additional_cache_keys)
         )
         # XXX should probably check the other fields as well
+
+    def extended_version_matches(self, amt) -> bool:
+        """Returns True if the given amt is the same version as this amt."""
+        return (
+            self.name == amt.name
+            and self.version == amt.version
+            and sorted(self.additional_cache_keys) == sorted(amt.additional_cache_keys)
+        )
 
     @property
     def required_manual_directive(self) -> Union[str, None]:

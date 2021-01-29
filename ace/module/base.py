@@ -3,6 +3,7 @@
 
 import asyncio
 import inspect
+import uuid
 
 from dataclasses import dataclass, field
 from typing import Optional
@@ -21,10 +22,15 @@ def get_default_sync_limit():
 
 class AnalysisModule:
 
-    type: AnalysisModuleType = field(default_factory=lambda: AnalysisModuleType("anonymous", ""))
+    type: Optional[AnalysisModuleType] = None
     limiter: Optional[asyncio.Semaphore] = None
 
     def __init__(self, type: Optional[AnalysisModuleType] = None, limit: Optional[int] = None):
+        if type is None:
+            self.type = AnalysisModuleType(f"anonymous-{uuid.uuid4()}", "")
+        else:
+            self.type = type
+
         if limit is None:
             if self.is_async():
                 limit = get_default_async_limit()
@@ -41,3 +47,6 @@ class AnalysisModule:
 
     def execute_analysis(self, root, observable) -> bool:
         raise NotImplementedError()
+
+    def upgrade(self):
+        pass

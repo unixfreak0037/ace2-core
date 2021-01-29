@@ -40,10 +40,6 @@ class AnalysisModuleManager:
     def compute_scaling(self, module: AnalysisModule) -> int:
         return self.scaling_algorithm(self, module)
 
-    def load_analysis_modules(self):
-        # TODO
-        self.analysis_modules = [AnalysisModule()]
-
     async def verify_registration(self) -> bool:
         return True
 
@@ -58,8 +54,6 @@ class AnalysisModuleManager:
         # register all analysis modules
         # create limits for all amts
         # start a LIMIT
-
-        # self.load_analysis_modules()
 
         # download current registration and compare
         if not await self.verify_registration():

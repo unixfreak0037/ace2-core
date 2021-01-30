@@ -11,17 +11,11 @@ from typing import Optional
 from ace.api import get_api
 from ace.api.analysis import AnalysisModuleType
 
-# XXX
-def get_default_async_limit():
-    return 1
-
-
-def get_default_sync_limit():
-    """Return the default limit for non-async workers. Defaults to local cpu count."""
-    return multiprocessing.cpu_count()
-
 
 class AnalysisModule:
+    """Base class for analysis modules.
+    Override the execute_analysis function to implement analysis logic.
+    Override the upgrade function to implement custom upgrade logic."""
 
     type: Optional[AnalysisModuleType] = None
 
@@ -33,14 +27,14 @@ class AnalysisModule:
 
         if limit is None:
             if self.is_async():
-                self.limit = get_default_async_limit()
+                self.limit = 3  # XXX ???
             else:
-                self.limit = get_default_sync_limit()
+                self.limit = multiprocessing.cpu_count()
         else:
             self.limit = limit
 
-    def register(self) -> AnalysisModuleType:
-        return get_api().register_analysis_module_type(self.type)
+    # def register(self) -> AnalysisModuleType:
+    # return get_api().register_analysis_module_type(self.type)
 
     def is_async(self) -> bool:
         return inspect.iscoroutinefunction(self.execute_analysis)

@@ -15,6 +15,7 @@ from ace.api.base import AceAPI, AnalysisRequest
 from ace.module.base import AnalysisModule
 from ace.analysis import RootAnalysis
 
+# possible results of compute_scaling
 SCALE_UP = 1
 NO_SCALING = 0
 SCALE_DOWN = -1
@@ -25,14 +26,21 @@ CONCURRENCY_MODE_THREADED = 1
 CONCURRENCY_MODE_PROCESS = 2
 
 
-def execute_sync_module(module, request_json):
+#
+# this function is called by the Executor that handles non-async analysis modules
+# since everything is pickled we use json to transfer the analysis request
+#
+# remember that module and request_json are *copies* executing in another process
+def _execute_sync_module(module: AnalysisModule, request_json: str) -> tuple[bool, str]:
     request = AnalysisRequest.from_json(request_json)
     result = module.execute_analysis(request.modified_root, request.modified_observable)
     return result, request.to_json()
 
 
 class AnalysisModuleManager:
-    def __init__(self, concurrency_mode=CONCURRENCY_MODE_THREADED):
+    """Executes and manages ace.module.AnalysisModule objects."""
+
+    def __init__(self, concurrency_mode=CONCURRENCY_MODE_THREADED, wait_time=0):
         # the analysis modules this manager is running
         self.analysis_modules = []
         self.analysis_module_map = {}  # key = AnalysisModule.type.name, value = AnalysisModule
@@ -42,11 +50,11 @@ class AnalysisModuleManager:
         self.module_task_count = {}  # key = AnalysisModule, value = int
 
         # executor for non-async modules
-        self.concurrency_mode = concurrency_mode
+        self.concurrency_mode = concurrency_mode  # determines threading or multiprocessing
         self.executor = None
 
         # the amount of time (in seconds) to wait for analysis requests
-        self.wait_time = 0  # defaults to not waiting
+        self.wait_time = wait_time  # defaults to not waiting
 
         #
         # state flags
@@ -100,10 +108,13 @@ class AnalysisModuleManager:
         SCALE_UP: to increase the number of workers by 1.
         SCALE_DOWN: to decrease the number of workers by 1.
         NO_SCALING: to keep current levels."""
+        # by default we never scale up
+        # implement custom algorithms in subclasses
         return SCALE_DOWN
 
     def add_module(self, module: AnalysisModule) -> AnalysisModule:
-        """Adds the given AnalysisModule to this manager. Duplicate modules are ignored."""
+        """Adds the given AnalysisModule to this manager. Duplicate modules are ignored.
+        Returns the added module, or None if the module already existed."""
         if type(module) not in [type(_) for _ in self.analysis_modules]:
             self.analysis_modules.append(module)
             self.analysis_module_map[module.type.name] = module
@@ -113,14 +124,17 @@ class AnalysisModuleManager:
             return None
 
     def _new_module_task(self, module: AnalysisModule, whoami: str):
+        # adds a new analysis module task to the event loop
         task = asyncio.create_task(self.module_loop(module, whoami))
         self.module_tasks.append(task)
 
     def initialize_module_tasks(self):
+        """Creates the initial set of analysis module tasks, one for each loaded analysis module."""
         for module in self.analysis_modules:
             self.create_module_task(module)
 
     def create_module_task(self, module: AnalysisModule, whoami: Optional[str] = None):
+        """Creates a new analysis module task if the limit of the module allows it."""
         if whoami is None:
             whoami = str(uuid.uuid4())
 
@@ -134,16 +148,20 @@ class AnalysisModuleManager:
             pass  # TODO notify we are trying to scale above the limit
 
     def continue_module_task(self, module: AnalysisModule, whoami: str):
+        """Continues execution of the module."""
         self._new_module_task(module, whoami)
 
     def stop_module_task(self, module: AnalysisModule, whoami: str):
+        """Stops execution of the module."""
         self.module_task_count[module] -= 1
 
     async def run_once(self) -> bool:
+        """Run once through the analysis routine and exit."""
         self.shutdown = True
         return await self.run()
 
     async def run(self) -> bool:
+        """Run the analysis routine. Does not return until all tasks have completed."""
         # download current registration and compare
         if not await self.verify_registration():
             return False
@@ -170,6 +188,7 @@ class AnalysisModuleManager:
                 module = await completed_task
 
     async def module_loop(self, module: AnalysisModule, whoami: str):
+        """Entrypoint for analysis module execution."""
         request = await get_api().get_next_analysis_request(whoami, module.type, self.wait_time)
         scaling = self.compute_scaling(module)
         if not self.shutdown and scaling == SCALE_UP:
@@ -198,6 +217,11 @@ class AnalysisModuleManager:
     async def execute_module(
         self, module: AnalysisModule, whoami: str, request: AnalysisRequest
     ) -> tuple[bool, AnalysisRequest]:
+        """Processes the request with the analysis module.
+        Returns a tuple (result, request) where
+        result is the boolean result of AnalysisModule.execute_analysis
+        request is a copy of the original request with the results added"""
+
         assert isinstance(module, AnalysisModule)
         assert isinstance(whoami, str) and whoami
         assert isinstance(request, AnalysisRequest)
@@ -216,7 +240,7 @@ class AnalysisModuleManager:
             try:
                 request_json = request.to_json()
                 result, request_result_json = await asyncio.get_event_loop().run_in_executor(
-                    self.executor, execute_sync_module, module, request_json
+                    self.executor, _execute_sync_module, module, request_json
                 )
                 return result, AnalysisRequest.from_json(request_result_json)
             except Exception as e:

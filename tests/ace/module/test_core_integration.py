@@ -62,6 +62,8 @@ async def test_basic_analysis_async():
 
 
 class TestSyncAnalysisModule(AnalysisModule):
+    __test__ = False
+
     # define the type for this analysis module
     type = ace.api.analysis.AnalysisModuleType("test", "")
 
@@ -75,7 +77,7 @@ class TestSyncAnalysisModule(AnalysisModule):
 @pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_basic_analysis_sync_threaded(concurrency_mode):
+async def test_basic_analysis_sync(concurrency_mode):
 
     # create an instance of it
     module = TestSyncAnalysisModule()

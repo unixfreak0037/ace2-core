@@ -19,12 +19,6 @@ class CustomAnalysisModule2(AnalysisModule):
 
 
 @pytest.mark.unit
-@pytest.mark.asyncio
-async def test_manager_start(event_loop):
-    await AnalysisModuleManager().run()
-
-
-@pytest.mark.unit
 def test_add_module():
     manager = AnalysisModuleManager()
     module = CustomAnalysisModule()

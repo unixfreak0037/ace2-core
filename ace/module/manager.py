@@ -4,6 +4,7 @@
 import asyncio
 import concurrent.futures
 import logging
+import multiprocessing
 import uuid
 
 from dataclasses import dataclass
@@ -18,20 +19,34 @@ SCALE_UP = 1
 NO_SCALING = 0
 SCALE_DOWN = -1
 
-# XXX
-WAIT_TIME = 0
+# concurrency mode for non-async analysis modules
+# defaults to threaded
+CONCURRENCY_MODE_THREADED = 1
+CONCURRENCY_MODE_PROCESS = 2
+
+
+def execute_sync_module(module, request_json):
+    request = AnalysisRequest.from_json(request_json)
+    result = module.execute_analysis(request.modified_root, request.modified_observable)
+    return result, request.to_json()
 
 
 class AnalysisModuleManager:
-    def __init__(self):
+    def __init__(self, concurrency_mode=CONCURRENCY_MODE_THREADED):
         # the analysis modules this manager is running
         self.analysis_modules = []
         self.analysis_module_map = {}  # key = AnalysisModule.type.name, value = AnalysisModule
+
         # current list of tasks
         self.module_tasks = []  # asyncio.Task
         self.module_task_count = {}  # key = AnalysisModule, value = int
+
         # executor for non-async modules
+        self.concurrency_mode = concurrency_mode
         self.executor = None
+
+        # the amount of time (in seconds) to wait for analysis requests
+        self.wait_time = 0  # defaults to not waiting
 
         #
         # state flags
@@ -134,7 +149,10 @@ class AnalysisModuleManager:
             return False
 
         # executor for non-async modules
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)  # XXX use ProcessPool
+        if self.concurrency_mode == CONCURRENCY_MODE_THREADED:
+            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
+        else:
+            self.executor = concurrent.futures.ProcessPoolExecutor()
 
         # start initial analysis tasks
         self.initialize_module_tasks()
@@ -152,13 +170,13 @@ class AnalysisModuleManager:
                 module = await completed_task
 
     async def module_loop(self, module: AnalysisModule, whoami: str):
-        request = await get_api().get_next_analysis_request(whoami, module.type, WAIT_TIME)
+        request = await get_api().get_next_analysis_request(whoami, module.type, self.wait_time)
         scaling = self.compute_scaling(module)
         if not self.shutdown and scaling == SCALE_UP:
             self.create_module_task(module)
 
         if request:
-            result = await self.execute_module(module, whoami, request)
+            result, request = await self.execute_module(module, whoami, request)
         else:
             result = None
 
@@ -177,7 +195,9 @@ class AnalysisModuleManager:
 
         return module
 
-    async def execute_module(self, module: AnalysisModule, whoami: str, request: AnalysisRequest) -> bool:
+    async def execute_module(
+        self, module: AnalysisModule, whoami: str, request: AnalysisRequest
+    ) -> tuple[bool, AnalysisRequest]:
         assert isinstance(module, AnalysisModule)
         assert isinstance(whoami, str) and whoami
         assert isinstance(request, AnalysisRequest)
@@ -185,17 +205,22 @@ class AnalysisModuleManager:
         request.initialize_result()
         if module.is_async():
             try:
-                return await module.execute_analysis(request.modified_root, request.modified_observable)
+                result = await module.execute_analysis(request.modified_root, request.modified_observable)
+                return result, request
             except Exception as e:
+                breakpoint()
                 # do something
                 # raise e  # XXX
                 return False
         else:
             try:
-                return await asyncio.get_event_loop().run_in_executor(
-                    self.executor, module.execute_analysis, request.modified_root, request.modified_observable
+                request_json = request.to_json()
+                result, request_result_json = await asyncio.get_event_loop().run_in_executor(
+                    self.executor, execute_sync_module, module, request_json
                 )
+                return result, AnalysisRequest.from_json(request_result_json)
             except Exception as e:
+                breakpoint()
                 # do something
                 # raise e  # XXX
                 return False

@@ -14,14 +14,14 @@ from ace.system.analysis_tracking import get_root_analysis
 from ace.system.analysis_module import register_analysis_module_type
 from ace.api.analysis import AnalysisModuleType, Analysis
 from ace.module.base import AnalysisModule
-from ace.module.manager import AnalysisModuleManager
+from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
 
 import pytest
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_basic_analysis_async(event_loop):
+async def test_basic_analysis_async():
 
     # basic analysis module
     class TestAsyncAnalysisModule(AnalysisModule):
@@ -49,6 +49,47 @@ async def test_basic_analysis_async(event_loop):
 
     # create a new manager to run our analysis modules
     manager = AnalysisModuleManager()
+    manager.add_module(module)
+    await manager.run_once()
+
+    # check the results in the core
+    root = get_root_analysis(root)
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(module.type)
+    assert analysis
+    assert analysis.details == {"test": "test"}
+    assert analysis.observables[0] == ace.system.analysis.Observable("test", "hello")
+
+
+class TestSyncAnalysisModule(AnalysisModule):
+    # define the type for this analysis module
+    type = ace.api.analysis.AnalysisModuleType("test", "")
+
+    # define it as an sync module
+    def execute_analysis(self, root: ace.api.analysis.RootAnalysis, observable: ace.api.analysis.Observable) -> bool:
+        analysis = observable.add_analysis(ace.api.analysis.Analysis(type=self.type, details={"test": "test"}))
+        analysis.add_observable("test", "hello")
+        return True
+
+
+@pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_basic_analysis_sync_threaded(concurrency_mode):
+
+    # create an instance of it
+    module = TestSyncAnalysisModule()
+
+    # register the type to the core
+    register_analysis_module_type(module.type)
+
+    # submit a root for analysis so we create a new job
+    root = ace.system.analysis.RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    # create a new manager to run our analysis modules
+    manager = AnalysisModuleManager(concurrency_mode=concurrency_mode)
     manager.add_module(module)
     await manager.run_once()
 

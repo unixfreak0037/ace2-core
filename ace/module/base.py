@@ -1,8 +1,8 @@
 # vim: ts=4:sw=4:et:cc=120
 #
 
-import asyncio
 import inspect
+import multiprocessing
 import uuid
 
 from dataclasses import dataclass, field
@@ -17,13 +17,13 @@ def get_default_async_limit():
 
 
 def get_default_sync_limit():
-    return 1
+    """Return the default limit for non-async workers. Defaults to local cpu count."""
+    return multiprocessing.cpu_count()
 
 
 class AnalysisModule:
 
     type: Optional[AnalysisModuleType] = None
-    limiter: Optional[asyncio.Semaphore] = None
 
     def __init__(self, type: Optional[AnalysisModuleType] = None, limit: Optional[int] = None):
         if type is None:
@@ -33,11 +33,11 @@ class AnalysisModule:
 
         if limit is None:
             if self.is_async():
-                limit = get_default_async_limit()
+                self.limit = get_default_async_limit()
             else:
-                limit = get_default_sync_limit()
-
-        self.limiter = asyncio.Semaphore(limit)
+                self.limit = get_default_sync_limit()
+        else:
+            self.limit = limit
 
     def register(self) -> AnalysisModuleType:
         return get_api().register_analysis_module_type(self.type)
@@ -50,3 +50,6 @@ class AnalysisModule:
 
     def upgrade(self):
         pass
+
+    def __hash__(self):
+        return self.type.name.__hash__()

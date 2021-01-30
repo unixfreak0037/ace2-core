@@ -50,7 +50,7 @@ async def test_basic_analysis_async(event_loop):
     # create a new manager to run our analysis modules
     manager = AnalysisModuleManager()
     manager.add_module(module)
-    await manager.run()
+    await manager.run_once()
 
     # check the results in the core
     root = get_root_analysis(root)

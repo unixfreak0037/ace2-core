@@ -5,15 +5,18 @@ from ace.api import get_api
 from ace.api.analysis import AnalysisModuleType
 from ace.api.local import LocalAceAPI
 from ace.module.base import AnalysisModule
-from ace.module.manager import AnalysisModuleManager
+from ace.module.manager import AnalysisModuleManager, SCALE_UP, SCALE_DOWN, NO_SCALING
 
 import pytest
+
 
 class CustomAnalysisModule(AnalysisModule):
     pass
 
+
 class CustomAnalysisModule2(AnalysisModule):
     pass
+
 
 @pytest.mark.unit
 @pytest.mark.asyncio
@@ -35,6 +38,7 @@ def test_add_module():
     module_2 = CustomAnalysisModule2()
     assert manager.add_module(module_2) is module_2
     assert len(manager.analysis_modules) == 2
+
 
 @pytest.mark.unit
 @pytest.mark.asyncio
@@ -72,3 +76,55 @@ async def test_verify_registration():
     manager = AnalysisModuleManager()
     manager.add_module(UpgradableAnalysisModule(amt))
     assert await manager.verify_registration()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_scaling_task_creation():
+    class CustomManager(AnalysisModuleManager):
+        direction = SCALE_DOWN
+
+        def compute_scaling(self, module):
+            return self.direction
+
+        def _new_module_task(self, module, whoami):
+            self.module_tasks.append(object())
+
+        def total_task_count(self):
+            return sum(iter(self.module_task_count.values()))
+
+    amt = AnalysisModuleType("test", "")
+    result = await get_api().register_analysis_module_type(amt)
+    manager = CustomManager()
+    module = AnalysisModule(amt, limit=2)
+    manager.add_module(module)
+
+    # no tasks to start
+    assert manager.total_task_count() == 0
+
+    # starts with one task
+    manager.initialize_module_tasks()
+    assert manager.total_task_count() == 1
+
+    # scale up to 2 tasks
+    manager.direction = SCALE_UP
+    result = await manager.module_loop(module, "test")
+    assert manager.total_task_count() == 2
+
+    # should not scale past limit
+    result = await manager.module_loop(module, "test")
+    assert manager.total_task_count() == 2
+
+    # scale down to one task
+    manager.direction = SCALE_DOWN
+    result = await manager.module_loop(module, "test")
+    assert manager.total_task_count() == 1
+
+    # scale down does not drop below one task
+    result = await manager.module_loop(module, "test")
+    assert manager.total_task_count() == 1
+
+    # after shutdown it drops to zero tasks
+    manager.shutdown = True
+    await manager.module_loop(module, "test")
+    assert manager.total_task_count() == 0

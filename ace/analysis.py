@@ -344,10 +344,7 @@ class AnalysisModuleType:
 
     def version_matches(self, amt) -> bool:
         """Returns True if the given amt is the same version as this amt."""
-        return (
-            self.name == amt.name
-            and self.version == amt.version
-        )
+        return self.name == amt.name and self.version == amt.version
         # XXX should probably check the other fields as well
 
     def extended_version_matches(self, amt) -> bool:

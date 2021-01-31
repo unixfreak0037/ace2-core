@@ -182,7 +182,7 @@ async def test_force_stop_stuck_sync_task():
 async def test_raised_exception_during_async_analysis():
     class CustomAnalysisModule(AnalysisModule):
         async def execute_analysis(self, root, observable):
-            raise RuntimeError()
+            raise RuntimeError("failure")
 
     amt = ace.api.analysis.AnalysisModuleType("test", "")
     register_analysis_module_type(amt)
@@ -201,5 +201,34 @@ async def test_raised_exception_during_async_analysis():
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt)
 
-    assert analysis.error_message
+    assert analysis.error_message == "RuntimeError: failure"
+    assert analysis.stack_trace
+
+
+class FailingAnalysisModule(AnalysisModule):
+    def execute_analysis(self, root, observable):
+        raise RuntimeError("failure")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_raised_exception_during_sync_analysis():
+    amt = ace.api.analysis.AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    manager = AnalysisModuleManager()
+    module = FailingAnalysisModule(amt)
+    manager.add_module(module)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    await manager.run_once()
+
+    root = get_root_analysis(root)
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(amt)
+
+    assert analysis.error_message == "RuntimeError: failure"
     assert analysis.stack_trace

@@ -293,6 +293,6 @@ class AnalysisModuleManager:
             analysis = request.modified_observable.add_analysis(Analysis(type=module.type))
 
         # set the error message and stack trace details
-        analysis.error_message = f"{type(e)}: {e}"
+        analysis.error_message = f"{type(e).__name__}: {e}"
         analysis.stack_trace = format_error_report(e)
         return request

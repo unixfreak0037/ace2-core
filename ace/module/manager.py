@@ -26,19 +26,53 @@ SCALE_UP = 1
 NO_SCALING = 0
 SCALE_DOWN = -1
 
+#
+# concurrency routines
+#
+
 # concurrency mode for non-async analysis modules
 # defaults to threaded
 CONCURRENCY_MODE_THREADED = 1
 CONCURRENCY_MODE_PROCESS = 2
 
+#
+# process-based concurrency uses empty processes to do the work
+# all the arguments to the process are serialized (using pickle)
+# we don't want to have to serialize the instance of the analysis module
+# that would not work for module that load large data sets to do their work
+# (such as yara analyzers)
+# so instead, when the process starts, we use the initializer to load
+# all the analysis modules
+# these are passed in as a dict { name: [type, amt] }
+# where name is AnalysisModuleType.name
+# type is type(AnalysisModule)
+# amt is AnalysisModuleType
+# we use these arguments to instantiate copies of the analysis modules
+# and these instances of the analysis modules are kept in the global sync_module_map
+# then to execute them, we just pass the name and look up the name
+# in the global sync_module_map to get the analysis module to use
+# then all that needs to be serialized is the name of the module and the analysis request
+#
 
-#
-# this function is called by the Executor that handles non-async analysis modules
-# since everything is pickled we use json to transfer the analysis request
-#
-# remember that module and request_json are *copies* executing in another process
-def _execute_sync_module(module: AnalysisModule, request_json: str) -> str:
+sync_module_map = None
+
+
+def _initialize_executor(module_map):
+    global sync_module_map
+    sync_module_map = {}
+    # TODO probably need to initialize logging here
+    for module_name, params in module_map.items():
+        _type, amt = params
+        # create a new instance of the analysis module
+        sync_module_map[module_name] = _type(type=amt)
+        logging.info(f"loaded {amt.name} in subprocess")
+        # load any additional resources
+        sync_module_map[module_name].load()
+
+
+def _execute_sync_module(module_name: str, request_json: str) -> str:
     request = AnalysisRequest.from_json(request_json)
+    module = sync_module_map[module_name]
     module.execute_analysis(request.modified_root, request.modified_observable)
     return request.to_json()
 
@@ -165,11 +199,17 @@ class AnalysisModuleManager:
         self.module_task_count[module] -= 1
 
     def start_executor(self):
+        module_map = {_.type.name: [type(_), _.type] for _ in self.analysis_modules}
+
         # executor for non-async modules
         if self.concurrency_mode == CONCURRENCY_MODE_THREADED:
-            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
+            self.executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=multiprocessing.cpu_count(), initializer=_initialize_executor, initargs=(module_map,)
+            )
         else:
-            self.executor = concurrent.futures.ProcessPoolExecutor()
+            self.executor = concurrent.futures.ProcessPoolExecutor(
+                initializer=_initialize_executor, initargs=(module_map,)
+            )
 
     def kill_executor(self):
         if self.concurrency_mode != CONCURRENCY_MODE_PROCESS:
@@ -278,7 +318,7 @@ class AnalysisModuleManager:
             try:
                 request_json = request.to_json()
                 request_result_json = await asyncio.get_event_loop().run_in_executor(
-                    self.executor, _execute_sync_module, module, request_json
+                    self.executor, _execute_sync_module, module.type.name, request_json
                 )
                 return AnalysisRequest.from_json(request_result_json)
             except BrokenProcessPool as e:

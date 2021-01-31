@@ -45,5 +45,9 @@ class AnalysisModule:
     def upgrade(self):
         pass
 
+    # XXX I think we can get rid of this with a correct design
+    def load(self):
+        pass
+
     def __hash__(self):
         return self.type.name.__hash__()

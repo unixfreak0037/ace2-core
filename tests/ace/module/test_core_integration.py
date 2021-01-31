@@ -280,3 +280,58 @@ async def test_crashing_sync_analysis_module():
 
     assert analysis.error_message == "ok process crashed when analyzing test test"
     assert analysis.stack_trace
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_upgraded_async_analysis_module():
+    step_1 = asyncio.Event()
+    step_2 = asyncio.Event()
+
+    class CustomAnalysisModule(AnalysisModule):
+        def execute_analysis(self, root, observable):
+            nonlocal step_1
+            observable.add_analysis(Analysis(type=self.type, details={"version": self.type.version}))
+            if not step_1.is_set():
+                step_1.set()
+                return
+
+            step_2.set()
+
+    amt = ace.api.analysis.AnalysisModuleType("test", "", version="1.0.0")
+    register_analysis_module_type(amt)
+
+    manager = AnalysisModuleManager()
+    module = CustomAnalysisModule(type=amt)
+    manager.add_module(module)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    root_2 = RootAnalysis()
+    observable_2 = root_2.add_observable("test", "test")
+
+    async def _upgrade():
+        nonlocal step_1
+        nonlocal root_2
+        await step_1.wait()
+        updated_amt = ace.api.analysis.AnalysisModuleType("test", "", version="1.0.1")
+        register_analysis_module_type(updated_amt)
+        root_2.submit()
+
+    async def _shutdown():
+        nonlocal step_2
+        nonlocal manager
+        await step_2.wait()
+        manager.stop()
+
+    upgrade_task = asyncio.create_task(_upgrade())
+    shutdown_task = asyncio.create_task(_upgrade())
+    await manager.run()
+    await upgrade_task
+    await shutdown_task
+
+    root = get_root_analysis(root_2)
+    observable = root.get_observable(observable)
+    assert observable.get_analysis(amt) is None

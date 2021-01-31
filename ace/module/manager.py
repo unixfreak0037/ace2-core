@@ -18,6 +18,7 @@ from ace.api.base import AceAPI, AnalysisRequest
 from ace.error_reporting.reporter import format_error_report
 from ace.module.base import AnalysisModule
 from ace.analysis import RootAnalysis, Analysis
+from ace.system.analysis_module import AnalysisModuleTypeVersionError
 
 import psutil
 
@@ -273,7 +274,13 @@ class AnalysisModuleManager:
 
     async def module_loop(self, module: AnalysisModule, whoami: str):
         """Entrypoint for analysis module execution."""
-        request = await get_api().get_next_analysis_request(whoami, module.type, self.wait_time)
+        try:
+            request = await get_api().get_next_analysis_request(whoami, module.type, self.wait_time)
+        except AnalysisModuleTypeVersionError as e:
+            logging.info(f"module {module.type.name} has invalid version: {e}")
+            self.shutdown = True
+            return None
+
         scaling = self.compute_scaling(module)
         if not self.shutdown and scaling == SCALE_UP:
             self.create_module_task(module)

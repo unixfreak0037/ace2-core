@@ -5,6 +5,8 @@ import asyncio
 import concurrent.futures
 import logging
 import multiprocessing
+import os
+import signal
 import uuid
 
 from dataclasses import dataclass
@@ -14,6 +16,8 @@ from ace.api import get_api
 from ace.api.base import AceAPI, AnalysisRequest
 from ace.module.base import AnalysisModule
 from ace.analysis import RootAnalysis
+
+import psutil
 
 # possible results of compute_scaling
 SCALE_UP = 1
@@ -60,8 +64,11 @@ class AnalysisModuleManager:
         # state flags
         #
 
-        # set to True to stop the manager
+        # set to True to stop the manager gracefully (allowing existing tasks to complete)
         self.shutdown = False
+
+        # set to True to stop immediately
+        self.immediate_shutdown = False
 
     async def verify_registration(self) -> bool:
         """Ensure analysis modules are registered and up to date."""
@@ -125,7 +132,7 @@ class AnalysisModuleManager:
 
     def _new_module_task(self, module: AnalysisModule, whoami: str):
         # adds a new analysis module task to the event loop
-        task = asyncio.create_task(self.module_loop(module, whoami))
+        task = asyncio.create_task(self.module_loop(module, whoami), name=f"module {module.type.name}:{whoami}")
         self.module_tasks.append(task)
 
     def initialize_module_tasks(self):
@@ -155,6 +162,21 @@ class AnalysisModuleManager:
         """Stops execution of the module."""
         self.module_task_count[module] -= 1
 
+    def start_executor(self):
+        # executor for non-async modules
+        if self.concurrency_mode == CONCURRENCY_MODE_THREADED:
+            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
+        else:
+            self.executor = concurrent.futures.ProcessPoolExecutor()
+
+    def kill_executor(self):
+        if self.concurrency_mode != CONCURRENCY_MODE_PROCESS:
+            return
+
+        for process in psutil.Process(os.getpid()).children():
+            logging.warning(f"sending KILL to {process}")
+            process.send_signal(signal.SIGTERM)
+
     async def run_once(self) -> bool:
         """Run once through the analysis routine and exit."""
         self.shutdown = True
@@ -166,26 +188,46 @@ class AnalysisModuleManager:
         if not await self.verify_registration():
             return False
 
-        # executor for non-async modules
-        if self.concurrency_mode == CONCURRENCY_MODE_THREADED:
-            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
-        else:
-            self.executor = concurrent.futures.ProcessPoolExecutor()
+        # start the executor for the non-async analysis modules
+        self.start_executor()
 
         # start initial analysis tasks
         self.initialize_module_tasks()
 
-        # TODO fix cpu spin here
         # primary loop
         module_tasks = self.module_tasks[:]
         self.module_tasks = []
         while module_tasks:
-            done, pending = await asyncio.wait(module_tasks)
+            # done, pending = await asyncio.wait(module_tasks, timeout=0.1, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(module_tasks, timeout=0.01)
+            # if the system is shutting down then we go ahead and cancel any new and/or pending tasks
+            if self.immediate_shutdown:
+                for task in pending:
+                    task.cancel()
+                for task in self.module_tasks:
+                    task.cancel()
+
             self.module_tasks.extend(pending)
             module_tasks = self.module_tasks[:]
             self.module_tasks = []
             for completed_task in done:
-                module = await completed_task
+                try:
+                    module = await completed_task
+                except asyncio.CancelledError as e:
+                    logging.warning(f"task {completed_task.get_name()} was cancelled before it completed")
+
+        self.executor.shutdown(wait=False, cancel_futures=True)
+        self.kill_executor()
+        return True
+
+    def stop(self):
+        """Gracefully stops the manager. Allows existing jobs to complete."""
+        self.shutdown = True
+
+    def force_stop(self):
+        """Stops the manager now, cancelling all running jobs."""
+        self.shutdown = True
+        self.immediate_shutdown = True
 
     async def module_loop(self, module: AnalysisModule, whoami: str):
         """Entrypoint for analysis module execution."""

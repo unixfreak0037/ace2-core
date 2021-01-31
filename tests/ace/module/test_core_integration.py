@@ -6,6 +6,8 @@
 # we're using ace.system.analysis and ace.api.analysis in the same code here
 #
 
+import asyncio
+
 import ace.system.analysis
 import ace.api.analysis
 
@@ -19,7 +21,7 @@ from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, 
 import pytest
 
 
-@pytest.mark.unit
+@pytest.mark.system
 @pytest.mark.asyncio
 async def test_basic_analysis_async():
 
@@ -75,7 +77,7 @@ class TestSyncAnalysisModule(AnalysisModule):
 
 
 @pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
-@pytest.mark.unit
+@pytest.mark.system
 @pytest.mark.asyncio
 async def test_basic_analysis_sync(concurrency_mode):
 
@@ -102,3 +104,74 @@ async def test_basic_analysis_sync(concurrency_mode):
     assert analysis
     assert analysis.details == {"test": "test"}
     assert analysis.observables[0] == ace.system.analysis.Observable("test", "hello")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_force_stop_stuck_async_task():
+    control = asyncio.Event()
+
+    class CustomAnalysisModule(AnalysisModule):
+        async def execute_analysis(self, root, observable):
+            nonlocal control
+            control.set()
+            # get stuck
+            import sys
+
+            await asyncio.sleep(sys.maxsize)
+
+    # register the type to the core
+    amt = ace.api.analysis.AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    manager = AnalysisModuleManager()
+    module = CustomAnalysisModule(amt)
+    manager.add_module(module)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    async def _cancel():
+        nonlocal control
+        nonlocal manager
+        await control.wait()
+        manager.force_stop()
+
+    cancel_task = asyncio.get_event_loop().create_task(_cancel())
+    await manager.run()
+    await cancel_task
+
+
+class CustomAnalysisModule(AnalysisModule):
+    def execute_analysis(self, root, observable):
+        # get stuck
+        import time, sys
+
+        time.sleep(1000)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_force_stop_stuck_sync_task():
+    # register the type to the core
+    amt = ace.api.analysis.AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    manager = AnalysisModuleManager(concurrency_mode=CONCURRENCY_MODE_PROCESS)
+    module = CustomAnalysisModule(amt)
+    manager.add_module(module)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    async def _cancel():
+        nonlocal manager
+        manager.force_stop()
+
+    manager_task = asyncio.get_event_loop().create_task(manager.run())
+    await asyncio.wait([manager_task], timeout=0.01)
+    cancel_task = asyncio.get_event_loop().create_task(_cancel())
+    await manager_task
+    await cancel_task

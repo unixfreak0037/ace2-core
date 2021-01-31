@@ -116,6 +116,8 @@ class AnalysisModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
     details: Optional[Any] = Field(
         description="""The free-form result of the analysis (must be a serializable into JSON.)"""
     )
+    error_message: Optional[str] = Field(description="""The error message for when analysis has failed.""")
+    stack_trace: Optional[str] = Field(description="""Optional stack trace for error messages.""")
 
 
 class ObservableModel(DetectableObjectModel, TaggableObjectModel, BaseModel):

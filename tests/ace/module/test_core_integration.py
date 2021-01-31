@@ -175,3 +175,31 @@ async def test_force_stop_stuck_sync_task():
     cancel_task = asyncio.get_event_loop().create_task(_cancel())
     await manager_task
     await cancel_task
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_raised_exception_during_async_analysis():
+    class CustomAnalysisModule(AnalysisModule):
+        async def execute_analysis(self, root, observable):
+            raise RuntimeError()
+
+    amt = ace.api.analysis.AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    manager = AnalysisModuleManager()
+    module = CustomAnalysisModule(amt)
+    manager.add_module(module)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    await manager.run_once()
+
+    root = get_root_analysis(root)
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(amt)
+
+    assert analysis.error_message
+    assert analysis.stack_trace

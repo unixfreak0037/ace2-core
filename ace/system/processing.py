@@ -101,6 +101,7 @@ def process_analysis_request(ar: AnalysisRequest):
             target_root.save()
 
             fire_event(EVENT_PROCESSING_REQUEST_RESULT, ar)
+            # TODO fire event if analysis failed
 
             # process any analysis request links
             for linked_request in get_linked_analysis_requests(ar):

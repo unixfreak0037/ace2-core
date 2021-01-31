@@ -14,8 +14,9 @@ from typing import Optional
 
 from ace.api import get_api
 from ace.api.base import AceAPI, AnalysisRequest
+from ace.error_reporting.reporter import format_error_report
 from ace.module.base import AnalysisModule
-from ace.analysis import RootAnalysis
+from ace.analysis import RootAnalysis, Analysis
 
 import psutil
 
@@ -35,10 +36,10 @@ CONCURRENCY_MODE_PROCESS = 2
 # since everything is pickled we use json to transfer the analysis request
 #
 # remember that module and request_json are *copies* executing in another process
-def _execute_sync_module(module: AnalysisModule, request_json: str) -> tuple[bool, str]:
+def _execute_sync_module(module: AnalysisModule, request_json: str) -> str:
     request = AnalysisRequest.from_json(request_json)
-    result = module.execute_analysis(request.modified_root, request.modified_observable)
-    return result, request.to_json()
+    module.execute_analysis(request.modified_root, request.modified_observable)
+    return request.to_json()
 
 
 class AnalysisModuleManager:
@@ -237,9 +238,7 @@ class AnalysisModuleManager:
             self.create_module_task(module)
 
         if request:
-            result, request = await self.execute_module(module, whoami, request)
-        else:
-            result = None
+            request = await self.execute_module(module, whoami, request)
 
         # we just continue executing if there is no scaling required
         # OR this is the last task for this module
@@ -249,20 +248,16 @@ class AnalysisModuleManager:
         elif self.shutdown or scaling == SCALE_DOWN:
             self.stop_module_task(module, whoami)
 
-        if result:
-            # it is ok to wait here
-            # we continue analysis on a new task
+        # it is ok to wait here
+        # we continue analysis on a new task
+        if request:
             await get_api().submit_analysis_request(request)
 
         return module
 
-    async def execute_module(
-        self, module: AnalysisModule, whoami: str, request: AnalysisRequest
-    ) -> tuple[bool, AnalysisRequest]:
+    async def execute_module(self, module: AnalysisModule, whoami: str, request: AnalysisRequest) -> AnalysisRequest:
         """Processes the request with the analysis module.
-        Returns a tuple (result, request) where
-        result is the boolean result of AnalysisModule.execute_analysis
-        request is a copy of the original request with the results added"""
+        Returns a copy of the original request with the results added"""
 
         assert isinstance(module, AnalysisModule)
         assert isinstance(whoami, str) and whoami
@@ -271,22 +266,33 @@ class AnalysisModuleManager:
         request.initialize_result()
         if module.is_async():
             try:
-                result = await module.execute_analysis(request.modified_root, request.modified_observable)
-                return result, request
+                await module.execute_analysis(request.modified_root, request.modified_observable)
+                return request
             except Exception as e:
-                breakpoint()
-                # do something
-                # raise e  # XXX
-                return False
+                logging.error(f"{module} failed analyzing {request}: {e}")
+                return self.process_exception(module, request, e)
         else:
             try:
                 request_json = request.to_json()
-                result, request_result_json = await asyncio.get_event_loop().run_in_executor(
+                request_result_json = await asyncio.get_event_loop().run_in_executor(
                     self.executor, _execute_sync_module, module, request_json
                 )
-                return result, AnalysisRequest.from_json(request_result_json)
+                return AnalysisRequest.from_json(request_result_json)
             except Exception as e:
-                breakpoint()
-                # do something
-                # raise e  # XXX
-                return False
+                logging.error(f"{module} failed analyzing {request}: {e}")
+                return self.process_exception(module, request, e)
+
+    def process_exception(self, module: AnalysisModule, request: AnalysisRequest, e: Exception) -> AnalysisRequest:
+        assert isinstance(module, AnalysisModule)
+        assert isinstance(request, AnalysisRequest)
+        assert isinstance(e, Exception)
+
+        # use existing analysis if it already exists
+        analysis = request.modified_observable.get_analysis(module.type)
+        if analysis is None:
+            analysis = request.modified_observable.add_analysis(Analysis(type=module.type))
+
+        # set the error message and stack trace details
+        analysis.error_message = f"{type(e)}: {e}"
+        analysis.stack_trace = format_error_report(e)
+        return request

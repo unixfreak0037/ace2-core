@@ -427,12 +427,25 @@ class AnalysisModuleType:
 class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     """Represents an output of analysis work."""
 
-    def __init__(self, *args, details=None, type=None, root=None, observable=None, summary=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        details=None,
+        type=None,
+        root=None,
+        observable=None,
+        summary=None,
+        error_message=None,
+        stack_trace=None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         assert root is None or isinstance(root, RootAnalysis)
         assert type is None or isinstance(type, AnalysisModuleType)
         assert observable is None or isinstance(observable, Observable)
         assert summary is None or isinstance(summary, str)
+        assert error_message is None or isinstance(error_message, str)
+        assert stack_trace is None or isinstance(stack_trace, str)
 
         # unique ID
         self.uuid: str = str(uuid.uuid4())
@@ -468,6 +481,11 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         # a pretty good idea of what was discovered without needing to
         # load all the details of the alert
         self._summary = summary or None
+
+        # if analysis failed then this contains the description of the error
+        # and a stack trace for debugging
+        self.error_message = error_message
+        self.stack_trace = stack_trace
 
     #
     # Lockable interface
@@ -552,6 +570,8 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             observable_ids=self.observable_ids,
             summary=self.summary,
             details=None if exclude_analysis_details else self._details,
+            error_message=self.error_message,
+            stack_trace=self.stack_trace,
         )
 
     def to_dict(self, *args, **kwargs) -> dict:
@@ -597,6 +617,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
             result._details = data.details
             result._details_loaded = False
             result._details_modified = True  # XXX ??? I think this is right
+
+        result.error_message = data.error_message
+        result.stack_trace = data.stack_trace
 
         result.root = root
         return result
@@ -1447,7 +1470,13 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         if type:
             after_analysis = after.get_analysis(type)
             if after_analysis:
-                target_analysis = self.add_analysis(type=type, details=after_analysis.details)
+                target_analysis = self.add_analysis(
+                    type=type,
+                    details=after_analysis.details,
+                    summary=after_analysis.summary,
+                    error_message=after_analysis.error_message,
+                    stack_trace=after_analysis.stack_trace,
+                )
                 target_analysis.apply_diff_merge(before.root, after_analysis)
 
         return self

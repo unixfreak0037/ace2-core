@@ -8,10 +8,10 @@
 
 import asyncio
 
-import ace.system.analysis
+import ace.analysis
 import ace.api.analysis
 
-from ace.system.analysis import RootAnalysis, Observable
+from ace.analysis import RootAnalysis, Observable
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.analysis_module import register_analysis_module_type
 from ace.api.analysis import AnalysisModuleType, Analysis
@@ -45,7 +45,7 @@ async def test_basic_analysis_async():
     register_analysis_module_type(module.type)
 
     # submit a root for analysis so we create a new job
-    root = ace.system.analysis.RootAnalysis()
+    root = ace.analysis.RootAnalysis()
     observable = root.add_observable("test", "test")
     root.submit()
 
@@ -60,7 +60,7 @@ async def test_basic_analysis_async():
     analysis = observable.get_analysis(module.type)
     assert analysis
     assert analysis.details == {"test": "test"}
-    assert analysis.observables[0] == ace.system.analysis.Observable("test", "hello")
+    assert analysis.observables[0] == ace.analysis.Observable("test", "hello")
 
 
 class TestSyncAnalysisModule(AnalysisModule):
@@ -88,7 +88,7 @@ async def test_basic_analysis_sync(concurrency_mode):
     register_analysis_module_type(module.type)
 
     # submit a root for analysis so we create a new job
-    root = ace.system.analysis.RootAnalysis()
+    root = ace.analysis.RootAnalysis()
     observable = root.add_observable("test", "test")
     root.submit()
 
@@ -103,7 +103,7 @@ async def test_basic_analysis_sync(concurrency_mode):
     analysis = observable.get_analysis(module.type)
     assert analysis
     assert analysis.details == {"test": "test"}
-    assert analysis.observables[0] == ace.system.analysis.Observable("test", "hello")
+    assert analysis.observables[0] == ace.analysis.Observable("test", "hello")
 
 
 @pytest.mark.integration

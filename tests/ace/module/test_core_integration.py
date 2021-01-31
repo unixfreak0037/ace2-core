@@ -143,7 +143,7 @@ async def test_force_stop_stuck_async_task():
     await cancel_task
 
 
-class CustomAnalysisModule(AnalysisModule):
+class StuckAnalysisModule(AnalysisModule):
     def execute_analysis(self, root, observable):
         # get stuck
         import time, sys
@@ -159,7 +159,7 @@ async def test_force_stop_stuck_sync_task():
     register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager(concurrency_mode=CONCURRENCY_MODE_PROCESS)
-    module = CustomAnalysisModule(amt)
+    module = StuckAnalysisModule(amt)
     manager.add_module(module)
 
     root = RootAnalysis()
@@ -231,4 +231,52 @@ async def test_raised_exception_during_sync_analysis():
     analysis = observable.get_analysis(amt)
 
     assert analysis.error_message == "RuntimeError: failure"
+    assert analysis.stack_trace
+
+
+class CrashingAnalysisModule(AnalysisModule):
+    def execute_analysis(self, root, observable):
+        import os, signal
+
+        os.kill(os.getpid(), signal.SIGKILL)
+
+
+class SimpleSyncAnalysisModule(AnalysisModule):
+    def execute_analysis(self, root, observable):
+        observable.add_analysis(Analysis(type=self.type, details={"test": "test"}))
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_crashing_sync_analysis_module():
+    amt_crashing = ace.api.analysis.AnalysisModuleType("crash_test", "")
+    amt_ok = ace.api.analysis.AnalysisModuleType("ok", "")
+    register_analysis_module_type(amt_crashing)
+    register_analysis_module_type(amt_ok)
+
+    # this is only supported in CONCURRENCY_MODE_PROCESS
+    manager = AnalysisModuleManager(concurrency_mode=CONCURRENCY_MODE_PROCESS)
+    crashing_module = CrashingAnalysisModule(amt_crashing)
+    ok_module = SimpleSyncAnalysisModule(amt_ok)
+
+    manager.add_module(crashing_module)
+    manager.add_module(ok_module)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    await manager.run_once()
+
+    root = get_root_analysis(root)
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(amt_crashing)
+
+    assert analysis.error_message == "crash_test process crashed when analyzing test test"
+    assert analysis.stack_trace
+
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(amt_ok)
+
+    assert analysis.error_message == "ok process crashed when analyzing test test"
     assert analysis.stack_trace

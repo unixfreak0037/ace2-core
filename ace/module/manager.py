@@ -9,6 +9,7 @@ import os
 import signal
 import uuid
 
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from typing import Optional
 
@@ -269,7 +270,9 @@ class AnalysisModuleManager:
                 await module.execute_analysis(request.modified_root, request.modified_observable)
                 return request
             except Exception as e:
-                logging.error(f"{module} failed analyzing {request}: {e}")
+                logging.error(
+                    f"{module} failed analyzing {request.modified_observable.type} {request.modified_observable.value}: {e}"
+                )
                 return self.process_exception(module, request, e)
         else:
             try:
@@ -278,11 +281,27 @@ class AnalysisModuleManager:
                     self.executor, _execute_sync_module, module, request_json
                 )
                 return AnalysisRequest.from_json(request_result_json)
+            except BrokenProcessPool as e:
+                # when this happens you have to create and start a new one
+                logging.error(f"{module} crashed when analyzing {request}")
+                self.process_exception(
+                    module,
+                    request,
+                    e,
+                    error_message=f"{module.type.name} process crashed when analyzing {request.modified_observable.type} {request.modified_observable.value}",
+                )
+                # we have to start a new executor
+                self.start_executor()
+                return request
             except Exception as e:
-                logging.error(f"{module} failed analyzing {request}: {e}")
+                logging.error(
+                    f"{module} failed analyzing {request.modified_observable.type} {request.modified_observable.value}: {e}"
+                )
                 return self.process_exception(module, request, e)
 
-    def process_exception(self, module: AnalysisModule, request: AnalysisRequest, e: Exception) -> AnalysisRequest:
+    def process_exception(
+        self, module: AnalysisModule, request: AnalysisRequest, e: Exception, error_message: Optional[str] = None
+    ) -> AnalysisRequest:
         assert isinstance(module, AnalysisModule)
         assert isinstance(request, AnalysisRequest)
         assert isinstance(e, Exception)
@@ -293,6 +312,9 @@ class AnalysisModuleManager:
             analysis = request.modified_observable.add_analysis(Analysis(type=module.type))
 
         # set the error message and stack trace details
-        analysis.error_message = f"{type(e).__name__}: {e}"
+        if not error_message:
+            analysis.error_message = f"{type(e).__name__}: {e}"
+        else:
+            analysis.error_message = error_message
         analysis.stack_trace = format_error_report(e)
         return request

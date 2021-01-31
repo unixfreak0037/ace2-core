@@ -7,6 +7,7 @@ from ace.system import ACESystemInterface, get_system
 from ace.system.analysis_module import (
     AnalysisModuleType,
     AnalysisModuleTypeVersionError,
+    AnalysisModuleTypeExtendedVersionError,
     track_analysis_module_type,
     get_analysis_module_type,
 )
@@ -147,9 +148,13 @@ def get_next_analysis_request(
     # make sure that the requested analysis module hasn't been replaced by a newer version
     # if that's the case then the request fails and the requestor needs to update to the new version
     existing_amt = get_analysis_module_type(amt.name)
-    if existing_amt and not existing_amt.extended_version_matches(amt):
+    if existing_amt and not existing_amt.version_matches(amt):
         logging.info(f"requested amt {amt} version mismatch against {existing_amt}")
         raise AnalysisModuleTypeVersionError(amt, existing_amt)
+
+    if existing_amt and not existing_amt.extended_version_matches(amt):
+        logging.info(f"requested amt {amt} extended version mismatch against {existing_amt}")
+        raise AnalysisModuleTypeExtendedVersionError(amt, existing_amt)
 
     while True:
         next_ar = get_work(amt, timeout)

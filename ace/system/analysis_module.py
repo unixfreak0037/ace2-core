@@ -32,6 +32,12 @@ class AnalysisModuleTypeVersionError(Exception):
     pass
 
 
+class AnalysisModuleTypeExtendedVersionError(Exception):
+    """Raised when a request for a analysis with an out-of-date extended version is made."""
+
+    pass
+
+
 class AnalysisModuleTrackingInterface(ACESystemInterface):
     def track_analysis_module_type(self, amt: AnalysisModuleType):
         raise NotImplementedError()

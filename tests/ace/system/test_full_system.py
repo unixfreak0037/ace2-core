@@ -12,6 +12,7 @@ from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis, Observable
 from ace.system.analysis_module import (
     register_analysis_module_type,
     AnalysisModuleTypeVersionError,
+    AnalysisModuleTypeExtendedVersionError,
     delete_analysis_module_type,
     UnknownAnalysisModuleTypeError,
 )
@@ -329,7 +330,7 @@ def test_amt_version_upgrade():
     amt_upgraded = register_analysis_module_type(AnalysisModuleType("test", "", additional_cache_keys=["intel:v2"]))
 
     # but we're still using the old one so this should fail
-    with pytest.raises(AnalysisModuleTypeVersionError):
+    with pytest.raises(AnalysisModuleTypeExtendedVersionError):
         request = get_next_analysis_request("test", amt, 0)
 
     # and the work queue should still have one entry

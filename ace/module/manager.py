@@ -17,7 +17,7 @@ from ace.api import get_api
 from ace.api.base import AceAPI, AnalysisRequest
 from ace.error_reporting.reporter import format_error_report
 from ace.module.base import AnalysisModule
-from ace.analysis import RootAnalysis, Analysis
+from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
 from ace.system.analysis_module import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
 
 import psutil
@@ -71,9 +71,16 @@ def _initialize_executor(module_map):
         sync_module_map[module_name].load()
 
 
-def _execute_sync_module(module_name: str, request_json: str) -> str:
+def _execute_sync_module(module_type: str, request_json: str) -> str:
     request = AnalysisRequest.from_json(request_json)
-    module = sync_module_map[module_name]
+    amt = AnalysisModuleType.from_json(module_type)
+    module = sync_module_map[amt.name]
+    if not module.type.extended_version_matches(amt):
+        module.upgrade()
+
+    if not module.type.extended_version_matches(amt):
+        raise AnalysisModuleTypeExtendedVersionError(amt, module.type)
+
     module.execute_analysis(request.modified_root, request.modified_observable)
     return request.to_json()
 
@@ -96,6 +103,13 @@ class AnalysisModuleManager:
 
         # the amount of time (in seconds) to wait for analysis requests
         self.wait_time = wait_time  # defaults to not waiting
+
+        #
+        # asyncio events
+        #
+
+        # set right before entering processing loop
+        self.event_loop_starting_event = asyncio.Event()
 
         #
         # state flags
@@ -236,6 +250,7 @@ class AnalysisModuleManager:
 
         # start initial analysis tasks
         self.initialize_module_tasks()
+        self.event_loop_starting_event.set()
 
         # primary loop
         module_tasks = self.module_tasks[:]
@@ -336,7 +351,7 @@ class AnalysisModuleManager:
             try:
                 request_json = request.to_json()
                 request_result_json = await asyncio.get_event_loop().run_in_executor(
-                    self.executor, _execute_sync_module, module.type.name, request_json
+                    self.executor, _execute_sync_module, module.type.to_json(), request_json
                 )
                 return AnalysisRequest.from_json(request_result_json)
             except BrokenProcessPool as e:

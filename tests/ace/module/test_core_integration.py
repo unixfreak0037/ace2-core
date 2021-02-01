@@ -284,7 +284,9 @@ async def test_crashing_sync_analysis_module():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_upgraded_version_async_analysis_module():
+async def test_upgraded_version_analysis_module():
+    # NOTE for this one we don't need to test both sync and async because
+    # this check comes before analysis module execution (same for both)
     step_1 = asyncio.Event()
 
     class CustomAnalysisModule(AnalysisModule):
@@ -394,5 +396,60 @@ async def test_upgraded_extended_version_async_analysis_module():
     await shutdown_task
 
     root = get_root_analysis(root_2)
+    observable = root.get_observable(observable)
+    assert observable.get_analysis(amt).details["additional_cache_keys"] == ["intel:v2"]
+
+
+class UpgradableAnalysisModule(AnalysisModule):
+    def execute_analysis(self, root, observable):
+        observable.add_analysis(
+            Analysis(type=self.type, details={"additional_cache_keys": self.type.additional_cache_keys})
+        )
+
+    def upgrade(self):
+        self.type.additional_cache_keys = ["intel:v2"]
+
+
+@pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode):
+    """Tests the ability of a sync analysis module to update extended version data."""
+
+    amt = AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"])
+    register_analysis_module_type(amt)
+
+    # we want to bail after the first execution of the module
+    class CustomAnalysisModuleManager(AnalysisModuleManager):
+        async def execute_module(self, *args, **kwargs):
+            try:
+                result = await AnalysisModuleManager.execute_module(self, *args, **kwargs)
+            finally:
+                self.shutdown = True
+
+            return result
+
+    manager = CustomAnalysisModuleManager(concurrency_mode=concurrency_mode)
+    module = UpgradableAnalysisModule(type=amt)
+    manager.add_module(module)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+
+    async def _update_intel():
+        nonlocal manager
+        # wait for the event loop to start
+        await manager.event_loop_starting_event.wait()
+        # update the extended version data for this module type
+        updated_amt = AnalysisModuleType("test", "", additional_cache_keys=["intel:v2"])
+        register_analysis_module_type(updated_amt)
+        # and then submit for analysis
+        root.submit()
+
+    upgrade_task = asyncio.create_task(_update_intel())
+    await manager.run()
+    await upgrade_task
+
+    root = get_root_analysis(root)
     observable = root.get_observable(observable)
     assert observable.get_analysis(amt).details["additional_cache_keys"] == ["intel:v2"]

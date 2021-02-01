@@ -5,3 +5,7 @@ source = ace
 exclude_lines =
     raise NotImplementedError
     @abstractmethod
+omit =
+    ace/error_reporting/context.py
+    ace/error_reporting/encoding.py
+    ace/error_reporting/formatter.py

@@ -284,9 +284,8 @@ async def test_crashing_sync_analysis_module():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_upgraded_async_analysis_module():
+async def test_upgraded_version_async_analysis_module():
     step_1 = asyncio.Event()
-    step_2 = asyncio.Event()
 
     class CustomAnalysisModule(AnalysisModule):
         def execute_analysis(self, root, observable):
@@ -295,8 +294,6 @@ async def test_upgraded_async_analysis_module():
             if not step_1.is_set():
                 step_1.set()
                 return
-
-            step_2.set()
 
     amt = ace.api.analysis.AnalysisModuleType("test", "", version="1.0.0")
     register_analysis_module_type(amt)
@@ -320,18 +317,82 @@ async def test_upgraded_async_analysis_module():
         register_analysis_module_type(updated_amt)
         root_2.submit()
 
+    upgrade_task = asyncio.create_task(_upgrade())
+    await manager.run()
+    await upgrade_task
+
+    # in this case the version mismatch just causes the manger to exit
+    root = get_root_analysis(root_2)
+    observable = root.get_observable(observable)
+    # so no analysis should be seen
+    assert observable.get_analysis(amt) is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_upgraded_extended_version_async_analysis_module():
+    """Tests the ability of an analysis module to update extended version data."""
+
+    #
+    # in this case the first call to get_next_analysis_request fails
+    # but the module.upgrade() is called
+    # since the work task is not acquired it stays in the queue
+    # until the event_loop comes back around with the correct extended version data
+    #
+
+    step_1 = asyncio.Event()
+    step_2 = asyncio.Event()
+
+    class CustomAnalysisModule(AnalysisModule):
+        def execute_analysis(self, root, observable):
+            nonlocal step_1
+            observable.add_analysis(
+                Analysis(type=self.type, details={"additional_cache_keys": self.type.additional_cache_keys})
+            )
+            if not step_1.is_set():
+                step_1.set()
+                return
+
+            step_2.set()
+
+        def upgrade(self):
+            self.type.additional_cache_keys = ["intel:v2"]
+
+    amt = ace.api.analysis.AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"])
+    register_analysis_module_type(amt)
+
+    manager = AnalysisModuleManager()
+    module = CustomAnalysisModule(type=amt)
+    manager.add_module(module)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    root_2 = RootAnalysis()
+    observable_2 = root_2.add_observable("test", "test")
+
+    async def _update_intel():
+        nonlocal step_1
+        nonlocal root_2
+        await step_1.wait()
+        # update the extended version data for this module type
+        updated_amt = ace.api.analysis.AnalysisModuleType("test", "", additional_cache_keys=["intel:v2"])
+        register_analysis_module_type(updated_amt)
+        root_2.submit()
+
     async def _shutdown():
         nonlocal step_2
         nonlocal manager
         await step_2.wait()
         manager.stop()
 
-    upgrade_task = asyncio.create_task(_upgrade())
-    shutdown_task = asyncio.create_task(_upgrade())
+    upgrade_task = asyncio.create_task(_update_intel())
+    shutdown_task = asyncio.create_task(_shutdown())
     await manager.run()
     await upgrade_task
     await shutdown_task
 
     root = get_root_analysis(root_2)
     observable = root.get_observable(observable)
-    assert observable.get_analysis(amt) is None
+    assert observable.get_analysis(amt).details["additional_cache_keys"] == ["intel:v2"]

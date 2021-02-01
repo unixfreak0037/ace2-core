@@ -6,7 +6,7 @@ import multiprocessing
 import uuid
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union
 
 from ace.api import get_api
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable, Analysis
@@ -17,21 +17,28 @@ class AnalysisModule:
     Override the execute_analysis function to implement analysis logic.
     Override the upgrade function to implement custom upgrade logic."""
 
-    type: Optional[AnalysisModuleType] = None
+    type: AnalysisModuleType = None
+    limit: int = 3
+    timeout: Union[float, int] = None
 
-    def __init__(self, type: Optional[AnalysisModuleType] = None, limit: Optional[int] = None):
-        if type is None:
-            self.type = AnalysisModuleType(f"anonymous-{uuid.uuid4()}", "")
-        else:
+    def __init__(
+        self, type: Optional[AnalysisModuleType] = None, limit: Optional[int] = None, timeout: Union[int, float] = None
+    ):
+        if type:
             self.type = type
+        elif self.type is None:
+            self.type = AnalysisModuleType(f"anonymous-{uuid.uuid4()}", "")
 
-        if limit is None:
+        if limit:
+            self.limit = limit
+        elif self.limit is None:
             if self.is_async():
                 self.limit = 3  # XXX ???
             else:
                 self.limit = multiprocessing.cpu_count()
-        else:
-            self.limit = limit
+
+        if timeout:
+            self.timeout = timeout
 
     # def register(self) -> AnalysisModuleType:
     # return get_api().register_analysis_module_type(self.type)

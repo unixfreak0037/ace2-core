@@ -199,7 +199,7 @@ async def test_raised_exception_during_async_analysis():
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt)
 
-    assert analysis.error_message == "RuntimeError: failure"
+    assert analysis.error_message == "testv1.0.0 failed analyzing type test value test: failure"
     assert analysis.stack_trace
 
 
@@ -228,7 +228,7 @@ async def test_raised_exception_during_sync_analysis():
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt)
 
-    assert analysis.error_message == "RuntimeError: failure"
+    assert analysis.error_message == "testv1.0.0 failed analyzing type test value test: failure"
     assert analysis.stack_trace
 
 
@@ -270,13 +270,13 @@ async def test_crashing_sync_analysis_module():
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt_crashing)
 
-    assert analysis.error_message == "crash_test process crashed when analyzing test test"
+    assert analysis.error_message == "crash_testv1.0.0 process crashed when analyzing type test value test"
     assert analysis.stack_trace
 
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt_ok)
 
-    assert analysis.error_message == "ok process crashed when analyzing test test"
+    assert analysis.error_message == "okv1.0.0 process crashed when analyzing type test value test"
     assert analysis.stack_trace
 
 
@@ -447,3 +447,41 @@ async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode):
     root = get_root_analysis(root)
     observable = root.get_observable(observable)
     assert observable.get_analysis(amt).details["additional_cache_keys"] == ["intel:v2"]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_async_module_timeout():
+
+    # define a module that times out immediately
+    class TimeoutAsyncAnalysisModule(AnalysisModule):
+        # define the type for this analysis module
+        type = AnalysisModuleType("test", "")
+        timeout = 0
+
+        # define it as an async module
+        async def execute_analysis(self, root, observable, analysis):
+            await asyncio.sleep(1)  # should fail
+
+    # create an instance of it
+    module = TimeoutAsyncAnalysisModule()
+
+    # register the type to the core
+    register_analysis_module_type(module.type)
+
+    # submit a root for analysis so we create a new job
+    root = ace.analysis.RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    # create a new manager to run our analysis modules
+    manager = AnalysisModuleManager()
+    manager.add_module(module)
+    await manager.run_once()
+
+    # check the results in the core
+    root = get_root_analysis(root)
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(module.type)
+    assert analysis
+    assert analysis.error_message == "testv1.0.0 timed out analyzing type test value test after 0 seconds"

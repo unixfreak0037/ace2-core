@@ -309,6 +309,9 @@ class AnalysisModuleType:
     # if set to True then this analysis module only executes manually
     manual: bool = False
 
+    def __str__(self):
+        return f"{self.name}v{self.version}"
+
     #
     # json serialization
     #

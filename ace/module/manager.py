@@ -342,13 +342,25 @@ class AnalysisModuleManager:
         if module.is_async():
             try:
                 analysis = request.modified_observable.add_analysis(Analysis(type=module.type, details={}))
-                await module.execute_analysis(request.modified_root, request.modified_observable, analysis)
-                return request
-            except Exception as e:
-                logging.error(
-                    f"{module} failed analyzing {request.modified_observable.type} {request.modified_observable.value}: {e}"
+                await asyncio.wait_for(
+                    module.execute_analysis(request.modified_root, request.modified_observable, analysis),
+                    timeout=module.timeout,
                 )
-                return self.process_exception(module, request, e)
+                return request
+            except asyncio.TimeoutError as e:
+                return self.process_exception(
+                    module,
+                    request,
+                    e,
+                    f"{module.type} timed out analyzing type {request.modified_observable.type} value {request.modified_observable.value} after {module.timeout} seconds",
+                )
+            except Exception as e:
+                return self.process_exception(
+                    module,
+                    request,
+                    e,
+                    f"{module.type} failed analyzing type {request.modified_observable.type} value {request.modified_observable.value}: {e}",
+                )
         else:
             try:
                 request_json = request.to_json()
@@ -358,21 +370,22 @@ class AnalysisModuleManager:
                 return AnalysisRequest.from_json(request_result_json)
             except BrokenProcessPool as e:
                 # when this happens you have to create and start a new one
-                logging.error(f"{module} crashed when analyzing {request}")
                 self.process_exception(
                     module,
                     request,
                     e,
-                    error_message=f"{module.type.name} process crashed when analyzing {request.modified_observable.type} {request.modified_observable.value}",
+                    error_message=f"{module.type} process crashed when analyzing type {request.modified_observable.type} value {request.modified_observable.value}",
                 )
                 # we have to start a new executor
                 self.start_executor()
                 return request
             except Exception as e:
-                logging.error(
-                    f"{module} failed analyzing {request.modified_observable.type} {request.modified_observable.value}: {e}"
+                return self.process_exception(
+                    module,
+                    request,
+                    e,
+                    f"{module.type} failed analyzing type {request.modified_observable.type} value {request.modified_observable.value}: {e}",
                 )
-                return self.process_exception(module, request, e)
 
     def process_exception(
         self, module: AnalysisModule, request: AnalysisRequest, e: Exception, error_message: Optional[str] = None
@@ -392,4 +405,5 @@ class AnalysisModuleManager:
         else:
             analysis.error_message = error_message
         analysis.stack_trace = format_error_report(e)
+        logging.error(error_message)
         return request

@@ -70,7 +70,7 @@ class RootAnalysis(ace.analysis.RootAnalysis):
         return ace.analysis.RootAnalysis.from_json(value, _cls_map=get_cls_map())
 
     def discard(self) -> bool:
-        raise NotImplementedError()
+        pass
 
     async def submit(self):
         """Submits this RootAnalysis for analysis."""

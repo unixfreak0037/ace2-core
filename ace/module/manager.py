@@ -81,7 +81,8 @@ def _execute_sync_module(module_type: str, request_json: str) -> str:
     if not module.type.extended_version_matches(amt):
         raise AnalysisModuleTypeExtendedVersionError(amt, module.type)
 
-    module.execute_analysis(request.modified_root, request.modified_observable)
+    analysis = request.modified_observable.add_analysis(Analysis(type=module.type, details={}))
+    module.execute_analysis(request.modified_root, request.modified_observable, analysis)
     return request.to_json()
 
 
@@ -340,7 +341,8 @@ class AnalysisModuleManager:
         request.initialize_result()
         if module.is_async():
             try:
-                await module.execute_analysis(request.modified_root, request.modified_observable)
+                analysis = request.modified_observable.add_analysis(Analysis(type=module.type, details={}))
+                await module.execute_analysis(request.modified_root, request.modified_observable, analysis)
                 return request
             except Exception as e:
                 logging.error(

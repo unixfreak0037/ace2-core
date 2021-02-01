@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ace.api import get_api
-from ace.api.analysis import AnalysisModuleType
+from ace.analysis import RootAnalysis, AnalysisModuleType, Observable, Analysis
 
 
 class AnalysisModule:
@@ -39,7 +39,7 @@ class AnalysisModule:
     def is_async(self) -> bool:
         return inspect.iscoroutinefunction(self.execute_analysis)
 
-    def execute_analysis(self, root, observable) -> bool:
+    def execute_analysis(self, root: RootAnalysis, observable: Observable, analysis: Analysis):
         raise NotImplementedError()
 
     def upgrade(self):

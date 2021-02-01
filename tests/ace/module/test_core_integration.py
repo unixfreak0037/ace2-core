@@ -31,10 +31,8 @@ async def test_basic_analysis_async():
         type = ace.api.analysis.AnalysisModuleType("test", "")
 
         # define it as an async module
-        async def execute_analysis(
-            self, root: ace.api.analysis.RootAnalysis, observable: ace.api.analysis.Observable
-        ) -> bool:
-            analysis = observable.add_analysis(ace.api.analysis.Analysis(type=self.type, details={"test": "test"}))
+        async def execute_analysis(self, root, observable, analysis):
+            analysis.details = {"test": "test"}
             analysis.add_observable("test", "hello")
             return True
 
@@ -70,8 +68,8 @@ class TestSyncAnalysisModule(AnalysisModule):
     type = ace.api.analysis.AnalysisModuleType("test", "")
 
     # define it as an sync module
-    def execute_analysis(self, root: ace.api.analysis.RootAnalysis, observable: ace.api.analysis.Observable) -> bool:
-        analysis = observable.add_analysis(ace.api.analysis.Analysis(type=self.type, details={"test": "test"}))
+    def execute_analysis(self, root, observable, analysis):
+        analysis.details = {"test": "test"}
         analysis.add_observable("test", "hello")
         return True
 
@@ -112,7 +110,7 @@ async def test_force_stop_stuck_async_task():
     control = asyncio.Event()
 
     class CustomAnalysisModule(AnalysisModule):
-        async def execute_analysis(self, root, observable):
+        async def execute_analysis(self, root, observable, analysis):
             nonlocal control
             control.set()
             # get stuck
@@ -144,7 +142,7 @@ async def test_force_stop_stuck_async_task():
 
 
 class StuckAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable):
+    def execute_analysis(self, root, observable, analysis):
         # get stuck
         import time, sys
 
@@ -181,7 +179,7 @@ async def test_force_stop_stuck_sync_task():
 @pytest.mark.asyncio
 async def test_raised_exception_during_async_analysis():
     class CustomAnalysisModule(AnalysisModule):
-        async def execute_analysis(self, root, observable):
+        async def execute_analysis(self, root, observable, analysis):
             raise RuntimeError("failure")
 
     amt = ace.api.analysis.AnalysisModuleType("test", "")
@@ -206,7 +204,7 @@ async def test_raised_exception_during_async_analysis():
 
 
 class FailingAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable):
+    def execute_analysis(self, root, observable, analysis):
         raise RuntimeError("failure")
 
 
@@ -235,15 +233,15 @@ async def test_raised_exception_during_sync_analysis():
 
 
 class CrashingAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable):
+    def execute_analysis(self, root, observable, analysis):
         import os, signal
 
         os.kill(os.getpid(), signal.SIGKILL)
 
 
 class SimpleSyncAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable):
-        observable.add_analysis(Analysis(type=self.type, details={"test": "test"}))
+    def execute_analysis(self, root, observable, analysis):
+        analysis.details = {"test": "test"}
 
 
 @pytest.mark.integration
@@ -290,9 +288,9 @@ async def test_upgraded_version_analysis_module():
     step_1 = asyncio.Event()
 
     class CustomAnalysisModule(AnalysisModule):
-        def execute_analysis(self, root, observable):
+        def execute_analysis(self, root, observable, analysis):
             nonlocal step_1
-            observable.add_analysis(Analysis(type=self.type, details={"version": self.type.version}))
+            analysis.details = {"version": self.type.version}
             if not step_1.is_set():
                 step_1.set()
                 return
@@ -346,11 +344,9 @@ async def test_upgraded_extended_version_async_analysis_module():
     step_2 = asyncio.Event()
 
     class CustomAnalysisModule(AnalysisModule):
-        def execute_analysis(self, root, observable):
+        def execute_analysis(self, root, observable, analysis):
             nonlocal step_1
-            observable.add_analysis(
-                Analysis(type=self.type, details={"additional_cache_keys": self.type.additional_cache_keys})
-            )
+            analysis.details = {"additional_cache_keys": self.type.additional_cache_keys}
             if not step_1.is_set():
                 step_1.set()
                 return
@@ -401,10 +397,8 @@ async def test_upgraded_extended_version_async_analysis_module():
 
 
 class UpgradableAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable):
-        observable.add_analysis(
-            Analysis(type=self.type, details={"additional_cache_keys": self.type.additional_cache_keys})
-        )
+    def execute_analysis(self, root, observable, analysis):
+        analysis.details = {"additional_cache_keys": self.type.additional_cache_keys}
 
     def upgrade(self):
         self.type.additional_cache_keys = ["intel:v2"]

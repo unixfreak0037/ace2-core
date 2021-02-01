@@ -2,14 +2,45 @@
 
 The ACE core library provides base classes and utilities for developing analysis modules. They are provided as a means to accelerate development. You do not need to use them (see [this guide instead.]())
 
-## Overview
+## TL;DR
 
-You create new analysis modules by
+### Step 1: Define the Module Type
 
-- defining a new *type* of analysis
-- creating the Python code that implements the analysis
-- registering the new type with an executing core
-- starting an *analysis module manager* with the new module loaded
+```python
+from ace.analysis import AnalysisModuleType
+amt = AnalysisModuleType(
+    name="example_analysis",
+    description="Example analysis module type."
+)
+```
+
+### Step 2: Define the Analysis Module
+
+```python
+from ace.module.base import AnalysisModule
+class ExampleAnalysisModule(AnalysisModule):
+    type = amt
+    def execute_analysis(self, root, observable, analysis):
+        analysis.details = {"Hello": "World"}
+        observable = analysis.add_observable("ipv4", "1.2.3.4")
+        observable.add_detection_point("lol evil ip")
+```
+
+### Step 3: Register the Module Type
+
+```python
+from ace.api import get_api
+get_api().register_analysis_module_type(amt)
+```
+
+### Step 4: Run an Analysis Module Manager
+
+```python
+from ace.module.manager import AnalysisModuleManager
+manager = AnalysisModuleManager()
+manager.add_module(ExampleAnalysisModule())
+manager.run()
+```
 
 ## Analysis Module Type
 
@@ -29,8 +60,10 @@ Note that the **type** is separate from the implementation.
 A simple example of an analysis module that does nothing is as follows.
 
 ```python
-class MyAnalysisModule(AnalysisModule):
-    type = AnalysisModuleType(name="my_analysis_module", description="My Analysis Module")
+class ExampleAnalysisModule(AnalysisModule):
+    type = AnalysisModuleType(
+        name="example_analysis_module", 
+        description="Example analysis module that does nothing.")
 
     def execute_analysis(self, root, observable, analysis):
         pass
@@ -41,8 +74,10 @@ class MyAnalysisModule(AnalysisModule):
 Override and use the `load` function to load additional resources such as signatures and resource files.
 
 ```python
-class MyAnalysisModule(AnalysisModule):
-    type = AnalysisModuleType(name="my_analysis_module", description="My Analysis Module")
+class ExampleAnalysisModule(AnalysisModule):
+    type = AnalysisModuleType(
+        name="example_analysis_module", 
+        description="Example analysis module that does nothing.")
 
     def execute_analysis(self, root, observable, analysis):
         pass
@@ -53,23 +88,52 @@ class MyAnalysisModule(AnalysisModule):
         # open network connections
 ```
 
+## Upgrading
+
+Override the `upgrade` function to re-load any data needed to compute the analysis. This is useful for analysis modules that use external data such as signatures and rule sets.
+
+```python
+class ExampleAnalysisModule(AnalysisModule):
+    type = AnalysisModuleType(
+        name="example_analysis_module", 
+        description="Example analysis module that does nothing.")
+
+    def execute_analysis(self, root, observable, analysis):
+        pass
+
+    def upgrade(self):
+        # (for example)
+        self.rules = self.load_my_rule_set()
+```
+
 ## Async vs Sync
 
 The ACE core library supports analysis modules written to taken advantage of the `asyncio` library.
 
-If you prepend `async` to `execute_analysis` then the module will be considered `async`. Otherwise the module is considered `sync`.
+If you prepend `async` to `execute_analysis`, `upgrade` and `load` then the module will be considered `async`. Otherwise the module is considered `sync`.
 
 Modules that are `sync` are executed on their own process. Modules that are `async` are executed as part of the `asyncio` event loop.
 
 ```python
 # define an analysis module that uses asyncio
-class MyAsyncAnalysisModule(AnalysisModule):
-    type = AnalysisModuleType("async_module", "")
+class ExampleAsyncAnalysisModule(AnalysisModule):
+    type = AnalysisModuleType(
+        name="async_module", 
+        description="Example async analysis module."
+    )
 
     async def execute_analysis(self, root, observable, analysis):
-        # do async stuff
+        # do async analysis
+
+    async def upgrade(self):
+        # do async upgrade
+
+    async def load(self):
+        # do async load
 
 ```
+
+You can also use the `AsyncAnalysisModule` class which already has the function definitions set up correctly (meaning you don't have to override upgrade and load if you're not using them.)
 
 ## Analysis
 

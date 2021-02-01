@@ -4,22 +4,20 @@
 from ace.api import get_api
 from ace.api.analysis import AnalysisModuleType
 from ace.api.local import LocalAceAPI
-from ace.module.base import AnalysisModule
+from ace.module.base import AnalysisModule, AsyncAnalysisModule
 from ace.module.manager import AnalysisModuleManager, SCALE_UP, SCALE_DOWN, NO_SCALING
 
 import pytest
 
 
-class CustomAnalysisModule(AnalysisModule):
-    pass
-
-
-class CustomAnalysisModule2(AnalysisModule):
-    pass
-
-
 @pytest.mark.unit
 def test_add_module():
+    class CustomAnalysisModule(AsyncAnalysisModule):
+        pass
+
+    class CustomAnalysisModule2(AsyncAnalysisModule):
+        pass
+
     manager = AnalysisModuleManager()
     module = CustomAnalysisModule()
     assert manager.add_module(module) is module
@@ -43,26 +41,28 @@ async def test_verify_registration():
     assert await get_api().register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager()
-    manager.add_module(CustomAnalysisModule(amt))
+    manager.add_module(AsyncAnalysisModule(amt))
     assert await manager.verify_registration()
     # missing registration
     amt = AnalysisModuleType("missing", "")
     manager = AnalysisModuleManager()
-    manager.add_module(CustomAnalysisModule(amt))
+    manager.add_module(AsyncAnalysisModule(amt))
     assert not await manager.verify_registration()
+    assert not await manager.run()
     # version mismatch
     amt = AnalysisModuleType("test", "", version="1.0.1")
     manager = AnalysisModuleManager()
-    manager.add_module(CustomAnalysisModule(amt))
+    manager.add_module(AsyncAnalysisModule(amt))
     assert not await manager.verify_registration()
+    assert not await manager.run()
     # extended version mismatch
     amt = AnalysisModuleType("test", "", additional_cache_keys=["yara:71bec09d78fe6abdb94244a4cc89c740"])
     manager = AnalysisModuleManager()
-    manager.add_module(CustomAnalysisModule(amt))
+    manager.add_module(AsyncAnalysisModule(amt))
     assert not await manager.verify_registration()
     # extended version mismatch but upgrade ok
-    class UpgradableAnalysisModule(AnalysisModule):
-        def upgrade(self):
+    class UpgradableAnalysisModule(AsyncAnalysisModule):
+        async def upgrade(self):
             self.type.additional_cache_keys = ["yara:6f5902ac237024bdd0c176cb93063dc4"]
 
     # starts out with the wrong set of yara rules but upgrade() fixes that

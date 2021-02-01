@@ -11,6 +11,8 @@ from typing import Optional, Union
 from ace.api import get_api
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable, Analysis
 
+DEFAULT_ASYNC_LIMIT = 3  # XXX ???
+
 
 class AnalysisModule:
     """Base class for analysis modules.
@@ -18,7 +20,7 @@ class AnalysisModule:
     Override the upgrade function to implement custom upgrade logic."""
 
     type: AnalysisModuleType = None
-    limit: int = 3
+    limit: int = None
     timeout: Union[float, int] = None
 
     def __init__(
@@ -33,7 +35,7 @@ class AnalysisModule:
             self.limit = limit
         elif self.limit is None:
             if self.is_async():
-                self.limit = 3  # XXX ???
+                self.limit = DEFAULT_ASYNC_LIMIT
             else:
                 self.limit = multiprocessing.cpu_count()
 
@@ -58,3 +60,14 @@ class AnalysisModule:
 
     def __hash__(self):
         return self.type.name.__hash__()
+
+
+class AsyncAnalysisModule(AnalysisModule):
+    async def execute_analysis(self, root: RootAnalysis, observable: Observable, analysis: Analysis):
+        raise NotImplementedError()
+
+    async def upgrade(self):
+        pass
+
+    async def load(self):
+        pass

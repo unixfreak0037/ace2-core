@@ -15,7 +15,7 @@ from ace.analysis import RootAnalysis, Observable
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.analysis_module import register_analysis_module_type
 from ace.api.analysis import AnalysisModuleType, Analysis
-from ace.module.base import AnalysisModule
+from ace.module.base import AnalysisModule, AsyncAnalysisModule
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
 
 import pytest
@@ -26,7 +26,7 @@ import pytest
 async def test_basic_analysis_async():
 
     # basic analysis module
-    class TestAsyncAnalysisModule(AnalysisModule):
+    class TestAsyncAnalysisModule(AsyncAnalysisModule):
         # define the type for this analysis module
         type = ace.api.analysis.AnalysisModuleType("test", "")
 
@@ -109,7 +109,7 @@ async def test_basic_analysis_sync(concurrency_mode):
 async def test_force_stop_stuck_async_task():
     control = asyncio.Event()
 
-    class CustomAnalysisModule(AnalysisModule):
+    class CustomAnalysisModule(AsyncAnalysisModule):
         async def execute_analysis(self, root, observable, analysis):
             nonlocal control
             control.set()
@@ -178,7 +178,7 @@ async def test_force_stop_stuck_sync_task():
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_raised_exception_during_async_analysis():
-    class CustomAnalysisModule(AnalysisModule):
+    class CustomAnalysisModule(AsyncAnalysisModule):
         async def execute_analysis(self, root, observable, analysis):
             raise RuntimeError("failure")
 
@@ -343,8 +343,8 @@ async def test_upgraded_extended_version_async_analysis_module():
     step_1 = asyncio.Event()
     step_2 = asyncio.Event()
 
-    class CustomAnalysisModule(AnalysisModule):
-        def execute_analysis(self, root, observable, analysis):
+    class CustomAnalysisModule(AsyncAnalysisModule):
+        async def execute_analysis(self, root, observable, analysis):
             nonlocal step_1
             analysis.details = {"additional_cache_keys": self.type.additional_cache_keys}
             if not step_1.is_set():
@@ -353,7 +353,7 @@ async def test_upgraded_extended_version_async_analysis_module():
 
             step_2.set()
 
-        def upgrade(self):
+        async def upgrade(self):
             self.type.additional_cache_keys = ["intel:v2"]
 
     amt = ace.api.analysis.AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"])
@@ -449,12 +449,38 @@ async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode):
     assert observable.get_analysis(amt).details["additional_cache_keys"] == ["intel:v2"]
 
 
+@pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_upgrade_analysis_module_failure(concurrency_mode):
+
+    amt = AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"])
+    register_analysis_module_type(amt)
+
+    class CustomAnalysisModule(AnalysisModule):
+        async def execute_analysis(self, *args, **kwargs):
+            pass
+
+        async def upgrade(self):
+            raise RuntimeError()
+
+    manager = AnalysisModuleManager(concurrency_mode=concurrency_mode)
+    module = CustomAnalysisModule(type=amt)
+    manager.add_module(module)
+
+    amt = AnalysisModuleType("test", "", additional_cache_keys=["intel:v2"])
+    register_analysis_module_type(amt)
+
+    # this should fail since the upgrade fails
+    assert not await manager.run()
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_async_module_timeout():
 
     # define a module that times out immediately
-    class TimeoutAsyncAnalysisModule(AnalysisModule):
+    class TimeoutAsyncAnalysisModule(AsyncAnalysisModule):
         # define the type for this analysis module
         type = AnalysisModuleType("test", "")
         timeout = 0

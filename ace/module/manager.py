@@ -86,13 +86,22 @@ def _execute_sync_module(module_type: str, request_json: str) -> str:
     return request.to_json()
 
 
+def _upgrade_sync_module(amt_json: str) -> str:
+    if not sync_module_map:
+        raise RuntimeError("_upgrade_sync_module called before _initialize_executor")
+
+    amt = AnalysisModuleType.from_json(amt_json)
+    module = sync_module_map[amt.name]
+    module.upgrade()
+    return module.type.to_json()
+
+
 class AnalysisModuleManager:
     """Executes and manages ace.module.AnalysisModule objects."""
 
     def __init__(self, concurrency_mode=CONCURRENCY_MODE_THREADED, wait_time=0):
         # the analysis modules this manager is running
         self.analysis_modules = []
-        self.analysis_module_map = {}  # key = AnalysisModule.type.name, value = AnalysisModule
 
         # current list of tasks
         self.module_tasks = []  # asyncio.Task
@@ -143,17 +152,24 @@ class AnalysisModuleManager:
                 continue
 
             # is the version we have for this module different than the version already registered?
-            if not self.analysis_module_map[existing_type.name].type.version_matches(existing_type):
+            if not module.type.version_matches(existing_type):
                 logging.critical(f"analysis module type {module.type.name} has a different version")
                 verification_ok = False
                 continue
 
             # is the extended version different?
-            if not self.analysis_module_map[existing_type.name].type.extended_version_matches(existing_type):
+            if not module.type.extended_version_matches(existing_type):
                 # try to upgrade the module
-                self.analysis_module_map[existing_type.name].upgrade()
+                if module.is_async():
+                    await self.upgrade_module(module)
+                else:
+                    # NOTE this is blocking the async loop
+                    # it's OK because this only gets called when the manager starts up
+                    # you can't call self.upgrade_module() on sync modules until you've fully initialize the executor
+                    module.upgrade()
+
                 # is it still different?
-                if not self.analysis_module_map[existing_type.name].type.extended_version_matches(existing_type):
+                if not module.type.extended_version_matches(existing_type):
                     logging.critical(
                         f"analysis module type {module.type.name} has a different extended version after upgrade"
                     )
@@ -176,7 +192,6 @@ class AnalysisModuleManager:
         Returns the added module, or None if the module already existed."""
         if type(module) not in [type(_) for _ in self.analysis_modules]:
             self.analysis_modules.append(module)
-            self.analysis_module_map[module.type.name] = module
             self.module_task_count[module] = 0
             return module
         else:
@@ -199,9 +214,6 @@ class AnalysisModuleManager:
 
         if self.module_task_count[module] < module.limit:
             self._new_module_task(module, whoami)
-            if module not in self.module_task_count:
-                self.module_task_count[module] = 0
-
             self.module_task_count[module] += 1
         else:
             pass  # TODO notify we are trying to scale above the limit
@@ -288,6 +300,27 @@ class AnalysisModuleManager:
         self.shutdown = True
         self.immediate_shutdown = True
 
+    async def upgrade_module(self, module: AnalysisModule) -> bool:
+        """Attempts to upgrade the extended version of the analysis module.
+        Returns True if the upgrade was successful, False otherwise."""
+
+        # if the module is async then we attempt to upgrade it here
+        try:
+            if module.is_async():
+                await module.upgrade()
+            else:
+                module.type = AnalysisModuleType.from_json(
+                    await asyncio.get_event_loop().run_in_executor(
+                        self.executor, _upgrade_sync_module, module.type.to_json()
+                    )
+                )
+
+            return True
+
+        except Exception as e:
+            logging.error(f"unable to upgrade module {module.type}: {e}")
+            return False
+
     async def module_loop(self, module: AnalysisModule, whoami: str):
         """Entrypoint for analysis module execution."""
         request = None
@@ -295,17 +328,12 @@ class AnalysisModuleManager:
         try:
             request = await get_api().get_next_analysis_request(whoami, module.type, self.wait_time)
         except AnalysisModuleTypeExtendedVersionError as e:
-            logging.info(f"module {module.type.name} has invalid extended version: {e}")
-
-            # attempt to upgrade the module
-            try:
-                module.upgrade()
-            except Exception as e:
-                logging.error(f"unable to upgrade module {module.type.name}: {e}")
+            logging.warning(f"module {module.type.name} has invalid extended version: {e}")
+            if not await self.upgrade_module(module):
                 self.shutdown = True
 
         except AnalysisModuleTypeVersionError as e:
-            logging.info(f"module {module.type.name} has invalid version: {e}")
+            logging.error(f"module {module.type.name} has invalid version: {e}")
             self.shutdown = True
 
         scaling = self.compute_scaling(module)

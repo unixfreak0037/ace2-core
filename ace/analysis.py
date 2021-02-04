@@ -314,7 +314,7 @@ class AnalysisModuleType:
     manual: bool = False
 
     def __post_init__(self):
-        self.compiled_conditions = {} # key = condition, value = compiled (something)
+        self.compiled_conditions = {}  # key = condition, value = compiled (something)
 
     def __str__(self):
         return f"{self.name}v{self.version}"
@@ -445,36 +445,56 @@ class AnalysisModuleType:
         # condition format is type:value
         _type, _value = condition.split(":", 1)
 
-        if _type == 're':
+        # regular expression condition
+        if _type == "re":
             # compile regex if we haven't already
             if condition not in self.compiled_conditions:
                 try:
                     self.compiled_conditions[condition] = re.compile(_value)
                 except Exception as e:
+                    self.compiled_conditions[condition] = False
                     logging.error(f"regex condition {_value} from type {self.name} compliation failure: {e}")
-                    return False
 
+            # if we failed to compile then the condition fails
+            if not self.compiled_conditions[condition]:
+                return False
+
+            # to buffer to scan with the regex is the pretty-printed dict of the root
             pp = pprint.PrettyPrinter(indent=4, sort_dicts=True)
             target_buffer = pp.pformat(observable.root.to_dict())
             return self.compiled_conditions[condition].search(target_buffer, re.S)
 
-        elif _type == 'py3':
+        # python condition
+        elif _type == "py3":
             # compile python code if we haven't already
             if condition not in self.compiled_conditions:
                 try:
-                    self.compiled_conditions[condition] = compile(_value, self.name, 'eval')
+                    self.compiled_conditions[condition] = compile(_value, self.name, "eval")
                 except Exception as e:
                     logging.error(f"python condition from type {self.name} compliation failure: {e}")
-                    return False
+                    self.compiled_conditions[condition] = False
+
+            # if we failed to compile then the condition fails
+            if not self.compiled_conditions[condition]:
+                return False
 
             try:
-                return bool(eval(self.compiled_conditions[condition], {}, {
-                    'observable': observable,
-                    'amt': self,
-                }))
+                # on two local variables are available to the python snippit:
+                # observable and analysis module type
+                return bool(
+                    eval(
+                        self.compiled_conditions[condition],
+                        {},
+                        {
+                            "observable": observable,
+                            "amt": self,
+                        },
+                    )
+                )
             except Exception as e:
                 logging.error(f"python condition from type {self.name} failed to execute: {e}")
                 return False
+
 
 class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
     """Represents an output of analysis work."""

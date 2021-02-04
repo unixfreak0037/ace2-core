@@ -200,12 +200,12 @@ class TempAnalysisModuleType(AnalysisModuleType):
         ),
         # regex conditions
         (
-            TempAnalysisModuleType(conditions=['re:test']),
+            TempAnalysisModuleType(conditions=["re:test"]),
             RootAnalysis().add_observable("test", "test"),
             True,
         ),
         (
-            TempAnalysisModuleType(conditions=['re:t3st']),
+            TempAnalysisModuleType(conditions=["re:t3st"]),
             RootAnalysis().add_observable("test", "test"),
             False,
         ),
@@ -216,7 +216,19 @@ class TempAnalysisModuleType(AnalysisModuleType):
             True,
         ),
         (
-            TempAnalysisModuleType(conditions=['py3:False']),
+            TempAnalysisModuleType(conditions=["py3:False"]),
+            RootAnalysis().add_observable("test", "test"),
+            False,
+        ),
+        # invalid python compilation
+        (
+            TempAnalysisModuleType(conditions=['py3:observable.type == "test" sand observable.value == "test"']),
+            RootAnalysis().add_observable("test", "test"),
+            False,
+        ),
+        # invalid python execution
+        (
+            TempAnalysisModuleType(conditions=['py3:observable.sype == "test" and observable.value == "test"']),
             RootAnalysis().add_observable("test", "test"),
             False,
         ),

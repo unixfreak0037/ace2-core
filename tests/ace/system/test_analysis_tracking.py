@@ -17,6 +17,7 @@ from ace.system.analysis_tracking import (
     root_analysis_exists,
     track_analysis_details,
     track_root_analysis,
+    update_root_analysis,
     UnknownRootAnalysisError,
 )
 
@@ -31,10 +32,41 @@ def test_track_root_analysis():
     track_root_analysis(root)
     # root should be tracked
     assert get_root_analysis(root.uuid) == root
+    # should be OK to do twice
+    track_root_analysis(root)
+    assert get_root_analysis(root.uuid) == root
     # clear it out
     assert delete_root_analysis(root.uuid)
     # make sure it's gone
     assert get_root_analysis(root.uuid) is None
+
+
+@pytest.mark.integration
+def test_update_root_analysis():
+    root = RootAnalysis(desc="test 1")
+    track_root_analysis(root)
+    assert get_root_analysis(root.uuid) == root
+    old_root = get_root_analysis(root.uuid)
+    current_version = root.version
+    root.description = "test 2"
+    assert update_root_analysis(root)
+    # version should have updated
+    assert current_version != root.version
+    # and description should have changed
+    assert get_root_analysis(root.uuid).description == "test 2"
+    # don't change anything and it should still work
+    current_version = root.version
+    assert update_root_analysis(root)
+    # only the version changes
+    assert current_version != root.version
+
+    # now with the old copy try to set the description
+    assert old_root.version != root.version
+    old_root.description = "test 3"
+    # this should fail since the version is out of date
+    assert not update_root_analysis(old_root)
+    # the description should NOT have changed
+    assert get_root_analysis(root.uuid).description == "test 2"
 
 
 @pytest.mark.unit

@@ -62,6 +62,7 @@ class RootAnalysisTracking(Base):
     }
 
     uuid = Column(String(36), unique=True, primary_key=True)
+    version = Column(String(36), unique=False, primary_key=False, index=True)
 
     json_data = Column(Text, nullable=False)
 

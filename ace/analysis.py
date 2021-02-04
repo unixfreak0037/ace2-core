@@ -1619,7 +1619,7 @@ class RootAnalysis(Analysis, MergableObject):
         analysis_mode=None,
         queue=None,
         instructions=None,
-        version=0,
+        version=None,
         expires=None,
         *args,
         **kwargs,
@@ -1639,7 +1639,7 @@ class RootAnalysis(Analysis, MergableObject):
         if uuid:
             self.uuid = uuid
 
-        self._version = 0
+        self._version = None
         if version is not None:
             self.version = version
 
@@ -1814,13 +1814,12 @@ class RootAnalysis(Analysis, MergableObject):
 
     @property
     def version(self) -> int:
-        """Returns the current version of this RootAnalysis object.
-        The version starts at 0 and increments every time the object is modified and saved."""
+        """Returns the current version of this RootAnalysis object."""
         return self._version
 
     @version.setter
-    def version(self, value: int):
-        assert isinstance(value, int) and value >= 0
+    def version(self, value: str):
+        assert value is None or isinstance(value, str) and value
         self._version = value
 
     @property
@@ -2038,10 +2037,12 @@ class RootAnalysis(Analysis, MergableObject):
         logging.debug("recorded observable {} with id {}".format(observable, observable.uuid))
         return observable
 
-    def save(self):
+    def save(self) -> bool:
+        """Tracks or updates this root. Returns True if successful, False otherwise."""
         from ace.system.analysis_tracking import track_root_analysis
 
-        track_root_analysis(self)
+        if not track_root_analysis(self):
+            return False
 
         for analysis in self.all_analysis:
             if analysis is not self:

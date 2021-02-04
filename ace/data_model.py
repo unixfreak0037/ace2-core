@@ -246,12 +246,13 @@ class RootAnalysisModel(AnalysisModel, BaseModel):
         into."""
     )
     instructions: Optional[str] = Field(
+        default_factory=lambda: str(uuid.uuid4()),
         description="""An optional human readable list of instructions that an
-        analyst should perform when manually reviewing this alert."""
+        analyst should perform when manually reviewing this alert.""",
     )
-    version: Optional[int] = Field(
-        description="""An optional version number that automatically increments
-        every time the root is modified."""
+    version: Optional[str] = Field(
+        description="""An optional version string that automatically changes
+        every time the root is modified. The version must match when updating."""
     )
     expires: Optional[bool] = Field(
         False,

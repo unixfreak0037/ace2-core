@@ -2,6 +2,7 @@
 #
 
 import logging
+import uuid
 
 from typing import Union, Any, Optional
 
@@ -31,8 +32,17 @@ class AnalysisTrackingInterface(ACESystemInterface):
         """Returns the root for the given uuid or None if it does not exist.."""
         raise NotImplementedError()
 
-    def track_root_analysis(self, root: RootAnalysis):
-        """Tracks the given root to the given RootAnalysis uuid."""
+    def track_root_analysis(self, root: RootAnalysis) -> bool:
+        """Tracks the root analysis, returns True if it worked. Updates the
+        version property of the root."""
+        raise NotImplementedError()
+
+    def update_root_analysis(self, root: RootAnalysis) -> bool:
+        """Updates the root. Returns True if the update was successful, False
+        otherwise. Updates the version property of the root.
+
+        The version of the root passed in must match the version on record for
+        the update to work."""
         raise NotImplementedError()
 
     def delete_root_analysis(self, uuid: str) -> bool:
@@ -71,7 +81,8 @@ def get_root_analysis(root: Union[RootAnalysis, str]) -> Union[RootAnalysis, Non
     return get_system().analysis_tracking.get_root_analysis(root)
 
 
-def track_root_analysis(root: RootAnalysis):
+def track_root_analysis(root: RootAnalysis) -> bool:
+    """Inserts or updates the root analysis. Returns True if either operation is successfull."""
     assert isinstance(root, RootAnalysis)
     from ace.system.storage import track_content_root
 
@@ -79,17 +90,34 @@ def track_root_analysis(root: RootAnalysis):
         raise ValueError(f"uuid property of {root} is None in track_root_analysis")
 
     logging.debug(f"tracking root {root}")
-    exists = root_analysis_exists(root)
-    get_system().analysis_tracking.track_root_analysis(root)
+    if not get_system().analysis_tracking.track_root_analysis(root):
+        return update_root_analysis(root)
 
     # make sure storage content is tracked to their roots
     for observable in root.get_observables_by_type("file"):
         track_content_root(observable.value, root)
 
-    if not exists:
-        fire_event(EVENT_ANALYSIS_ROOT_NEW, root)
-    else:
-        fire_event(EVENT_ANALYSIS_ROOT_MODIFIED, root)
+    fire_event(EVENT_ANALYSIS_ROOT_NEW, root)
+    return True
+
+
+def update_root_analysis(root: RootAnalysis) -> bool:
+    assert isinstance(root, RootAnalysis)
+    from ace.system.storage import track_content_root
+
+    if root.uuid is None:
+        raise ValueError(f"uuid property of {root} is None in update_root_analysis")
+
+    logging.debug(f"updating root {root} with version {root.version}")
+    if not get_system().analysis_tracking.update_root_analysis(root):
+        return False
+
+    # make sure storage content is tracked to their roots
+    for observable in root.get_observables_by_type("file"):
+        track_content_root(observable.value, root)
+
+    fire_event(EVENT_ANALYSIS_ROOT_MODIFIED, root)
+    return True
 
 
 def delete_root_analysis(root: Union[RootAnalysis, str]) -> bool:

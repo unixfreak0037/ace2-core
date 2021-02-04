@@ -66,6 +66,10 @@ class AnalysisModuleTypeModel(BaseModel):
     The analysis_mode property of the RootAnalysis must be set to one of these values.
     An empty list means that this module runs in all analysis modes.""",
     )
+    conditions: list[str] = Field(
+        default_factory=list,
+        description="""TODO""",
+    )
     version: str = Field(
         "1.0.0",
         description="""Free form version of the module.

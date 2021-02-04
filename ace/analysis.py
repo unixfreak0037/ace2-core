@@ -8,10 +8,12 @@ import json
 import logging
 import os
 import os.path
+import pprint
+import re
 import shutil
 import sys
-import uuid
 import tempfile
+import uuid
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
@@ -292,6 +294,8 @@ class AnalysisModuleType:
     tags: list[str] = field(default_factory=list)
     # list of valid analysis modes
     modes: list[str] = field(default_factory=list)
+    # see TODO (insert link to conditions documentation)
+    conditions: list[str] = field(default_factory=list)
     # the current version of the analysis module type
     version: str = "1.0.0"
     # how long this analysis module has before it times out (in seconds)
@@ -308,6 +312,9 @@ class AnalysisModuleType:
     types: list[str] = field(default_factory=list)
     # if set to True then this analysis module only executes manually
     manual: bool = False
+
+    def __post_init__(self):
+        self.compiled_conditions = {}  # key = condition, value = compiled (something)
 
     def __str__(self):
         return f"{self.name}v{self.version}"
@@ -414,6 +421,11 @@ class AnalysisModuleType:
             if not observable.analysis_completed(amt):
                 return False
 
+        # AND
+        for condition in self.conditions:
+            if not self.condition_satisfied(condition, observable):
+                return False
+
         # has this observable been limited to specific analysis modules?
         if observable.limited_analysis:
             for amt in observable.limited_analysis:
@@ -425,6 +437,63 @@ class AnalysisModuleType:
             return False
 
         return True
+
+    def condition_satisfied(self, condition: str, observable: "Observable") -> bool:
+        """Returns True if the given conditino is satisfied by the observable, False otherwise.
+        TODO link to condition documentation."""
+
+        # condition format is type:value
+        _type, _value = condition.split(":", 1)
+
+        # regular expression condition
+        if _type == "re":
+            # compile regex if we haven't already
+            if condition not in self.compiled_conditions:
+                try:
+                    self.compiled_conditions[condition] = re.compile(_value)
+                except Exception as e:
+                    self.compiled_conditions[condition] = False
+                    logging.error(f"regex condition {_value} from type {self.name} compliation failure: {e}")
+
+            # if we failed to compile then the condition fails
+            if not self.compiled_conditions[condition]:
+                return False
+
+            # to buffer to scan with the regex is the pretty-printed dict of the root
+            pp = pprint.PrettyPrinter(indent=4, sort_dicts=True)
+            target_buffer = pp.pformat(observable.root.to_dict())
+            return self.compiled_conditions[condition].search(target_buffer, re.S)
+
+        # python condition
+        elif _type == "py3":
+            # compile python code if we haven't already
+            if condition not in self.compiled_conditions:
+                try:
+                    self.compiled_conditions[condition] = compile(_value, self.name, "eval")
+                except Exception as e:
+                    logging.error(f"python condition from type {self.name} compliation failure: {e}")
+                    self.compiled_conditions[condition] = False
+
+            # if we failed to compile then the condition fails
+            if not self.compiled_conditions[condition]:
+                return False
+
+            try:
+                # on two local variables are available to the python snippit:
+                # observable and analysis module type
+                return bool(
+                    eval(
+                        self.compiled_conditions[condition],
+                        {},
+                        {
+                            "observable": observable,
+                            "amt": self,
+                        },
+                    )
+                )
+            except Exception as e:
+                logging.error(f"python condition from type {self.name} failed to execute: {e}")
+                return False
 
 
 class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):

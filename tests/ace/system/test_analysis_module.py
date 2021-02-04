@@ -198,6 +198,40 @@ class TempAnalysisModuleType(AnalysisModuleType):
             RootAnalysis().add_observable(Observable("test", "test", requested_analysis=["test"])),
             True,
         ),
+        # regex conditions
+        (
+            TempAnalysisModuleType(conditions=["re:test"]),
+            RootAnalysis().add_observable("test", "test"),
+            True,
+        ),
+        (
+            TempAnalysisModuleType(conditions=["re:t3st"]),
+            RootAnalysis().add_observable("test", "test"),
+            False,
+        ),
+        # python conditions
+        (
+            TempAnalysisModuleType(conditions=['py3:observable.type == "test" and observable.value == "test"']),
+            RootAnalysis().add_observable("test", "test"),
+            True,
+        ),
+        (
+            TempAnalysisModuleType(conditions=["py3:False"]),
+            RootAnalysis().add_observable("test", "test"),
+            False,
+        ),
+        # invalid python compilation
+        (
+            TempAnalysisModuleType(conditions=['py3:observable.type == "test" sand observable.value == "test"']),
+            RootAnalysis().add_observable("test", "test"),
+            False,
+        ),
+        # invalid python execution
+        (
+            TempAnalysisModuleType(conditions=['py3:observable.sype == "test" and observable.value == "test"']),
+            RootAnalysis().add_observable("test", "test"),
+            False,
+        ),
         # valid dependency TODO
         # TODO need to start making modifications to RootAnalysis, Analysis and Observable to support this new system
         # (TempAnalysisModuleType(dependencies=['analysis_module']), RootAnalysis().add_observable("ipv4", '1.2.3.4'), True),

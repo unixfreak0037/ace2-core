@@ -78,27 +78,51 @@ def process_analysis_request(ar: AnalysisRequest):
             # when applying the diff merge it is super important to use the data from the analysis request
             # and *not* the current data
 
-            # apply any modifications to the root
-            target_root.apply_diff_merge(ar.original_root, ar.modified_root)
+            for _ in range(100):  # safer way to do while True
 
-            # and apply any modifications to the observable
-            target_observable = target_root.get_observable(ar.observable)
-            if not target_observable:
-                logging.error(f"cannot find {ar.observable} in target root {target_root}")
-                raise UnknownObservableError(ar.observable)
+                # apply any modifications to the root
+                target_root.apply_diff_merge(ar.original_root, ar.modified_root)
 
-            original_observable = ar.original_root.get_observable(ar.observable)
-            if not original_observable:
-                logging.error(f"cannot find {ar.observable} in original root {ar.original_root}")
-                raise UnknownObservableError(ar.observable)
+                # and apply any modifications to the observable
+                target_observable = target_root.get_observable(ar.observable)
+                if not target_observable:
+                    logging.error(f"cannot find {ar.observable} in target root {target_root}")
+                    raise UnknownObservableError(ar.observable)
 
-            modified_observable = ar.modified_root.get_observable(ar.observable)
-            if not modified_observable:
-                logging.error(f"cannot find {ar.observable} in modified root {ar.modified_root}")
-                raise UnknownObservableError(ar.observable)
+                original_observable = ar.original_root.get_observable(ar.observable)
+                if not original_observable:
+                    logging.error(f"cannot find {ar.observable} in original root {ar.original_root}")
+                    raise UnknownObservableError(ar.observable)
 
-            target_observable.apply_diff_merge(original_observable, modified_observable, ar.type)
-            target_root.save()
+                modified_observable = ar.modified_root.get_observable(ar.observable)
+                if not modified_observable:
+                    logging.error(f"cannot find {ar.observable} in modified root {ar.modified_root}")
+                    raise UnknownObservableError(ar.observable)
+
+                target_observable.apply_diff_merge(original_observable, modified_observable, ar.type)
+                if target_root.save():
+                    break
+
+                # if the save failed it means (assuming everything is working
+                # correctly) that the root was modified by another process
+                # in this case we get the latest version and try again
+                updated_root = get_root_analysis(target_root)
+                if not updated_root:
+                    raise UnknownRootAnalysisError(ar)
+
+                # if the reason that it failed is NOT because of a version difference
+                # then that means something else is wrong, no need to keep trying
+                if updated_root.version == target_root.version:
+                    raise RuntimeError("RootAnalysis.save() failed but version matches -- check logs for issues")
+
+                # otherwise we try again with an updated version of the root analysis
+                # TODO metrics
+                logging.debug("version mismatch for {target_root} during processing")
+                target_root = updated_root
+
+            else:
+                # something is wrong with the system or logic
+                raise RuntimeError("loop iterations exceeded")
 
             fire_event(EVENT_PROCESSING_REQUEST_RESULT, ar)
             # TODO fire event if analysis failed
@@ -112,17 +136,24 @@ def process_analysis_request(ar: AnalysisRequest):
                 process_analysis_request(linked_request)
 
         elif ar.is_root_analysis_request:
-            # are we updating an existing root analysis?
-            target_root = get_root_analysis(ar.root)
-            if target_root:
-                target_root.apply_merge(ar.root)
+            for _ in range(100):  # safer way to do while True
+                # are we updating an existing root analysis?
+                target_root = get_root_analysis(ar.root)
+                if target_root:
+                    target_root.apply_merge(ar.root)
+                else:
+                    # otherwise we just save the new one
+                    target_root = ar.root
+
+                if not target_root.save():
+                    logging.debug("version mismatch for {target_root} during processing")
+                    continue
+
+                fire_event(EVENT_PROCESSING_REQUEST_ROOT, ar)
+                break
             else:
-                # otherwise we just save the new one
-                target_root = ar.root
-
-            target_root.save()
-
-            fire_event(EVENT_PROCESSING_REQUEST_ROOT, ar)
+                # something is wrong with the system or logic
+                raise RuntimeError("loop iterations exceeded")
 
         # this should never fire
         if target_root is None:

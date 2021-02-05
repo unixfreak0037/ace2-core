@@ -69,6 +69,70 @@ def test_update_root_analysis():
     assert get_root_analysis(root.uuid).description == "test 2"
 
 
+@pytest.mark.integration
+def test_parallel_update_logic():
+    root = RootAnalysis(desc="test 1")
+    track_root_analysis(root)
+    assert get_root_analysis(root.uuid) == root
+    old_root = get_root_analysis(root)
+
+    # update the root
+    updated = get_root_analysis(root)
+    updated.description = "test 2"
+    assert updated.save()
+
+    # add an observable to the old root and try to save it
+    observable = old_root.add_observable("test", "test")
+    assert not old_root.save()
+    assert not get_root_analysis(root).get_observable(observable)
+
+    assert old_root.update()
+    # make sure we still have our change
+    assert old_root.get_observable(observable)
+    # now we should be able to save it
+    assert old_root.save()
+
+    #
+    # do it again but with information deeper in the analysis tree
+    #
+
+    root = get_root_analysis(root)
+    old_root = get_root_analysis(root)
+
+    root.get_observable(observable).add_tag("tag_1")
+    assert root.save()
+
+    old_root.get_observable(observable).add_tag("tag_2")
+    assert not old_root.save()
+    assert old_root.update()
+    assert old_root.save()
+    root = get_root_analysis(root)
+    # both of these tags should exist now
+    assert root.get_observable(observable).has_tag("tag_1")
+    assert root.get_observable(observable).has_tag("tag_2")
+
+    #
+    # test overlapping updates
+    #
+
+    root = get_root_analysis(root)
+    old_root = get_root_analysis(root)
+
+    observable = root.add_observable("test", "test_2").add_tag("tag_1")
+    assert root.save()
+
+    old_root.add_observable("test", "test_2").add_tag("tag_2")
+    assert not old_root.save()
+    old_root.update()
+    assert old_root.get_observable(observable).has_tag("tag_2")
+    assert old_root.save()
+
+    # both of these tags should exist now
+    root = get_root_analysis(root)
+    assert root.get_observable(observable).has_tag("tag_1")
+    assert root.get_observable(observable).has_tag("tag_2")
+
+
 @pytest.mark.unit
 def test_root_analysis_exists():
     root = RootAnalysis()

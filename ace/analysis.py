@@ -2049,7 +2049,23 @@ class RootAnalysis(Analysis, MergableObject):
                 analysis.save()
 
         # save our own details
-        return Analysis.save(self)
+        Analysis.save(self)
+        return True
+
+    def update(self) -> bool:
+        """Loads and merges any changes made to this root. Returns True if successful, False otherwise."""
+        from ace.system.analysis_tracking import get_root_analysis
+
+        existing_root = get_root_analysis(self)
+        if not existing_root:
+            return False
+
+        if self.version == existing_root.version:
+            return False
+
+        self.apply_merge(existing_root)
+        self.version = existing_root.version
+        return True
 
     def __del__(self):
         # make sure that any remaining storage directories are wiped out
@@ -2235,6 +2251,7 @@ class RootAnalysis(Analysis, MergableObject):
         self.description = target.description
         self.analysis_cancelled = target.analysis_cancelled
         self.analysis_cancelled_reason = target.analysis_cancelled_reason
+        # NOTE that we don't copy over the version data
         return self
 
     def apply_diff_merge(self, before: "RootAnalysis", after: "RootAnalysis") -> "RootAnalysis":

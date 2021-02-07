@@ -351,7 +351,7 @@ def test_EVENT_AR_EXPIRED():
     request.status = TRACKING_STATUS_ANALYZING
     track_analysis_request(request)
 
-    process_expired_analysis_requests()
+    process_expired_analysis_requests(amt)
 
     assert handler.event == EVENT_AR_EXPIRED
     assert handler.args[0] == request

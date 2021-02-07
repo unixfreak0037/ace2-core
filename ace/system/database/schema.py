@@ -144,6 +144,8 @@ class AnalysisRequestTracking(Base):
 
     json_data = Column(Text, nullable=False)
 
+    lock = Column(TimeStamp, nullable=True)
+
     # https://docs.sqlalchemy.org/en/14/orm/basic_relationships.html#many-to-many
     linked_requests = relationship(
         "AnalysisRequestTracking",

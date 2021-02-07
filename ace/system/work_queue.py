@@ -26,7 +26,6 @@ from ace.system.constants import (
     EVENT_WORK_REMOVE,
 )
 from ace.system.events import fire_event
-from ace.system.locking import LockAcquireFailed
 
 
 class WorkQueueManagerInterface(ACESystemInterface):
@@ -142,9 +141,6 @@ def get_next_analysis_request(
     assert isinstance(amt, AnalysisModuleType) or isinstance(amt, str)
     assert isinstance(timeout, int)
 
-    # make sure expired analysis requests go back in the work queues
-    process_expired_analysis_requests()
-
     # make sure that the requested analysis module hasn't been replaced by a newer version
     # if that's the case then the request fails and the requestor needs to update to the new version
     existing_amt = get_analysis_module_type(amt.name)
@@ -156,31 +152,27 @@ def get_next_analysis_request(
         logging.info(f"requested amt {amt} extended version mismatch against {existing_amt}")
         raise AnalysisModuleTypeExtendedVersionError(amt, existing_amt)
 
+    # make sure expired analysis requests go back in the work queues
+    process_expired_analysis_requests(amt)
+
+    # we don't need to do any locking here because of how the work queues work
     while True:
         next_ar = get_work(amt, timeout)
 
         if next_ar:
-            # TODO how long do we wait for this?
-            # so there's an assumption here that this AnalysisRequest will not be grabbed by another process
-            try:
-                with next_ar.lock():
-                    # get the most recent copy of the analysis request
-                    next_ar = get_analysis_request_by_request_id(next_ar.id)
-                    # if it was deleted then we ignore it and move on to the next one
-                    # this can happen if the request is deleted while it's waiting in the queue
-                    if not next_ar:
-                        continue
+            # get the most recent copy of the analysis request
+            next_ar = get_analysis_request_by_request_id(next_ar.id)
+            # if it was deleted then we ignore it and move on to the next one
+            # this can happen if the request is deleted while it's waiting in the queue
+            if not next_ar:
+                logging.warning("unknown request {next_ar} aquired from work queue for {amt}")
+                continue
 
-                    # set the owner, status then update
-                    next_ar.owner = owner_uuid
-                    next_ar.status = TRACKING_STATUS_ANALYZING
-                    logging.debug(f"assigned analysis request {next_ar} to {owner_uuid}")
-                    track_analysis_request(next_ar)
-                    fire_event(EVENT_WORK_ASSIGNED, next_ar)
-
-            except LockAcquireFailed as e:
-                # if we are unable to get the lock on the request then put it back into the queue
-                put_work(amt, next_ar)
-                raise e
+            # set the owner, status then update
+            next_ar.owner = owner_uuid
+            next_ar.status = TRACKING_STATUS_ANALYZING
+            logging.debug(f"assigned analysis request {next_ar} to {owner_uuid}")
+            track_analysis_request(next_ar)
+            fire_event(EVENT_WORK_ASSIGNED, next_ar)
 
         return next_ar

@@ -17,7 +17,6 @@ from ace.system.constants import (
     EVENT_ANALYSIS_DETAILS_DELETED,
 )
 from ace.system.events import fire_event
-from ace.system.locking import lock
 
 
 class UnknownRootAnalysisError(ValueError):

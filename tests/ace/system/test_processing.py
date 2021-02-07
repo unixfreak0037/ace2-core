@@ -34,9 +34,6 @@ def test_process_root_analysis_request():
     # the root analysis should be tracked
     assert get_root_analysis(root.uuid) is not None
 
-    # and it should not be locked
-    assert not root.is_locked()
-
     # the test observable should be in the queue
     assert get_queue_size(amt) == 1
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
@@ -741,3 +738,17 @@ def test_manual_analysis_module_type():
 
     # and now there should be 1 since added the required directive with the request_manual_analysis function
     assert get_queue_size(amt) == 1
+
+
+@pytest.mark.integration
+def test_expired_analysis_request_processing():
+    amt = register_analysis_module_type(AnalysisModuleType(name="test", description="", timeout=0, cache_ttl=600))
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    request = get_next_analysis_request("test", amt, 0)
+    assert request
+
+    # when we ask again we get the same request because it expired already
+    assert get_next_analysis_request("test", amt, 0) == request

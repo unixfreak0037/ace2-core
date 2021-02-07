@@ -130,39 +130,6 @@ class AsyncAceAPI(AceAPI):
     async def fire_event(self, event: str, *args, **kwargs):
         raise NotImplementedError()
 
-    # locking
-    async def get_lock_owner(self, lock_id: str) -> Union[str, None]:
-        raise NotImplementedError()
-
-    async def get_owner_wait_target(self, owner_id: str) -> Union[str, None]:
-        raise NotImplementedError()
-
-    async def track_wait_target(self, lock_id: Union[str, None], owner_id: str):
-        raise NotImplementedError()
-
-    async def clear_wait_target(self, owner_id: str):
-        raise NotImplementedError()
-
-    async def is_locked(self, lock_id: str) -> bool:
-        raise NotImplementedError()
-
-    async def get_lock_count(
-        self,
-    ) -> int:
-        raise NotImplementedError()
-
-    async def acquire(
-        self,
-        lock_id: str,
-        owner_id: Optional[str] = None,
-        timeout: Union[int, float, None] = None,
-        lock_timeout: Union[int, float, None] = None,
-    ) -> bool:
-        raise NotImplementedError()
-
-    async def releases(self, lock_id: str, owner_id: Optional[str] = None) -> bool:
-        raise NotImplementedError()
-
     # observables
     async def create_observable(self, type: str, *args, **kwargs) -> Observable:
         raise NotImplementedError()

@@ -41,211 +41,174 @@ from ace.system.exceptions import (
 )
 
 
+class AnalysisRequestLockedError(Exception):
+    """Raised when process_analysis_request is unable to lock the request."""
+
+    def __init__(self, request: AnalysisRequest):
+        super().__init__(f"failed to lock analysis request {request}")
+
+
 def process_analysis_request(ar: AnalysisRequest):
     """Processes an analysis request.
     This function implements the core logic of the system."""
 
     # need to lock this at the beginning so that nothing else modifies it
     # while we're processing it
-    # TODO how long do we wait?
-    with ar.root.lock():
-        target_root = None
-        # did we complete a request?
-        if ar.is_observable_analysis_result:
-            existing_ar = get_analysis_request(ar.id)
+    # we only need to do this for observable analysis requests because they are the only types of
+    # requests that can be modified (by creating linked requests)
+    if ar.is_observable_analysis_request and not ar.lock():
+        raise AnalysisRequestLockedError(ar)
 
-            # is this analysis request gone?
-            if not existing_ar:
-                logging.info(f"requested unknown analysis request {ar.id}")
-                raise UnknownAnalysisRequest(ar)
+    target_root = None
+    # did we complete a request?
+    if ar.is_observable_analysis_result:
+        existing_ar = get_analysis_request(ar.id)
 
-            # did the ownership change?
-            if existing_ar.owner != ar.owner:
-                logging.info(f"requested expired analysis request {ar.id}")
-                raise ExpiredAnalysisRequest(ar)
+        # is this analysis request gone?
+        if not existing_ar:
+            logging.info(f"requested unknown analysis request {ar.id}")
+            raise UnknownAnalysisRequest(ar)
 
-            # get the existing root analysis
-            target_root = get_root_analysis(ar.root)
-            if not target_root:
-                logging.info(f"analysis request {ar.id} referenced unknown root {ar.root}")
-                raise UnknownRootAnalysisError(ar)
+        # did the ownership change?
+        if existing_ar.owner != ar.owner:
+            logging.info(f"requested expired analysis request {ar.id}")
+            raise ExpiredAnalysisRequest(ar)
 
-            # should we cache these results?
-            if ar.is_cachable and not ar.cache_hit:
-                cache_analysis_result(ar)
+        # get the existing root analysis
+        target_root = get_root_analysis(ar.root)
+        if not target_root:
+            logging.info(f"analysis request {ar.id} referenced unknown root {ar.root}")
+            raise UnknownRootAnalysisError(ar)
 
-            # NOTE
-            # when applying the diff merge it is super important to use the data from the analysis request
-            # and *not* the current data
+        # should we cache these results?
+        if ar.is_cachable and not ar.cache_hit:
+            cache_analysis_result(ar)
 
-            for _ in range(100):  # safer way to do while True
+        # NOTE
+        # when applying the diff merge it is super important to use the data from the analysis request
+        # and *not* the current data
 
-                # apply any modifications to the root
-                target_root.apply_diff_merge(ar.original_root, ar.modified_root)
+        # apply any modifications to the root
+        target_root.apply_diff_merge(ar.original_root, ar.modified_root)
 
-                # and apply any modifications to the observable
-                target_observable = target_root.get_observable(ar.observable)
-                if not target_observable:
-                    logging.error(f"cannot find {ar.observable} in target root {target_root}")
-                    raise UnknownObservableError(ar.observable)
+        # and apply any modifications to the observable
+        target_observable = target_root.get_observable(ar.observable)
+        if not target_observable:
+            logging.error(f"cannot find {ar.observable} in target root {target_root}")
+            raise UnknownObservableError(ar.observable)
 
-                original_observable = ar.original_root.get_observable(ar.observable)
-                if not original_observable:
-                    logging.error(f"cannot find {ar.observable} in original root {ar.original_root}")
-                    raise UnknownObservableError(ar.observable)
+        original_observable = ar.original_root.get_observable(ar.observable)
+        if not original_observable:
+            logging.error(f"cannot find {ar.observable} in original root {ar.original_root}")
+            raise UnknownObservableError(ar.observable)
 
-                modified_observable = ar.modified_root.get_observable(ar.observable)
-                if not modified_observable:
-                    logging.error(f"cannot find {ar.observable} in modified root {ar.modified_root}")
-                    raise UnknownObservableError(ar.observable)
+        modified_observable = ar.modified_root.get_observable(ar.observable)
+        if not modified_observable:
+            logging.error(f"cannot find {ar.observable} in modified root {ar.modified_root}")
+            raise UnknownObservableError(ar.observable)
 
-                target_observable.apply_diff_merge(original_observable, modified_observable, ar.type)
-                if target_root.save():
-                    break
+        target_observable.apply_diff_merge(original_observable, modified_observable, ar.type)
+        target_root.update_and_save()
 
-                # if the save failed it means (assuming everything is working
-                # correctly) that the root was modified by another process
-                # in this case we get the latest version and try again
-                updated_root = get_root_analysis(target_root)
-                if not updated_root:
-                    raise UnknownRootAnalysisError(ar)
+        fire_event(EVENT_PROCESSING_REQUEST_RESULT, ar)
+        # TODO fire event if analysis failed
 
-                # if the reason that it failed is NOT because of a version difference
-                # then that means something else is wrong, no need to keep trying
-                if updated_root.version == target_root.version:
-                    raise RuntimeError("RootAnalysis.save() failed but version matches -- check logs for issues")
+        # process any analysis request links
+        for linked_request in get_linked_analysis_requests(ar):
+            linked_request.initialize_result()
+            linked_request.original_root = ar.original_root
+            linked_request.modified_root = ar.modified_root
+            logging.debug(f"processing linked analysis request {linked_request} from {ar}")
+            process_analysis_request(linked_request)
 
-                # otherwise we try again with an updated version of the root analysis
-                # TODO metrics
-                logging.debug("version mismatch for {target_root} during processing")
-                target_root = updated_root
+    elif ar.is_root_analysis_request:
+        # are we updating an existing root analysis?
+        target_root = get_root_analysis(ar.root)
+        if target_root:
+            target_root.apply_merge(ar.root)
+        else:
+            # otherwise we just save the new one
+            target_root = ar.root
 
-            else:
-                # something is wrong with the system or logic
-                raise RuntimeError("loop iterations exceeded")
+        target_root.update_and_save()
+        fire_event(EVENT_PROCESSING_REQUEST_ROOT, ar)
 
-            fire_event(EVENT_PROCESSING_REQUEST_RESULT, ar)
-            # TODO fire event if analysis failed
+    # this should never fire
+    if target_root is None:
+        logging.critical("hit unexpected code branch")
+        raise RuntimeError("target_root is None")
 
-            # process any analysis request links
-            for linked_request in get_linked_analysis_requests(ar):
-                linked_request.initialize_result()
-                linked_request.original_root = ar.original_root
-                linked_request.modified_root = ar.modified_root
-                logging.debug(f"processing linked analysis request {linked_request} from {ar}")
-                process_analysis_request(linked_request)
+    # did we generate an alert?
+    if not target_root.analysis_cancelled and target_root.has_detections():
+        track_alert(target_root)
 
-        elif ar.is_root_analysis_request:
-            for _ in range(100):  # safer way to do while True
-                # are we updating an existing root analysis?
-                target_root = get_root_analysis(ar.root)
-                if target_root:
-                    target_root.apply_merge(ar.root)
-                else:
-                    # otherwise we just save the new one
-                    target_root = ar.root
-
-                if not target_root.save():
-                    logging.debug("version mismatch for {target_root} during processing")
+    # for each observable that needs to be analyzed
+    if not target_root.analysis_cancelled:
+        logging.debug(f"processing {target_root}")
+        for observable in ar.observables:
+            for amt in get_all_analysis_module_types():
+                # does this analysis module accept this observable?
+                if not amt.accepts(observable):
                     continue
 
-                fire_event(EVENT_PROCESSING_REQUEST_ROOT, ar)
-                break
-            else:
-                # something is wrong with the system or logic
-                raise RuntimeError("loop iterations exceeded")
+                # is this analysis request already completed?
+                if target_root.analysis_completed(observable, amt):
+                    continue
 
-        # this should never fire
-        if target_root is None:
-            logging.critical("hit unexpected code branch")
-            raise RuntimeError("target_root is None")
+                # is this analysis request for this RootAnalysis already being tracked?
+                if target_root.analysis_tracked(observable, amt):
+                    continue
 
-        # did we generate an alert?
-        if not target_root.analysis_cancelled and target_root.has_detections():
-            track_alert(target_root)
+                # is this observable being analyzed by another root analysis?
+                # NOTE if the analysis module does not support caching
+                # then get_analysis_request_by_observable always returns None
+                tracked_ar = get_analysis_request_by_observable(observable, amt)
 
-        # for each observable that needs to be analyzed
-        if not target_root.analysis_cancelled:
-            logging.debug(f"processing {target_root}")
-            for observable in ar.observables:
-                for amt in get_all_analysis_module_types():
-                    # does this analysis module accept this observable?
-                    if not amt.accepts(observable):
-                        continue
+                # at this point we know we're going to create a request to analyze this
+                new_ar = observable.create_analysis_request(amt)
+                track_analysis_request(new_ar)
 
-                    # is this analysis request already completed?
-                    if target_root.analysis_completed(observable, amt):
-                        continue
+                if tracked_ar and tracked_ar != ar:
+                    try:
+                        # tell that AR to update the details of this analysis as well when it's done
+                        # if link_analysis_requests returns False it means it was unable to link it
+                        if link_analysis_requests(tracked_ar, new_ar):
+                            observable.track_analysis_request(new_ar)
+                            # track_analysis_request(new_ar)
+                            target_root.update_and_save()
+                            # and then that's it for this request
+                            # it waits for tracked_ar to complete
+                            continue
 
-                    # is this analysis request for this RootAnalysis already being tracked?
-                    if target_root.analysis_tracked(observable, amt):
-                        continue
+                        # oh well -- it could be in the cache
 
-                    # is this observable being analyzed by another root analysis?
-                    # NOTE if the analysis module does not support caching
-                    # then get_analysis_request_by_observable always returns None
-                    tracked_ar = get_analysis_request_by_observable(observable, amt)
-                    if tracked_ar and tracked_ar != ar:
-                        try:
-                            # see if we can lock the other request
-                            with tracked_ar.lock():
-                                if get_analysis_request(tracked_ar.id):
-                                    #
-                                    # Analysis Request Linking
-                                    #
-                                    # if we can get the AR and lock it it means it's still in a queue waiting
-                                    # so we can tell that AR to update the details of this analysis as well when it's done
+                    except Exception as e:  # TODO what can be thrown here?
+                        raise e
 
-                                    # we create a new analysis request
-                                    new_ar = observable.create_analysis_request(amt)
-                                    track_analysis_request(new_ar)
-                                    observable.track_analysis_request(new_ar)
-                                    link_analysis_requests(tracked_ar, new_ar)
-                                    track_analysis_request(new_ar)
-                                    target_root.save()
-                                    # and then that's it for this request
-                                    # it waits for tracked_ar to complete
-                                    continue
+                # is this analysis in the cache?
+                cached_result = get_cached_analysis_result(observable, amt)
+                if cached_result:
+                    logging.debug(f"using cached result {cached_result} for {observable} type {amt} in {target_root}")
 
-                            # the AR was completed before we could lock it
-                            # oh well -- it could be in the cache
-
-                        except Exception as e:  # TODO what can be thrown here?
-                            raise e
-                            # logging.fatal(f"unknown error: {e}")
-                            # breakpoint()  # XXX if debug
-                            # continue
-
-                    # is this analysis in the cache?
-                    cached_result = get_cached_analysis_result(observable, amt)
-                    if cached_result:
-                        logging.debug(
-                            f"using cached result {cached_result} for {observable} type {amt} in {target_root}"
-                        )
-
-                        new_ar = observable.create_analysis_request(amt)
-                        new_ar.original_root = cached_result.original_root
-                        new_ar.modified_root = cached_result.modified_root
-                        new_ar.cache_hit = True
-                        track_analysis_request(new_ar)
-                        observable.track_analysis_request(new_ar)
-                        target_root.save()
-                        fire_event(EVENT_CACHE_HIT, target_root, observable, new_ar)
-                        process_analysis_request(new_ar)
-                        continue
-
-                    # otherwise we need to request it
-                    logging.info(
-                        f"creating new analysis request for observable {observable} amt {amt} root {target_root}"
-                    )
-                    new_ar = observable.create_analysis_request(amt)
-                    # (we also track the request inside the RootAnalysis object)
-                    observable.track_analysis_request(new_ar)
+                    new_ar.original_root = cached_result.original_root
+                    new_ar.modified_root = cached_result.modified_root
+                    new_ar.cache_hit = True
                     track_analysis_request(new_ar)
-                    target_root.save()
-                    fire_event(EVENT_PROCESSING_REQUEST_OBSERVABLE, new_ar)
-                    submit_analysis_request(new_ar)
+                    observable.track_analysis_request(new_ar)
+                    target_root.update_and_save()
+                    fire_event(EVENT_CACHE_HIT, target_root, observable, new_ar)
+                    process_analysis_request(new_ar)
                     continue
+
+                # otherwise we need to request it
+                logging.info(f"creating new analysis request for observable {observable} amt {amt} root {target_root}")
+                # (we also track the request inside the RootAnalysis object)
+                observable.track_analysis_request(new_ar)
+                # track_analysis_request(new_ar)
+                target_root.update_and_save()
+                fire_event(EVENT_PROCESSING_REQUEST_OBSERVABLE, new_ar)
+                submit_analysis_request(new_ar)
+                continue
 
     # at this point this AnalysisRequest is no longer needed
     delete_analysis_request(ar)

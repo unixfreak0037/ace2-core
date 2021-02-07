@@ -37,7 +37,6 @@ from ace.system.database.analysis_module import DatabaseAnalysisModuleTrackingIn
 from ace.system.database.analysis_request import DatabaseAnalysisRequestTrackingInterface
 from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterface
 from ace.system.database.caching import DatabaseCachingInterface
-from ace.system.database.locking import DatabaseLockingInterface
 from ace.system.database.observables import DatabaseObservableInterface
 
 
@@ -51,7 +50,6 @@ class DatabaseACESystem:
 
     analysis_tracking = DatabaseAnalysisTrackingInterface()
     caching = DatabaseCachingInterface()
-    locking = DatabaseLockingInterface()
     module_tracking = DatabaseAnalysisModuleTrackingInterface()
     observable = DatabaseObservableInterface()
     request_tracking = DatabaseAnalysisRequestTrackingInterface()

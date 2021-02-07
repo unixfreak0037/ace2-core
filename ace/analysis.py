@@ -22,7 +22,6 @@ from typing import Union, Optional, Any
 import ace
 
 from ace.system.exceptions import UnknownObservableError
-from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
 from ace.data_model import (
     AnalysisModel,
@@ -496,7 +495,7 @@ class AnalysisModuleType:
                 return False
 
 
-class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
+class Analysis(TaggableObject, DetectableObject, MergableObject):
     """Represents an output of analysis work."""
 
     def __init__(
@@ -558,14 +557,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         # and a stack trace for debugging
         self.error_message = error_message
         self.stack_trace = stack_trace
-
-    #
-    # Lockable interface
-    #
-
-    @property
-    def lock_id(self):
-        return self.uuid
 
     # --------------------------------------------------------------------------------
 
@@ -2067,6 +2058,27 @@ class RootAnalysis(Analysis, MergableObject):
         self.version = existing_root.version
         return True
 
+    def update_and_save(self) -> bool:
+        """Calls RootAnalysis.save() in a loop until it is accepted. When the
+        call to save() fails, the most recent of the root is acquired and
+        merged into this root."""
+
+        from ace.system.analysis_tracking import get_root_analysis
+
+        for _ in range(100):  # safer way to do a while True:
+            if self.save():
+                return True
+
+            modified_root = get_root_analysis(self)
+            if modified_root.version == self.version:
+                raise RuntimeError("RootAnalysis.save() failed but version matches -- check logs for issues")
+
+            self.apply_merge(modified_root)
+            self.version = modified_root.version
+            continue
+        else:
+            raise RuntimeError("loop iterations exceeded -- check logs for issues")
+
     def __del__(self):
         # make sure that any remaining storage directories are wiped out
         if self.discard():
@@ -2093,11 +2105,11 @@ class RootAnalysis(Analysis, MergableObject):
             return f"RootAnalysis({self.uuid})"
 
     def __eq__(self, other):
-        """Two RootAnalysis objects are equal if the uuid is equal."""
+        """Two RootAnalysis objects are equal if the uuid and version is equal."""
         if not isinstance(other, type(self)):
             return False
 
-        return other.uuid == self.uuid
+        return other.uuid == self.uuid and other.version == self.version
 
     @property
     def all_analysis(self):

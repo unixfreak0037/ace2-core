@@ -26,7 +26,6 @@ from ace.system.analysis_request import (
 from ace.system.analysis_tracking import get_root_analysis, track_root_analysis
 from ace.system.constants import *
 from ace.system.processing import process_analysis_request
-from ace.system.locking import LockAcquireFailed
 from ace.system.work_queue import get_next_analysis_request, get_queue_size
 
 import pytest
@@ -209,103 +208,6 @@ def test_expected_status():
 
     # now this request should not be tracked anymore
     assert get_analysis_request(request_id) is None
-
-
-@pytest.mark.system
-def test_get_next_analysis_request_locking():
-    owner_uuid = str(uuid.uuid4())
-    assert register_analysis_module_type(amt := AnalysisModuleType("test", ""))
-
-    root = RootAnalysis()
-    observable = root.add_observable("test", "test")
-    root.submit()
-
-    root = get_root_analysis(root)
-    assert root
-    observable = root.get_observable(observable)
-    assert observable
-    request_id = observable.get_analysis_request_id(amt)
-    assert request_id
-    request = get_analysis_request(request_id)
-    assert request
-
-    # a root analysis with a observable has been submitted and we've got a reference to the request
-
-    def _lock(request, event, lock_acquired_event):
-        try:
-            with request.lock():
-                lock_acquired_event.set()
-                event.wait(3)
-        except Exception as e:
-            logging.error(str(e))
-            breakpoint()
-            pass
-
-    # lock the request on another thread
-    event = threading.Event()
-    lock_acquired_event = threading.Event()
-    t = threading.Thread(target=_lock, args=(request, event, lock_acquired_event))
-    t.start()
-
-    lock_acquired_event.wait(3)
-
-    # try to lock the request on the main thread
-    with pytest.raises(LockAcquireFailed):
-        work_request = get_next_analysis_request(owner_uuid, amt, 0)
-
-    # release the lock
-    event.set()
-    t.join(3)
-
-    # now we should be able to get the request
-    work_request = get_next_analysis_request(owner_uuid, amt, 3)
-    assert work_request
-
-
-@pytest.mark.system
-def test_process_analysis_request_locking():
-    owner_uuid = str(uuid.uuid4())
-    assert register_analysis_module_type(amt := AnalysisModuleType("test", ""))
-
-    root = RootAnalysis()
-    observable = root.add_observable("test", "test")
-    root.submit()
-
-    root = get_root_analysis(root)
-    assert root
-    observable = root.get_observable(observable)
-    assert observable
-    request_id = observable.get_analysis_request_id(amt)
-    assert request_id
-    request = get_analysis_request(request_id)
-    assert request
-
-    # start tracking the root analysis
-    track_root_analysis(root)
-
-    def _lock(root, event, sync):
-        with root.lock():
-            sync.set()
-            event.wait(3)
-
-    # lock the root analysis on another thread
-    event = threading.Event()
-    sync = threading.Event()
-    t = threading.Thread(target=_lock, args=(root, event, sync))
-    t.start()
-
-    sync.wait(3)
-
-    # try to submit it for analysis
-    with pytest.raises(LockAcquireFailed):
-        root.submit()
-
-    # release the lock
-    event.set()
-    t.join(3)
-
-    # now we should be able to submit the request
-    root.submit()
 
 
 @pytest.mark.system

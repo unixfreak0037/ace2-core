@@ -4,6 +4,7 @@ import copy
 import datetime
 import json
 import os.path
+import uuid
 
 from ace.analysis import (
     RootAnalysis,
@@ -127,6 +128,27 @@ def test_apply_diff_merge_detetion_points():
     assert not target_observable.has_detection_points()
     target_observable.apply_diff_merge(original_observable, modified_observable)
     assert not target_observable.has_detection_points()
+
+
+@pytest.mark.unit
+def test_update_and_save():
+    root = RootAnalysis()
+    root.update_and_save()
+    tracked_root = get_root_analysis(root)
+    assert tracked_root == root
+    # modify tracked root
+    tracked_root.description = "test"
+    tracked_root.update_and_save()
+    # now they are different
+    assert root != get_root_analysis(root)
+    # make modification on original root
+    root.add_tag("tag")
+    root.update_and_save()
+    # now we have an updated copy
+    assert root == get_root_analysis(root)
+    # that has both changes
+    assert root.description == "test"
+    assert root.has_tag("tag")
 
 
 #
@@ -692,6 +714,14 @@ def test_root_eq():
     assert root == copy.deepcopy(root)
     # invalid compare
     assert root != object()
+    # same uuid different version
+    root = RootAnalysis()
+    modified_root = copy.deepcopy(root)
+    modified_root.version = str(uuid.uuid4())
+    assert root != modified_root
+    # same uuid same version
+    root.version = modified_root.version
+    assert root == modified_root
 
 
 @pytest.mark.unit

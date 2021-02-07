@@ -140,52 +140,6 @@ class AceAPI:
     def fire_event(self, event: str, *args, **kwargs):
         raise NotImplementedError()
 
-    # locking
-    def get_lock_owner(self, lock_id: str) -> Union[str, None]:
-        raise NotImplementedError()
-
-    def get_owner_wait_target(self, owner_id: str) -> Union[str, None]:
-        raise NotImplementedError()
-
-    def track_wait_target(self, lock_id: Union[str, None], owner_id: str):
-        raise NotImplementedError()
-
-    def clear_wait_target(self, owner_id: str):
-        raise NotImplementedError()
-
-    def is_locked(self, lock_id: str) -> bool:
-        raise NotImplementedError()
-
-    def get_lock_count(
-        self,
-    ) -> int:
-        raise NotImplementedError()
-
-    def acquire(
-        self,
-        lock_id: str,
-        owner_id: Optional[str] = None,
-        timeout: Union[int, float, None] = None,
-        lock_timeout: Union[int, float, None] = None,
-    ) -> bool:
-        raise NotImplementedError()
-
-    def releases(self, lock_id: str, owner_id: Optional[str] = None) -> bool:
-        raise NotImplementedError()
-
-    @contextmanager
-    def lock(self, lock_id: str, timeout: Optional[float] = None, lock_timeout: Optional[float] = None):
-        try:
-            lock_result = acquire(lock_id, timeout=timeout, lock_timeout=lock_timeout)
-
-            if not lock_result:
-                raise LockAcquireFailed()
-            else:
-                yield lock_result
-        finally:
-            if lock_result:
-                release(lock_id)
-
     # observables
     def create_observable(self, type: str, *args, **kwargs) -> Observable:
         raise NotImplementedError()

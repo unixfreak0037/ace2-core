@@ -10,11 +10,14 @@ import ace
 
 from ace.analysis import Observable
 from ace.system.database import get_db
-from ace.system.database.schema import AnalysisRequestTracking
-from ace.system.constants import TRACKING_STATUS_ANALYZING
-from ace.system.analysis_request import AnalysisRequestTrackingInterface, AnalysisRequest
+from ace.system.database.schema import AnalysisRequestTracking, analysis_request_links
+from ace.system.events import fire_event
+from ace.system.constants import TRACKING_STATUS_ANALYZING, EVENT_AR_EXPIRED
+from ace.system.analysis_request import AnalysisRequestTrackingInterface, AnalysisRequest, submit_analysis_request
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.caching import generate_cache_key
+
+from sqlalchemy import and_, text
 
 
 class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface):
@@ -37,21 +40,20 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
         get_db().merge(db_request)
         get_db().commit()
 
-    def link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest):
-        source_request = (
-            get_db().query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
-        )
-        if source_request is None:
-            return
+    def link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest) -> bool:
+        from sqlalchemy import select, bindparam, String, and_
 
-        dest_request = (
-            get_db().query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == dest.id).one_or_none()
-        )
-        if dest_request is None:
-            return
+        # when we process an analysis request we "lock" it by setting the lock field
+        # so if we try to link against an analysis request that is "locked" it fails
 
-        source_request.linked_requests.append(dest_request)
+        sel = select(
+            [bindparam("s", type_=String).label("source_id"), bindparam("d", type_=String).label("dest_id")],
+            AnalysisRequestTracking.__table__,
+        ).where(and_(AnalysisRequestTracking.id == source.id, AnalysisRequestTracking.lock == None))
+        update = analysis_request_links.insert().from_select(["source_id", "dest_id"], sel)
+        count = get_db().execute(update, {"s": source.id, "d": dest.id}).rowcount
         get_db().commit()
+        return count == 1
 
     def get_linked_analysis_requests(self, source: AnalysisRequest) -> list[AnalysisRequest]:
         source_request = (
@@ -61,6 +63,32 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             return None
 
         return [AnalysisRequest.from_dict(json.loads(_.json_data)) for _ in source_request.linked_requests]
+
+    def lock_analysis_request(self, request: AnalysisRequest) -> bool:
+        count = (
+            get_db()
+            .execute(
+                AnalysisRequestTracking.__table__.update()
+                .where(and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock == None))
+                .values(lock=text("CURRENT_TIMESTAMP"))
+            )
+            .rowcount
+        )
+        get_db().commit()
+        return count == 1
+
+    def unlock_analysis_request(self, request: AnalysisRequest) -> bool:
+        count = (
+            get_db()
+            .execute(
+                AnalysisRequestTracking.__table__.update()
+                .where(and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock != None))
+                .values(lock=None)
+            )
+            .rowcount
+        )
+        get_db().commit()
+        return count == 1
 
     def delete_analysis_request(self, key: str) -> bool:
         count = (
@@ -108,3 +136,22 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingInterface)
             return None
 
         return AnalysisRequest.from_dict(json.loads(result.json_data))
+
+    def process_expired_analysis_requests(self, amt: AnalysisModuleType) -> int:
+        assert isinstance(amt, AnalysisModuleType)
+        for db_request in (
+            get_db()
+            .query(AnalysisRequestTracking)
+            .filter(
+                and_(
+                    AnalysisRequestTracking.analysis_module_type == amt.name,
+                    datetime.datetime.now() > AnalysisRequestTracking.expiration_date,
+                )
+            )
+        ):
+            request = AnalysisRequest.from_json(db_request.json_data)
+            fire_event(EVENT_AR_EXPIRED, request)
+            try:
+                submit_analysis_request(request)
+            except UnknownAnalysisModuleTypeError:
+                delete_analysis_request(request)

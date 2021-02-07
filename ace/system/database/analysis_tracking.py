@@ -1,6 +1,7 @@
 # vim: sw=4:ts=4:et:cc=120
 
 import json
+import uuid
 
 from typing import Any, Union
 
@@ -12,7 +13,7 @@ from ace.system.database.schema import RootAnalysisTracking, AnalysisDetailsTrac
 from ace.system.analysis_tracking import AnalysisTrackingInterface, UnknownRootAnalysisError
 
 import sqlalchemy.exc
-from sqlalchemy.sql import exists
+from sqlalchemy.sql import exists, and_
 
 
 class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
@@ -22,17 +23,48 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingInterface):
         if not result:
             return None
 
-        return RootAnalysis.from_json(result.json_data)
+        # we keep a copy of the actual value of the version property in the database
+        # (the JSON would have a copy of the previous value)
+        # also see update_root_analysis
+        root = RootAnalysis.from_json(result.json_data)
+        root.version = result.version
+        return root
 
-    def track_root_analysis(self, root: RootAnalysis):
+    def track_root_analysis(self, root: RootAnalysis) -> bool:
         """Tracks the given root to the given RootAnalysis uuid."""
-        tracking = RootAnalysisTracking(
-            uuid=root.uuid,
-            json_data=root.to_json(exclude_analysis_details=True),
-        )
+        version = root.version
+        if version is None:
+            version = str(uuid.uuid4())
 
-        get_db().merge(tracking)
+        try:
+            get_db().execute(
+                RootAnalysisTracking.__table__.insert().values(
+                    uuid=root.uuid, version=version, json_data=root.to_json(exclude_analysis_details=True)
+                )
+            )
+            get_db().commit()
+            root.version = version
+            return True
+        except sqlalchemy.exc.IntegrityError:
+            return False
+
+    def update_root_analysis(self, root: RootAnalysis) -> bool:
+        # when we update we also update the version
+        new_version = str(uuid.uuid4())
+        result = get_db().execute(
+            RootAnalysisTracking.__table__.update().values(
+                version=new_version, json_data=root.to_json(exclude_analysis_details=True)
+            )
+            # so the version has to match for the update to work
+            .where(and_(RootAnalysisTracking.uuid == root.uuid, RootAnalysisTracking.version == root.version))
+        )
         get_db().commit()
+        if result.rowcount == 0:
+            # if the version doesn't match then the update fails
+            return False
+
+        root.version = new_version
+        return True
 
     def root_analysis_exists(self, root: str) -> bool:
         return get_db().query(exists().where(RootAnalysisTracking.uuid == root)).scalar()

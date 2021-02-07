@@ -8,7 +8,6 @@ from ace.system import ACESystem, get_system, set_system
 from ace.system.database import DatabaseACESystem
 from ace.system.distributed import DistributedACESystem
 from ace.system.threaded import ThreadedACESystem
-from ace.system.threaded.locking import ThreadedLockingInterface
 
 import fastapi.testclient
 import pytest
@@ -53,7 +52,6 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
 class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, ThreadedACESystem):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.locking.client = fastapi.testclient.TestClient(ace.system.distributed.locking.app)
 
     def initialize(self):
         super().initialize()
@@ -71,14 +69,11 @@ class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, Thre
         self.work_queue.redis_connection = lambda: rc
 
 
-ace.system.distributed.locking.distributed_interface = ThreadedLockingInterface()
-
-
 @pytest.fixture(
     autouse=True,
     scope="session",
     params=[
-        ThreadedACETestSystem,
+        # ThreadedACETestSystem,
         DatabaseACETestSystem,
         DistributedACETestSystem,
     ],

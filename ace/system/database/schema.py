@@ -62,6 +62,7 @@ class RootAnalysisTracking(Base):
     }
 
     uuid = Column(String(36), unique=True, primary_key=True)
+    version = Column(String(36), unique=False, primary_key=False, index=True)
 
     json_data = Column(Text, nullable=False)
 
@@ -142,6 +143,8 @@ class AnalysisRequestTracking(Base):
     root_uuid = Column(String, nullable=False, index=True)
 
     json_data = Column(Text, nullable=False)
+
+    lock = Column(TimeStamp, nullable=True)
 
     # https://docs.sqlalchemy.org/en/14/orm/basic_relationships.html#many-to-many
     linked_requests = relationship(

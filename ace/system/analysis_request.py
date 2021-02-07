@@ -19,10 +19,9 @@ from ace.system.constants import (
     EVENT_AR_EXPIRED,
 )
 from ace.system.events import fire_event
-from ace.system.locking import Lockable, acquire, release
 
 
-class AnalysisRequest(Lockable):
+class AnalysisRequest:
     """Represents a request to analyze a single observable or a new analysis."""
 
     def __init__(
@@ -144,14 +143,6 @@ class AnalysisRequest(Lockable):
         return AnalysisRequest.from_dict(AnalysisRequestModel.parse_raw(value).dict())
 
     #
-    # Lockable interface
-    #
-
-    @property
-    def lock_id(self):
-        return self.id
-
-    #
     # utility functions
     #
 
@@ -215,6 +206,12 @@ class AnalysisRequest(Lockable):
         """Submits this analysis request for processing."""
         submit_analysis_request(self)
 
+    def lock(self) -> bool:
+        return lock_analysis_request(self)
+
+    def unlock(self) -> bool:
+        return unlock_analysis_request(self)
+
 
 class AnalysisRequestTrackingInterface(ACESystemInterface):
     """Tracks and manages analysis requests."""
@@ -222,7 +219,10 @@ class AnalysisRequestTrackingInterface(ACESystemInterface):
     def track_analysis_request(self, request: AnalysisRequest):
         raise NotImplementedError()
 
-    def link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest):
+    def lock_analysis_request(self, request: AnalysisRequest) -> bool:
+        raise NotImplementedError()
+
+    def link_analysis_requests(self, source_request: AnalysisRequest, dest_request: AnalysisRequest) -> bool:
         raise NotImplementedError()
 
     def get_linked_analysis_requests(self, source: AnalysisRequest) -> list[AnalysisRequest]:
@@ -246,6 +246,9 @@ class AnalysisRequestTrackingInterface(ACESystemInterface):
     def clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
         raise NotImplementedError()
 
+    def process_expired_analysis_requests(self, amt: AnalysisModuleType):
+        raise NotImplementedError()
+
 
 def track_analysis_request(request: AnalysisRequest):
     """Begins tracking the given AnalysisRequest."""
@@ -261,17 +264,29 @@ def track_analysis_request(request: AnalysisRequest):
     return result
 
 
-def link_analysis_requests(source: AnalysisRequest, dest: AnalysisRequest):
-    assert isinstance(source, AnalysisRequest)
-    assert isinstance(dest, AnalysisRequest)
-    assert source != dest
-    logging.debug(f"linking analysis request source {source} to dest {dest}")
-    get_system().request_tracking.link_analysis_requests(source, dest)
+def lock_analysis_request(request: AnalysisRequest) -> bool:
+    """Attempts to lock the request. Returns True if successful, False otherwise.
+    A request that is locked should not be modified by a process that did not acquire the lock."""
+    assert isinstance(request, AnalysisRequest)
+    return get_system().request_tracking.lock_analysis_request(request)
 
 
-def get_linked_analysis_requests(source: AnalysisRequest) -> list[AnalysisRequest]:
-    assert isinstance(source, AnalysisRequest)
-    return get_system().request_tracking.get_linked_analysis_requests(source)
+def unlock_analysis_request(request: AnalysisRequest) -> bool:
+    assert isinstance(request, AnalysisRequest)
+    return get_system().request_tracking.unlock_analysis_request(request)
+
+
+def link_analysis_requests(source_request: AnalysisRequest, dest_request: AnalysisRequest) -> bool:
+    assert isinstance(source_request, AnalysisRequest)
+    assert isinstance(dest_request, AnalysisRequest)
+    assert source_request != dest_request
+    logging.debug(f"linking analysis request source {source_request} to dest {dest_request}")
+    return get_system().request_tracking.link_analysis_requests(source_request, dest_request)
+
+
+def get_linked_analysis_requests(source_request: AnalysisRequest) -> list[AnalysisRequest]:
+    assert isinstance(source_request, AnalysisRequest)
+    return get_system().request_tracking.get_linked_analysis_requests(source_request)
 
 
 def get_analysis_request_by_request_id(request_id: str) -> Union[AnalysisRequest, None]:
@@ -334,6 +349,7 @@ def submit_analysis_request(ar: AnalysisRequest):
 
     ar.owner = None
     ar.status = TRACKING_STATUS_QUEUED
+    unlock_analysis_request(ar)
     track_analysis_request(ar)
 
     # if this is a RootAnalysis request then we just process it here (there is no inbound queue for root analysis)
@@ -344,25 +360,7 @@ def submit_analysis_request(ar: AnalysisRequest):
     put_work(ar.type, ar)
 
 
-def process_expired_analysis_requests():
+def process_expired_analysis_requests(amt: AnalysisModuleType):
     """Moves all unlocked expired analysis requests back into the queue."""
-
-    # if there is another process already doing this then we don't need to
-    if not acquire(SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS, timeout=0):
-        return
-
-    logging.debug(f"processing expired analysis requests")
-
-    try:
-        for request in get_expired_analysis_requests():
-            if request.acquire(timeout=0):
-                try:
-                    # re-submit the analysis request
-                    # this changes the status and thus takes it out of expiration
-                    logging.info(f"re-submitting expired analysis request {request}")
-                    fire_event(EVENT_AR_EXPIRED, request)
-                    submit_analysis_request(request)
-                except UnknownAnalysisModuleTypeError:
-                    delete_analysis_request(request.id)
-    finally:
-        release(SYSTEM_LOCK_EXPIRED_ANALYSIS_REQUESTS)
+    assert isinstance(amt, AnalysisModuleType)
+    return get_system().request_tracking.process_expired_analysis_requests(amt)

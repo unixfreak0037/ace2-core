@@ -13,7 +13,6 @@ import ace.system.analysis_tracking
 import ace.system.caching
 import ace.system.config
 import ace.system.events
-import ace.system.locking
 import ace.system.observables
 import ace.system.processing
 import ace.system.storage
@@ -155,39 +154,6 @@ class LocalAceAPI(AceAPI):
 
     async def fire_event(self, event: str, *args, **kwargs):
         return ace.system.events.fire_event(event, *args, **kwargs)
-
-    # locking
-    async def get_lock_owner(self, lock_id: str) -> Union[str, None]:
-        return ace.system.locking.get_lock_owner(lock_id)
-
-    async def get_owner_wait_target(self, owner_id: str) -> Union[str, None]:
-        return ace.system.locking.get_owner_wait_target(owner_id)
-
-    async def track_wait_target(self, lock_id: Union[str, None], owner_id: str):
-        return ace.system.locking.track_wait_target(lock_id, owner_id)
-
-    async def clear_wait_target(self, owner_id: str):
-        return ace.system.locking.clear_wait_target(owner_id)
-
-    async def is_locked(self, lock_id: str) -> bool:
-        return ace.system.locking.is_locked(lock_id)
-
-    async def get_lock_count(
-        self,
-    ) -> int:
-        return ace.system.locking.get_lock_count()
-
-    async def acquire(
-        self,
-        lock_id: str,
-        owner_id: Optional[str] = None,
-        timeout: Union[int, float, None] = None,
-        lock_timeout: Union[int, float, None] = None,
-    ) -> bool:
-        return ace.system.locking.acquire(lock_id, owner_id, timeout, lock_timeout)
-
-    async def release(self, lock_id: str, owner_id: Optional[str] = None) -> bool:
-        return ace.system.locking.release(lock_id, owner_id)
 
     # observables
     async def create_observable(self, type: str, *args, **kwargs) -> Observable:

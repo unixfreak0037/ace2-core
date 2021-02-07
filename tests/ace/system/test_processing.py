@@ -34,9 +34,6 @@ def test_process_root_analysis_request():
     # the root analysis should be tracked
     assert get_root_analysis(root.uuid) is not None
 
-    # and it should not be locked
-    assert not root.is_locked()
-
     # the test observable should be in the queue
     assert get_queue_size(amt) == 1
     request = get_next_analysis_request(OWNER_UUID, amt, 0)
@@ -50,6 +47,62 @@ def test_process_root_analysis_request():
 
     # the original root analysis request should be deleted
     assert get_analysis_request(root_request.id) is None
+
+
+@pytest.mark.integration
+def test_process_parallel_root_analysis_request(monkeypatch):
+    amt = AnalysisModuleType(name=ANALYSIS_TYPE_TEST, description="blah", cache_ttl=60)
+    assert register_analysis_module_type(amt) == amt
+
+    root = RootAnalysis()
+    test_observable = root.add_observable("test", "test")
+
+    root_request = root.create_analysis_request()
+    process_analysis_request(root_request)
+
+    # the root analysis should be tracked
+    assert get_root_analysis(root.uuid) is not None
+
+    # get the current version of the root
+    old_root = get_root_analysis(root)
+
+    import ace.system.analysis_tracking
+
+    original_get_root_analysis = ace.system.analysis_tracking.get_root_analysis
+    trigger = False
+
+    def hacked_get_root_analysis(_root):
+        nonlocal root
+        nonlocal original_get_root_analysis
+        nonlocal trigger
+
+        result = original_get_root_analysis(_root)
+        if trigger:
+            return result
+
+        # only do this once
+        trigger = True
+
+        # modify the root right after we get it
+        from ace.system import get_system
+
+        if isinstance(_root, RootAnalysis):
+            _root = _root.uuid
+
+        root = get_system().analysis_tracking.get_root_analysis(_root)
+        root.save()
+
+        return result
+
+    with monkeypatch.context() as m:
+        m.setattr(ace.system.processing, "get_root_analysis", hacked_get_root_analysis)
+
+        # add an observable to an old copy of the root
+        observable = old_root.add_observable("test", "test_2")
+        process_analysis_request(old_root.create_analysis_request())
+
+    # it should have still worked
+    assert get_root_analysis(root).get_observable(observable)
 
 
 @pytest.mark.integration
@@ -161,6 +214,70 @@ def test_process_analysis_result(cache_ttl):
     if cache_ttl is not None:
         # this analysis result for this observable should be cached now
         assert get_cached_analysis_result(request.observable, request.type) is not None
+
+    # get the root analysis and ensure this observable has the analysis now
+    root = get_root_analysis(root.uuid)
+    assert root is not None
+    observable = root.get_observable(request.observable)
+    assert observable is not None
+    analysis = observable.get_analysis(request.type)
+    assert analysis is not None
+    assert analysis.root == root
+    assert analysis.observable == request.observable
+    assert analysis.details == request.modified_observable.get_analysis(amt).details
+
+    # request should be deleted
+    assert get_analysis_request(request.id) is None
+
+
+@pytest.mark.integration
+def test_process_analysis_result_modified_root(monkeypatch):
+    """Test handling of processing root that is modified during processing."""
+    amt = AnalysisModuleType("test", "")
+    assert register_analysis_module_type(amt) == amt
+
+    root = RootAnalysis()
+    test_observable = root.add_observable("test", "test")
+
+    root_request = root.create_analysis_request()
+    process_analysis_request(root_request)
+
+    # get the analysis request
+    request = get_next_analysis_request("test", amt, 0)
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
+
+    import ace.system.analysis_tracking
+
+    original_get_root_analysis = ace.system.analysis_tracking.get_root_analysis
+    trigger = False
+
+    def hacked_get_root_analysis(_root):
+        nonlocal root
+        nonlocal original_get_root_analysis
+        nonlocal trigger
+
+        result = original_get_root_analysis(_root)
+        if trigger:
+            return result
+
+        # only do this once
+        trigger = True
+
+        # modify the root right after we get it
+        from ace.system import get_system
+
+        if isinstance(_root, RootAnalysis):
+            _root = _root.uuid
+
+        root = get_system().analysis_tracking.get_root_analysis(_root)
+        root.save()
+
+        return result
+
+    with monkeypatch.context() as m:
+        m.setattr(ace.system.processing, "get_root_analysis", hacked_get_root_analysis)
+        process_analysis_request(request)
 
     # get the root analysis and ensure this observable has the analysis now
     root = get_root_analysis(root.uuid)
@@ -621,3 +738,17 @@ def test_manual_analysis_module_type():
 
     # and now there should be 1 since added the required directive with the request_manual_analysis function
     assert get_queue_size(amt) == 1
+
+
+@pytest.mark.integration
+def test_expired_analysis_request_processing():
+    amt = register_analysis_module_type(AnalysisModuleType(name="test", description="", timeout=0, cache_ttl=600))
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    root.submit()
+
+    request = get_next_analysis_request("test", amt, 0)
+    assert request
+
+    # when we ask again we get the same request because it expired already
+    assert get_next_analysis_request("test", amt, 0) == request

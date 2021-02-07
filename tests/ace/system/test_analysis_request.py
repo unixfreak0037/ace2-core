@@ -13,6 +13,7 @@ from ace.system.analysis_request import (
     get_analysis_request_by_request_id,
     get_analysis_requests_by_root,
     get_expired_analysis_requests,
+    link_analysis_requests,
     process_expired_analysis_requests,
     track_analysis_request,
 )
@@ -122,12 +123,14 @@ def test_result_observables():
 
 @pytest.mark.integration
 def test_lock_analysis_request():
-    from ace.system.locking import get_lock_owner
-
     root = RootAnalysis()
     request = root.create_analysis_request()
-    with request.lock():
-        assert get_lock_owner(request.lock_id) == request.lock_owner_id
+    track_analysis_request(request)
+    assert request.lock()
+    assert not request.lock()
+    assert request.unlock()
+    assert not request.unlock()
+    assert request.lock()
 
 
 @pytest.mark.integration
@@ -180,6 +183,7 @@ def test_get_expired_analysis_request():
 
 @pytest.mark.integration
 def test_process_expired_analysis_request():
+    # set the request to time out immediately
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
     register_analysis_module_type(amt)
 
@@ -191,7 +195,7 @@ def test_process_expired_analysis_request():
     track_analysis_request(request)
     assert get_expired_analysis_requests() == [request]
     add_work_queue(amt.name)
-    process_expired_analysis_requests()
+    process_expired_analysis_requests(amt)
     request = get_analysis_request_by_request_id(request.id)
     assert request.status == TRACKING_STATUS_QUEUED
     assert not get_expired_analysis_requests()
@@ -199,6 +203,7 @@ def test_process_expired_analysis_request():
 
 @pytest.mark.integration
 def test_process_expired_analysis_request_invalid_work_queue():
+    # test what happens when we're processing an expired analyiss request for a module type that has been deleted
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
     register_analysis_module_type(amt)
 
@@ -210,7 +215,7 @@ def test_process_expired_analysis_request_invalid_work_queue():
     track_analysis_request(request)
     assert get_expired_analysis_requests() == [request]
     delete_analysis_module_type(amt)
-    process_expired_analysis_requests()
+    process_expired_analysis_requests(amt)
     assert get_analysis_request_by_request_id(request.id) is None
     assert not get_expired_analysis_requests()
 
@@ -238,3 +243,51 @@ def test_clear_tracking_by_analysis_module_type():
     assert get_analysis_request_by_request_id(request.id)
     clear_tracking_by_analysis_module_type(amt)
     assert get_analysis_request_by_request_id(request.id) is None
+
+
+@pytest.mark.unit
+def test_link_analysis_requests():
+    amt = AnalysisModuleType("test", "")
+    register_analysis_module_type(amt)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    source_request = observable.create_analysis_request(amt)
+    track_analysis_request(source_request)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    dest_request = observable.create_analysis_request(amt)
+    track_analysis_request(dest_request)
+
+    assert link_analysis_requests(source_request, dest_request)
+
+    # attempting to link against a locked request fails
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    source_request = observable.create_analysis_request(amt)
+    track_analysis_request(source_request)
+    assert source_request.lock()
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    dest_request = observable.create_analysis_request(amt)
+    track_analysis_request(dest_request)
+
+    assert not link_analysis_requests(source_request, dest_request)
+
+    # attempting to link against a deleted request fails
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    source_request = observable.create_analysis_request(amt)
+    track_analysis_request(source_request)
+    delete_analysis_request(source_request)
+
+    root = RootAnalysis()
+    observable = root.add_observable("test", "test")
+    dest_request = observable.create_analysis_request(amt)
+    track_analysis_request(dest_request)
+
+    assert not link_analysis_requests(source_request, dest_request)

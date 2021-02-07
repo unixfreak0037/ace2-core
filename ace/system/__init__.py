@@ -16,7 +16,6 @@ class ACESystem:
     caching = None
     config = None
     events = None
-    locking = None
     module_tracking = None
     observable = None
     request_tracking = None
@@ -29,7 +28,6 @@ class ACESystem:
         self.caching.reset()
         self.config.reset()
         self.events.reset()
-        self.locking.reset()
         self.module_tracking.reset()
         self.request_tracking.reset()
         self.storage.reset()

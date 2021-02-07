@@ -93,7 +93,7 @@ def test_get_next_analysis_request_expired():
     assert next_ar == request
 
     # execute this manually
-    process_expired_analysis_requests()
+    process_expired_analysis_requests(amt)
 
     # should be back in the queue
     request = get_analysis_request_by_request_id(request.id)

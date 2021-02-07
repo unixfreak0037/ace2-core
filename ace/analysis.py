@@ -22,7 +22,6 @@ from typing import Union, Optional, Any
 import ace
 
 from ace.system.exceptions import UnknownObservableError
-from ace.system.locking import Lockable
 from ace.time import parse_datetime_string, utc_now
 from ace.data_model import (
     AnalysisModel,
@@ -496,7 +495,7 @@ class AnalysisModuleType:
                 return False
 
 
-class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
+class Analysis(TaggableObject, DetectableObject, MergableObject):
     """Represents an output of analysis work."""
 
     def __init__(
@@ -558,14 +557,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject, Lockable):
         # and a stack trace for debugging
         self.error_message = error_message
         self.stack_trace = stack_trace
-
-    #
-    # Lockable interface
-    #
-
-    @property
-    def lock_id(self):
-        return self.uuid
 
     # --------------------------------------------------------------------------------
 
@@ -1619,7 +1610,7 @@ class RootAnalysis(Analysis, MergableObject):
         analysis_mode=None,
         queue=None,
         instructions=None,
-        version=0,
+        version=None,
         expires=None,
         *args,
         **kwargs,
@@ -1639,7 +1630,7 @@ class RootAnalysis(Analysis, MergableObject):
         if uuid:
             self.uuid = uuid
 
-        self._version = 0
+        self._version = None
         if version is not None:
             self.version = version
 
@@ -1814,13 +1805,12 @@ class RootAnalysis(Analysis, MergableObject):
 
     @property
     def version(self) -> int:
-        """Returns the current version of this RootAnalysis object.
-        The version starts at 0 and increments every time the object is modified and saved."""
+        """Returns the current version of this RootAnalysis object."""
         return self._version
 
     @version.setter
-    def version(self, value: int):
-        assert isinstance(value, int) and value >= 0
+    def version(self, value: str):
+        assert value is None or isinstance(value, str) and value
         self._version = value
 
     @property
@@ -2038,17 +2028,56 @@ class RootAnalysis(Analysis, MergableObject):
         logging.debug("recorded observable {} with id {}".format(observable, observable.uuid))
         return observable
 
-    def save(self):
+    def save(self) -> bool:
+        """Tracks or updates this root. Returns True if successful, False otherwise."""
         from ace.system.analysis_tracking import track_root_analysis
 
-        track_root_analysis(self)
+        if not track_root_analysis(self):
+            return False
 
         for analysis in self.all_analysis:
             if analysis is not self:
                 analysis.save()
 
         # save our own details
-        return Analysis.save(self)
+        Analysis.save(self)
+        return True
+
+    def update(self) -> bool:
+        """Loads and merges any changes made to this root. Returns True if successful, False otherwise."""
+        from ace.system.analysis_tracking import get_root_analysis
+
+        existing_root = get_root_analysis(self)
+        if not existing_root:
+            return False
+
+        if self.version == existing_root.version:
+            return False
+
+        self.apply_merge(existing_root)
+        self.version = existing_root.version
+        return True
+
+    def update_and_save(self) -> bool:
+        """Calls RootAnalysis.save() in a loop until it is accepted. When the
+        call to save() fails, the most recent of the root is acquired and
+        merged into this root."""
+
+        from ace.system.analysis_tracking import get_root_analysis
+
+        for _ in range(100):  # safer way to do a while True:
+            if self.save():
+                return True
+
+            modified_root = get_root_analysis(self)
+            if modified_root.version == self.version:
+                raise RuntimeError("RootAnalysis.save() failed but version matches -- check logs for issues")
+
+            self.apply_merge(modified_root)
+            self.version = modified_root.version
+            continue
+        else:
+            raise RuntimeError("loop iterations exceeded -- check logs for issues")
 
     def __del__(self):
         # make sure that any remaining storage directories are wiped out
@@ -2076,11 +2105,11 @@ class RootAnalysis(Analysis, MergableObject):
             return f"RootAnalysis({self.uuid})"
 
     def __eq__(self, other):
-        """Two RootAnalysis objects are equal if the uuid is equal."""
+        """Two RootAnalysis objects are equal if the uuid and version is equal."""
         if not isinstance(other, type(self)):
             return False
 
-        return other.uuid == self.uuid
+        return other.uuid == self.uuid and other.version == self.version
 
     @property
     def all_analysis(self):
@@ -2234,6 +2263,7 @@ class RootAnalysis(Analysis, MergableObject):
         self.description = target.description
         self.analysis_cancelled = target.analysis_cancelled
         self.analysis_cancelled_reason = target.analysis_cancelled_reason
+        # NOTE that we don't copy over the version data
         return self
 
     def apply_diff_merge(self, before: "RootAnalysis", after: "RootAnalysis") -> "RootAnalysis":

@@ -3,7 +3,6 @@
 
 import asyncio
 import concurrent.futures
-import logging
 import multiprocessing
 import os
 import signal
@@ -18,6 +17,7 @@ from ace.api.base import AceAPI, AnalysisRequest
 from ace.error_reporting.reporter import format_error_report
 from ace.module.base import AnalysisModule
 from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
+from ace.system import get_logger
 from ace.system.analysis_module import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
 
 import psutil
@@ -66,7 +66,7 @@ def _initialize_executor(module_map):
         _type, amt = params
         # create a new instance of the analysis module
         sync_module_map[module_name] = _type(type=amt)
-        logging.info(f"loaded {amt.name} in subprocess")
+        get_logger().info(f"loaded {amt.name} in subprocess")
         # load any additional resources
         sync_module_map[module_name].load()
 
@@ -147,13 +147,13 @@ class AnalysisModuleManager:
         for task in asyncio.as_completed(tasks):
             module, existing_type = await task
             if not existing_type:
-                logging.critical(f"analysis module type {module.type.name} is not registered")
+                get_logger().critical(f"analysis module type {module.type.name} is not registered")
                 verification_ok = False
                 continue
 
             # is the version we have for this module different than the version already registered?
             if not module.type.version_matches(existing_type):
-                logging.critical(f"analysis module type {module.type.name} has a different version")
+                get_logger().critical(f"analysis module type {module.type.name} has a different version")
                 verification_ok = False
                 continue
 
@@ -170,7 +170,7 @@ class AnalysisModuleManager:
 
                 # is it still different?
                 if not module.type.extended_version_matches(existing_type):
-                    logging.critical(
+                    get_logger().critical(
                         f"analysis module type {module.type.name} has a different extended version after upgrade"
                     )
                     verification_ok = False
@@ -244,7 +244,7 @@ class AnalysisModuleManager:
             return
 
         for process in psutil.Process(os.getpid()).children():
-            logging.warning(f"sending KILL to {process}")
+            get_logger().warning(f"sending KILL to {process}")
             process.send_signal(signal.SIGTERM)
 
     async def run_once(self) -> bool:
@@ -285,7 +285,7 @@ class AnalysisModuleManager:
                 try:
                     module = await completed_task
                 except asyncio.CancelledError as e:
-                    logging.warning(f"task {completed_task.get_name()} was cancelled before it completed")
+                    get_logger().warning(f"task {completed_task.get_name()} was cancelled before it completed")
 
         self.executor.shutdown(wait=False, cancel_futures=True)
         self.kill_executor()
@@ -318,7 +318,7 @@ class AnalysisModuleManager:
             return True
 
         except Exception as e:
-            logging.error(f"unable to upgrade module {module.type}: {e}")
+            get_logger().error(f"unable to upgrade module {module.type}: {e}")
             return False
 
     async def module_loop(self, module: AnalysisModule, whoami: str):
@@ -328,12 +328,12 @@ class AnalysisModuleManager:
         try:
             request = await get_api().get_next_analysis_request(whoami, module.type, self.wait_time)
         except AnalysisModuleTypeExtendedVersionError as e:
-            logging.warning(f"module {module.type.name} has invalid extended version: {e}")
+            get_logger().warning(f"module {module.type.name} has invalid extended version: {e}")
             if not await self.upgrade_module(module):
                 self.shutdown = True
 
         except AnalysisModuleTypeVersionError as e:
-            logging.error(f"module {module.type.name} has invalid version: {e}")
+            get_logger().error(f"module {module.type.name} has invalid version: {e}")
             self.shutdown = True
 
         scaling = self.compute_scaling(module)
@@ -433,5 +433,5 @@ class AnalysisModuleManager:
         else:
             analysis.error_message = error_message
         analysis.stack_trace = format_error_report(e)
-        logging.error(error_message)
+        get_logger().error(error_message)
         return request

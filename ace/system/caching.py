@@ -1,11 +1,10 @@
 # vim: ts=4:sw=4:et:cc=120
 import hashlib
-import logging
 
 from typing import Union, Optional
 
 from ace.analysis import Observable, AnalysisModuleType
-from ace.system import ACESystemInterface, get_system
+from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.analysis_module import AnalysisModuleType
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.constants import EVENT_CACHE_NEW
@@ -84,19 +83,19 @@ def cache_analysis_result(request: AnalysisRequest) -> Union[str, None]:
     if cache_key is None:
         return None
 
-    logging.debug(f"caching analysis request {request} with key {cache_key} ttl {request.type.cache_ttl}")
+    get_logger().debug(f"caching analysis request {request} with key {cache_key} ttl {request.type.cache_ttl}")
     result = get_system().caching.cache_analysis_result(cache_key, request, request.type.cache_ttl)
     fire_event(EVENT_CACHE_NEW, cache_key, request)
     return result
 
 
 def delete_expired_cached_analysis_results():
-    logging.debug(f"deleting expired cached analysis results")
+    get_logger().debug(f"deleting expired cached analysis results")
     get_system().caching.delete_expired_cached_analysis_results()
 
 
 def delete_cached_analysis_results_by_module_type(amt: AnalysisModuleType):
-    logging.debug(f"deleting cached analysis results for analysis module type {amt}")
+    get_logger().debug(f"deleting cached analysis results for analysis module type {amt}")
     get_system().caching.delete_cached_analysis_results_by_module_type(amt)
 
 

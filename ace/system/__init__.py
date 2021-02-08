@@ -2,6 +2,8 @@
 #
 # global system components
 
+import logging
+
 
 class ACESystemInterface:
     """The base class that all system interfaces inherit from."""
@@ -59,3 +61,7 @@ def set_system(system: ACESystem):
     """Sets the reference to the global ACESystem object."""
     global global_system
     global_system = system
+
+
+def get_logger():
+    return logging.getLogger("ace")

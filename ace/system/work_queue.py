@@ -1,9 +1,8 @@
 # vim: ts=4:sw=4:et:cc=120
 
-import logging
 from typing import Union, Optional
 
-from ace.system import ACESystemInterface, get_system
+from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.analysis_module import (
     AnalysisModuleType,
     AnalysisModuleTypeVersionError,
@@ -80,7 +79,7 @@ def put_work(amt: Union[AnalysisModuleType, str], analysis_request: AnalysisRequ
     if isinstance(amt, AnalysisModuleType):
         amt = amt.name
 
-    logging.debug(f"adding request {analysis_request} to work queue for {amt}")
+    get_logger().debug(f"adding request {analysis_request} to work queue for {amt}")
     result = get_system().work_queue.put_work(amt, analysis_request)
     fire_event(EVENT_WORK_ADD, amt, analysis_request)
     return result
@@ -101,7 +100,7 @@ def delete_work_queue(amt: Union[AnalysisModuleType, str]) -> bool:
     if isinstance(amt, AnalysisModuleType):
         amt = amt.name
 
-    logging.debug(f"deleting work queue for {amt}")
+    get_logger().debug(f"deleting work queue for {amt}")
     result = get_system().work_queue.delete_work_queue(amt)
     if result:
         fire_event(EVENT_WORK_QUEUE_DELETED, amt)
@@ -114,7 +113,7 @@ def add_work_queue(amt: Union[AnalysisModuleType, str]) -> bool:
     if isinstance(amt, AnalysisModuleType):
         amt = amt.name
 
-    logging.debug(f"adding work queue for {amt}")
+    get_logger().debug(f"adding work queue for {amt}")
     result = get_system().work_queue.add_work_queue(amt)
     if result:
         fire_event(EVENT_WORK_QUEUE_NEW, amt)
@@ -145,11 +144,11 @@ def get_next_analysis_request(
     # if that's the case then the request fails and the requestor needs to update to the new version
     existing_amt = get_analysis_module_type(amt.name)
     if existing_amt and not existing_amt.version_matches(amt):
-        logging.info(f"requested amt {amt} version mismatch against {existing_amt}")
+        get_logger().info(f"requested amt {amt} version mismatch against {existing_amt}")
         raise AnalysisModuleTypeVersionError(amt, existing_amt)
 
     if existing_amt and not existing_amt.extended_version_matches(amt):
-        logging.info(f"requested amt {amt} extended version mismatch against {existing_amt}")
+        get_logger().info(f"requested amt {amt} extended version mismatch against {existing_amt}")
         raise AnalysisModuleTypeExtendedVersionError(amt, existing_amt)
 
     # make sure expired analysis requests go back in the work queues
@@ -165,13 +164,13 @@ def get_next_analysis_request(
             # if it was deleted then we ignore it and move on to the next one
             # this can happen if the request is deleted while it's waiting in the queue
             if not next_ar:
-                logging.warning("unknown request {next_ar} aquired from work queue for {amt}")
+                get_logger().warning("unknown request {next_ar} aquired from work queue for {amt}")
                 continue
 
             # set the owner, status then update
             next_ar.owner = owner_uuid
             next_ar.status = TRACKING_STATUS_ANALYZING
-            logging.debug(f"assigned analysis request {next_ar} to {owner_uuid}")
+            get_logger().debug(f"assigned analysis request {next_ar} to {owner_uuid}")
             track_analysis_request(next_ar)
             fire_event(EVENT_WORK_ASSIGNED, next_ar)
 

@@ -1,9 +1,8 @@
 # vim: ts=4:sw=4:et:cc=120
 
-import logging
 from typing import Optional
 
-from ace.system import ACESystemInterface, get_system
+from ace.system import ACESystemInterface, get_system, get_logger
 
 
 class EventHandler:
@@ -41,12 +40,12 @@ class EventInterface(ACESystemInterface):
 
 
 def register_event_handler(event: str, handler: EventHandler):
-    logging.debug(f"registering event handler for {event}: {handler}")
+    get_logger().debug(f"registering event handler for {event}: {handler}")
     return get_system().events.register_event_handler(event, handler)
 
 
 def remove_event_handler(handler: EventHandler, events: Optional[list[str]] = []):
-    logging.debug(f"removing event handler {handler}")
+    get_logger().debug(f"removing event handler {handler}")
     return get_system().events.remove_event_handler(handler, events)
 
 
@@ -58,7 +57,7 @@ def fire_event(event: str, *args, **kwargs):
     """Calls all registered event handlers for the given event.
     There is no requirement that handlers are called in any particular order."""
 
-    logging.debug(f"fired event {event}")
+    get_logger().debug(f"fired event {event}")
     for handler in get_event_handlers(event):
         try:
             handler.handle_event(event, *args, **kwargs)

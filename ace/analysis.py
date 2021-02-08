@@ -5,7 +5,6 @@ import copy
 import datetime
 import hashlib
 import json
-import logging
 import os
 import os.path
 import pprint
@@ -21,6 +20,7 @@ from typing import Union, Optional, Any
 
 import ace
 
+from ace.system import get_logger
 from ace.system.exceptions import UnknownObservableError
 from ace.time import parse_datetime_string, utc_now
 from ace.data_model import (
@@ -164,7 +164,7 @@ class DetectableObject(MergableObject):
             return self
 
         self._detections.append(detection)
-        logging.debug(f"added detection point {detection} to {self}")
+        get_logger().debug(f"added detection point {detection} to {self}")
         return self
 
     def clear_detection_points(self):
@@ -235,7 +235,7 @@ class TaggableObject(MergableObject):
             return self
 
         self.tags.append(tag)
-        logging.debug(f"added {tag} to {self}")
+        get_logger().debug(f"added {tag} to {self}")
         return self
 
     def clear_tags(self):
@@ -414,7 +414,7 @@ class AnalysisModuleType:
         for dep in self.dependencies:
             amt = get_analysis_module_type(dep)
             if amt is None:
-                logging.debug(f"{observable} has unknown dependency {dep}")
+                get_logger().debug(f"{observable} has unknown dependency {dep}")
                 return False
 
             if not observable.analysis_completed(amt):
@@ -452,7 +452,7 @@ class AnalysisModuleType:
                     self.compiled_conditions[condition] = re.compile(_value)
                 except Exception as e:
                     self.compiled_conditions[condition] = False
-                    logging.error(f"regex condition {_value} from type {self.name} compliation failure: {e}")
+                    get_logger().error(f"regex condition {_value} from type {self.name} compliation failure: {e}")
 
             # if we failed to compile then the condition fails
             if not self.compiled_conditions[condition]:
@@ -568,10 +568,10 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
         # this is called whenever .details is requested and it hasn't been loaded yet
 
         if self._details_modified:
-            logging.warning("called _load_details() after details where modified")
+            get_logger().warning("called _load_details() after details where modified")
 
         if self._details is not None:
-            logging.warning("called _load_details() after details was already set")
+            get_logger().warning("called _load_details() after details was already set")
 
         try:
             from ace.system.analysis_tracking import get_analysis_details
@@ -580,12 +580,12 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
             self._details_modified = False
 
             if self._details is None:
-                logging.warning(f"missing analysis details for {self.uuid}")
+                get_logger().warning(f"missing analysis details for {self.uuid}")
 
             return self._details
 
         except Exception as e:
-            logging.error("unable to load analysis details {self.uuid}: {e}")
+            get_logger().error("unable to load analysis details {self.uuid}: {e}")
             raise e
 
     #
@@ -921,7 +921,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
         assert isinstance(ar, AnalysisRequest)
 
-        logging.debug(f"tracking analysis request {ar} for {self}")
+        get_logger().debug(f"tracking analysis request {ar} for {self}")
         self.request_tracking[ar.type.name] = ar.id
 
     # XXX not sure we use this
@@ -1067,7 +1067,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         assert isinstance(directive, str)
         if directive not in self.directives:
             self.directives.append(directive)
-            logging.debug(f"added directive {directive} to {self}")
+            get_logger().debug(f"added directive {directive} to {self}")
 
         return self
 
@@ -1113,7 +1113,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         if target.uuid not in self._links:
             self._links.append(target.uuid)
 
-        logging.debug("linked {} to {}".format(self, target))
+        get_logger().debug("linked {} to {}".format(self, target))
 
     @property
     def limited_analysis(self):
@@ -1354,7 +1354,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
         analysis.observables = analysis_observables
 
-        logging.debug(f"added analysis {analysis} type {analysis.type} to observable {self}")
+        get_logger().debug(f"added analysis {analysis} type {analysis.type} to observable {self}")
         return analysis
 
     def get_analysis(self, amt: Union[AnalysisModuleType, str]) -> Union[Analysis, None]:
@@ -1985,7 +1985,7 @@ class RootAnalysis(Analysis, MergableObject):
         # XXX gross this is probably pretty inefficient
         for o in self.observable_store.values():
             if o == observable:
-                logging.debug(
+                get_logger().debug(
                     "returning existing observable {} ({}) [{}] <{}> for {} ({}) [{}] <{}>".format(
                         o, id(o), o.uuid, o.type, observable, id(observable), observable.uuid, observable.type
                     )
@@ -1994,7 +1994,7 @@ class RootAnalysis(Analysis, MergableObject):
 
         observable.root = self
         self.observable_store[observable.uuid] = observable
-        logging.debug("recorded observable {} with id {}".format(observable, observable.uuid))
+        get_logger().debug("recorded observable {} with id {}".format(observable, observable.uuid))
         return observable
 
     def save(self) -> bool:
@@ -2051,7 +2051,7 @@ class RootAnalysis(Analysis, MergableObject):
     def __del__(self):
         # make sure that any remaining storage directories are wiped out
         if self.discard():
-            logging.warning(f"discard() was not called on {self}")
+            get_logger().warning(f"discard() was not called on {self}")
 
     def discard(self) -> bool:
         """Discards a local RootAnalysis object. This has the effect of
@@ -2061,7 +2061,7 @@ class RootAnalysis(Analysis, MergableObject):
         Returns True if something was deleted, False otherwise."""
         if self.storage_dir and os.path.exists(self.storage_dir):
             shutil.rmtree(self.storage_dir)
-            logging.debug(f"deleted {self.storage_dir}")
+            get_logger().debug(f"deleted {self.storage_dir}")
             self.storage_dir = None
             return True
 

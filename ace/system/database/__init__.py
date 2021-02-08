@@ -4,7 +4,6 @@ CONFIG_DB_URL = "/ace/core/sqlalchemy/url"
 CONFIG_DB_KWARGS = "/ace/core/sqlalchemy/kwargs"
 
 import functools
-import logging
 import os
 import os.path
 import random
@@ -16,7 +15,7 @@ import sqlite3
 
 import ace
 
-from ace.system import ACESystem, get_system
+from ace.system import ACESystem, get_system, get_logger
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import DBAPIError, IntegrityError
@@ -87,14 +86,14 @@ class DatabaseACESystem:
             if connection_record.info["pid"] != pid:
                 connection_record.connection = connection_proxy.connection = None
                 message = f"connection record belongs to pid {connection_record.info['pid']} attempting to check out in pid {pid}"
-                logging.debug(message)
+                get_logger().debug(message)
                 raise exc.DisconnectionError(message)
 
             tid = threading.get_ident()
             if connection_record.info["tid"] != tid:
                 connection_record.connection = connection_proxy.connection = None
                 message = f"connection record belongs to tid {connection_record.info['tid']} attempting to check out in tid {tid}"
-                logging.debug(message)
+                get_logger().debug(message)
                 raise exc.DisconnectionError(message)
 
         self.DatabaseSession = sessionmaker(bind=self.engine)
@@ -177,7 +176,7 @@ def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=Fa
             else:
                 for (_sql, _params) in zip(sql_or_func, params):
                     # if ace.CONFIG['global'].getboolean('log_sql'):
-                    # logging.debug(f"executing with retry (attempt #{count}) sql {_sql} with paramters {_params}")
+                    # get_logger().debug(f"executing with retry (attempt #{count}) sql {_sql} with paramters {_params}")
                     cursor.execute(_sql, _params)
                     results.append(cursor.rowcount)
 
@@ -205,11 +204,11 @@ def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=Fa
             if (
                 e.args[0] == 1213 or e.args[0] == 1205 or (isinstance(e.args[0], str) and e.args[0] == "DEADLOCK")
             ) and count < attempts:
-                logging.warning("deadlock detected -- trying again (attempt #{})".format(count))
+                get_logger().warning("deadlock detected -- trying again (attempt #{})".format(count))
                 try:
                     db.rollback()
                 except Exception as rollback_error:
-                    logging.error("rollback failed for transaction in deadlock: {}".format(rollback_error))
+                    get_logger().error("rollback failed for transaction in deadlock: {}".format(rollback_error))
                     raise e
 
                 count += 1
@@ -219,7 +218,7 @@ def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=Fa
                 if not callable(sql_or_func):
                     i = 0
                     for _sql, _params in zip(sql_or_func, params):
-                        logging.warning(
+                        get_logger().warning(
                             "DEADLOCK STATEMENT #{} SQL {} PARAMS {}".format(
                                 i, _sql, ",".join([str(_) for _ in _params])
                             )
@@ -282,12 +281,14 @@ def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
                 or (isinstance(e.orig.args[0], str) and e.orig.args[0] == "DEADLOCK")
                 and current_attempt < attempts
             ):
-                logging.debug(f"DEADLOCK STATEMENT attempt #{current_attempt + 1} SQL {e.statement} PARAMS {e.params}")
+                get_logger().debug(
+                    f"DEADLOCK STATEMENT attempt #{current_attempt + 1} SQL {e.statement} PARAMS {e.params}"
+                )
 
                 try:
                     get_db().rollback()  # rolls back to the begin_nested()
                 except Exception as e:
-                    logging.error(f"unable to roll back transaction: {e}")
+                    get_logger().error(f"unable to roll back transaction: {e}")
 
                     et, ei, tb = sys.exc_info()
                     raise e.with_traceback(tb)

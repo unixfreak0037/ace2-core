@@ -2,10 +2,9 @@
 #
 # global system components
 
-import logging
 from typing import Any, Optional
 
-from ace.system import get_system, ACESystemInterface
+from ace.system import get_logger, get_system, ACESystemInterface
 from ace.system.constants import EVENT_CONFIG_SET
 from ace.system.events import fire_event
 
@@ -23,7 +22,7 @@ def get_config(key: str, default: Optional[Any] = None) -> Any:
 
 
 def set_config(key: str, value: Any):
-    logging.debug(f"modified config key {key}")
+    get_logger().debug(f"modified config key {key}")
     result = get_system().config.set_config(key, value)
     fire_event(EVENT_CONFIG_SET, key, value)
     return result

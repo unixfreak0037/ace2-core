@@ -1,13 +1,12 @@
 # vim: ts=4:sw=4:et:cc=120
 
 import json
-import logging
 
 from dataclasses import dataclass, field
 from typing import Union, Optional
 
 from ace.analysis import Observable, RootAnalysis, AnalysisModuleType
-from ace.system import ACESystemInterface, get_system
+from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.constants import EVENT_AMT_NEW, EVENT_AMT_MODIFIED, EVENT_AMT_DELETED
 from ace.system.events import fire_event
 
@@ -78,7 +77,7 @@ def register_analysis_module_type(amt: AnalysisModuleType) -> AnalysisModuleType
     # make sure all the dependencies exist
     for dep in amt.dependencies:
         if get_analysis_module_type(dep) is None:
-            logging.error(f"registration for {amt} failed: dependency on unknown type {dep}")
+            get_logger().error(f"registration for {amt} failed: dependency on unknown type {dep}")
             raise UnknownAnalysisModuleTypeError(amt)
 
     # make sure there are no circular (or self) dependencies
@@ -102,7 +101,7 @@ def register_analysis_module_type(amt: AnalysisModuleType) -> AnalysisModuleType
 
 def track_analysis_module_type(amt: AnalysisModuleType):
     assert isinstance(amt, AnalysisModuleType)
-    logging.debug(f"tracking analysis module type {amt}")
+    get_logger().debug(f"tracking analysis module type {amt}")
     return get_system().module_tracking.track_analysis_module_type(amt)
 
 
@@ -127,7 +126,7 @@ def delete_analysis_module_type(amt: Union[AnalysisModuleType, str]) -> bool:
     if not get_analysis_module_type(amt.name):
         return False
 
-    logging.info(f"deleting analysis module type {amt}")
+    get_logger().info(f"deleting analysis module type {amt}")
 
     # remove the work queue for the module
     delete_work_queue(amt.name)

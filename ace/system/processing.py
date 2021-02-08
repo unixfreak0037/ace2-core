@@ -2,10 +2,9 @@
 #
 
 import copy
-import logging
 
 from ace.analysis import recurse_tree
-from ace.system import ACESystemInterface, get_system
+from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.alerting import track_alert
 from ace.system.analysis_tracking import (
     UnknownRootAnalysisError,
@@ -66,18 +65,18 @@ def process_analysis_request(ar: AnalysisRequest):
 
         # is this analysis request gone?
         if not existing_ar:
-            logging.info(f"requested unknown analysis request {ar.id}")
+            get_logger().info(f"requested unknown analysis request {ar.id}")
             raise UnknownAnalysisRequest(ar)
 
         # did the ownership change?
         if existing_ar.owner != ar.owner:
-            logging.info(f"requested expired analysis request {ar.id}")
+            get_logger().info(f"requested expired analysis request {ar.id}")
             raise ExpiredAnalysisRequest(ar)
 
         # get the existing root analysis
         target_root = get_root_analysis(ar.root)
         if not target_root:
-            logging.info(f"analysis request {ar.id} referenced unknown root {ar.root}")
+            get_logger().info(f"analysis request {ar.id} referenced unknown root {ar.root}")
             raise UnknownRootAnalysisError(ar)
 
         # should we cache these results?
@@ -94,17 +93,17 @@ def process_analysis_request(ar: AnalysisRequest):
         # and apply any modifications to the observable
         target_observable = target_root.get_observable(ar.observable)
         if not target_observable:
-            logging.error(f"cannot find {ar.observable} in target root {target_root}")
+            get_logger().error(f"cannot find {ar.observable} in target root {target_root}")
             raise UnknownObservableError(ar.observable)
 
         original_observable = ar.original_root.get_observable(ar.observable)
         if not original_observable:
-            logging.error(f"cannot find {ar.observable} in original root {ar.original_root}")
+            get_logger().error(f"cannot find {ar.observable} in original root {ar.original_root}")
             raise UnknownObservableError(ar.observable)
 
         modified_observable = ar.modified_root.get_observable(ar.observable)
         if not modified_observable:
-            logging.error(f"cannot find {ar.observable} in modified root {ar.modified_root}")
+            get_logger().error(f"cannot find {ar.observable} in modified root {ar.modified_root}")
             raise UnknownObservableError(ar.observable)
 
         target_observable.apply_diff_merge(original_observable, modified_observable, ar.type)
@@ -118,7 +117,7 @@ def process_analysis_request(ar: AnalysisRequest):
             linked_request.initialize_result()
             linked_request.original_root = ar.original_root
             linked_request.modified_root = ar.modified_root
-            logging.debug(f"processing linked analysis request {linked_request} from {ar}")
+            get_logger().debug(f"processing linked analysis request {linked_request} from {ar}")
             process_analysis_request(linked_request)
 
     elif ar.is_root_analysis_request:
@@ -135,7 +134,7 @@ def process_analysis_request(ar: AnalysisRequest):
 
     # this should never fire
     if target_root is None:
-        logging.critical("hit unexpected code branch")
+        get_logger().critical("hit unexpected code branch")
         raise RuntimeError("target_root is None")
 
     # did we generate an alert?
@@ -144,7 +143,7 @@ def process_analysis_request(ar: AnalysisRequest):
 
     # for each observable that needs to be analyzed
     if not target_root.analysis_cancelled:
-        logging.debug(f"processing {target_root}")
+        get_logger().debug(f"processing {target_root}")
         for observable in ar.observables:
             for amt in get_all_analysis_module_types():
                 # does this analysis module accept this observable?
@@ -188,7 +187,9 @@ def process_analysis_request(ar: AnalysisRequest):
                 # is this analysis in the cache?
                 cached_result = get_cached_analysis_result(observable, amt)
                 if cached_result:
-                    logging.debug(f"using cached result {cached_result} for {observable} type {amt} in {target_root}")
+                    get_logger().debug(
+                        f"using cached result {cached_result} for {observable} type {amt} in {target_root}"
+                    )
 
                     new_ar.original_root = cached_result.original_root
                     new_ar.modified_root = cached_result.modified_root
@@ -201,7 +202,9 @@ def process_analysis_request(ar: AnalysisRequest):
                     continue
 
                 # otherwise we need to request it
-                logging.info(f"creating new analysis request for observable {observable} amt {amt} root {target_root}")
+                get_logger().info(
+                    f"creating new analysis request for observable {observable} amt {amt} root {target_root}"
+                )
                 # (we also track the request inside the RootAnalysis object)
                 observable.track_analysis_request(new_ar)
                 # track_analysis_request(new_ar)
@@ -215,6 +218,6 @@ def process_analysis_request(ar: AnalysisRequest):
 
     # should this root expire now?
     if ar.root.is_expired():
-        logging.debug(f"deleting expired root analysis {ar.root}")
+        get_logger().debug(f"deleting expired root analysis {ar.root}")
         fire_event(EVENT_ANALYSIS_ROOT_EXPIRED, ar.root)
         delete_root_analysis(ar.root)

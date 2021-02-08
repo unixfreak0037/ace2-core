@@ -1,13 +1,12 @@
 # vim: ts=4:sw=4:et:cc=120
 
 import copy
-import logging
 import uuid
 from typing import Union, List, Optional, Any
 
 from ace.analysis import RootAnalysis, Observable
 from ace.data_model import AnalysisRequestModel, RootAnalysisModel
-from ace.system import ACESystemInterface, get_system
+from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
 from ace.system.constants import (
@@ -258,7 +257,7 @@ def track_analysis_request(request: AnalysisRequest):
     if request.type and get_analysis_module_type(request.type.name) is None:
         raise UnknownAnalysisModuleTypeError(request.type.name)
 
-    logging.debug(f"tracking analysis request {request}")
+    get_logger().debug(f"tracking analysis request {request}")
     result = get_system().request_tracking.track_analysis_request(request)
     fire_event(EVENT_AR_NEW, request)
     return result
@@ -280,7 +279,7 @@ def link_analysis_requests(source_request: AnalysisRequest, dest_request: Analys
     assert isinstance(source_request, AnalysisRequest)
     assert isinstance(dest_request, AnalysisRequest)
     assert source_request != dest_request
-    logging.debug(f"linking analysis request source {source_request} to dest {dest_request}")
+    get_logger().debug(f"linking analysis request source {source_request} to dest {dest_request}")
     return get_system().request_tracking.link_analysis_requests(source_request, dest_request)
 
 
@@ -316,7 +315,7 @@ def delete_analysis_request(target: Union[AnalysisRequest, str]) -> bool:
     if isinstance(target, AnalysisRequest):
         target = target.id
 
-    logging.debug(f"deleting analysis request {target}")
+    get_logger().debug(f"deleting analysis request {target}")
     result = get_system().request_tracking.delete_analysis_request(target)
     if result:
         fire_event(EVENT_AR_DELETED, target)
@@ -335,7 +334,7 @@ def get_analysis_requests_by_root(key: str) -> list[AnalysisRequest]:
 
 def clear_tracking_by_analysis_module_type(amt: AnalysisModuleType):
     """Deletes tracking for any requests assigned to the given analysis module type."""
-    logging.debug(f"clearing analysis request tracking for analysis module type {amt}")
+    get_logger().debug(f"clearing analysis request tracking for analysis module type {amt}")
     return get_system().request_tracking.clear_tracking_by_analysis_module_type(amt)
 
 

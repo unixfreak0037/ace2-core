@@ -3,7 +3,6 @@
 import contextlib
 import datetime
 import io
-import logging
 import os.path
 import shutil
 
@@ -11,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Union, Optional, Iterator
 
 from ace.analysis import RootAnalysis
-from ace.system import ACESystemInterface, get_system
+from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.constants import EVENT_STORAGE_NEW, EVENT_STORAGE_DELETED
 from ace.system.events import fire_event
@@ -92,7 +91,7 @@ class StorageInterface(ACESystemInterface):
 def store_content(content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
     assert isinstance(content, bytes) or isinstance(content, str) or isinstance(content, io.IOBase)
     assert isinstance(meta, ContentMetadata)
-    logging.debug(f"storing content {meta}")
+    get_logger().debug(f"storing content {meta}")
     sha256 = get_system().storage.store_content(content, meta)
     fire_event(EVENT_STORAGE_NEW, sha256, meta)
     return sha256
@@ -116,7 +115,7 @@ def iter_expired_content() -> Iterator[ContentMetadata]:
 
 
 def delete_content(sha256: str) -> bool:
-    logging.debug(f"deleting content {sha256}")
+    get_logger().debug(f"deleting content {sha256}")
     result = get_system().storage.delete_content(sha256)
     if result:
         fire_event(EVENT_STORAGE_DELETED, sha256)
@@ -131,7 +130,7 @@ def track_content_root(sha256: str, root: Union[RootAnalysis, str]):
     if isinstance(root, RootAnalysis):
         root = root.uuid
 
-    logging.debug(f"tracking content {sha256} to root {root}")
+    get_logger().debug(f"tracking content {sha256} to root {root}")
     get_system().storage.track_content_root(sha256, root)
 
 
@@ -179,7 +178,7 @@ def has_valid_root_reference(meta: ContentMetadata) -> bool:
 
 def delete_expired_content() -> int:
     """Deletes all expired content and returns the number of items deleted."""
-    logging.debug("deleting expired content")
+    get_logger().debug("deleting expired content")
     count = 0
     for meta in iter_expired_content():
         root_exists = False

@@ -463,37 +463,6 @@ class AnalysisModuleType:
             target_buffer = pp.pformat(observable.root.to_dict())
             return self.compiled_conditions[condition].search(target_buffer, re.S)
 
-        # python condition
-        elif _type == "py3":
-            # compile python code if we haven't already
-            if condition not in self.compiled_conditions:
-                try:
-                    self.compiled_conditions[condition] = compile(_value, self.name, "eval")
-                except Exception as e:
-                    get_logger().error(f"python condition from type {self.name} compliation failure: {e}")
-                    self.compiled_conditions[condition] = False
-
-            # if we failed to compile then the condition fails
-            if not self.compiled_conditions[condition]:
-                return False
-
-            try:
-                # on two local variables are available to the python snippit:
-                # observable and analysis module type
-                return bool(
-                    eval(
-                        self.compiled_conditions[condition],
-                        {},
-                        {
-                            "observable": observable,
-                            "amt": self,
-                        },
-                    )
-                )
-            except Exception as e:
-                get_logger().error(f"python condition from type {self.name} failed to execute: {e}")
-                return False
-
 
 class Analysis(TaggableObject, DetectableObject, MergableObject):
     """Represents an output of analysis work."""

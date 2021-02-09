@@ -197,7 +197,7 @@ def process_analysis_request(ar: AnalysisRequest):
                     track_analysis_request(new_ar)
                     observable.track_analysis_request(new_ar)
                     target_root.update_and_save()
-                    fire_event(EVENT_CACHE_HIT, target_root, observable, new_ar)
+                    fire_event(EVENT_CACHE_HIT, [target_root, observable, new_ar])
                     process_analysis_request(new_ar)
                     continue
 

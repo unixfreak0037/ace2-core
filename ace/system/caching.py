@@ -85,7 +85,7 @@ def cache_analysis_result(request: AnalysisRequest) -> Union[str, None]:
 
     get_logger().debug(f"caching analysis request {request} with key {cache_key} ttl {request.type.cache_ttl}")
     result = get_system().caching.cache_analysis_result(cache_key, request, request.type.cache_ttl)
-    fire_event(EVENT_CACHE_NEW, cache_key, request)
+    fire_event(EVENT_CACHE_NEW, [cache_key, request])
     return result
 
 

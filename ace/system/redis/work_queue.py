@@ -1,9 +1,5 @@
 # vim: ts=4:sw=4:et:cc=120
 
-CONFIG_REDIS_HOST = "/ace/core/redis/host"
-CONFIG_REDIS_PORT = "/ace/core/redis/port"
-CONFIG_REDIS_DB = "/ace/core/redis/db"
-
 import json
 
 from typing import Union, Optional
@@ -11,6 +7,7 @@ from typing import Union, Optional
 from ace.system import ACESystemInterface
 from ace.system.analysis_module import UnknownAnalysisModuleTypeError
 from ace.system.analysis_request import AnalysisRequest
+from ace.system.redis import CONFIG_REDIS_DB, CONFIG_REDIS_PORT, CONFIG_REDIS_HOST, get_redis_connection
 from ace.system.work_queue import WorkQueueManagerInterface
 from ace.time import utc_now
 
@@ -29,15 +26,6 @@ def get_marker_name(name: str) -> str:
 
 def get_queue_name(name: str) -> str:
     return f"work_queue:{name}"
-
-
-def get_redis_connection():
-    """Returns a redis connection to use."""
-    return redis.Redis(
-        host=get_config(CONFIG_REDIS_HOST, default="localhost"),
-        port=get_config(CONFIG_REDIS_PORT, default=6379),
-        db=get_config(CONFIG_REDIS_DB, default=0),
-    )
 
 
 class RedisWorkQueueManagerInterface(WorkQueueManagerInterface):

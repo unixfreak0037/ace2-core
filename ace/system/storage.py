@@ -17,6 +17,7 @@ from ace.system.events import fire_event
 from ace.time import utc_now
 
 
+# XXX this needs to move to pydantic
 @dataclass
 class ContentMetadata:
     # the meta "name" of the content
@@ -93,7 +94,7 @@ def store_content(content: Union[bytes, str, io.IOBase], meta: ContentMetadata) 
     assert isinstance(meta, ContentMetadata)
     get_logger().debug(f"storing content {meta}")
     sha256 = get_system().storage.store_content(content, meta)
-    fire_event(EVENT_STORAGE_NEW, sha256, meta)
+    fire_event(EVENT_STORAGE_NEW, [sha256, meta])
     return sha256
 
 

@@ -27,5 +27,15 @@ class ThreadedEventInterafce(EventInterface):
     def get_event_handlers(self, event: str) -> list[EventHandler]:
         return self.event_handlers.get(event, [])
 
+    def fire_event(self, event: str, event_json: str):
+        assert isinstance(event, str) and event
+        assert isinstance(event_json, str) and event_json
+
+        for handler in self.get_event_handlers(event):
+            try:
+                handler.handle_event(event, event_json)
+            except Exception as e:
+                handler.handle_exception(event, e, event_json)
+
     def reset(self):
         self.event_handlers = {}

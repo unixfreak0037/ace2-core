@@ -9,22 +9,17 @@ from ace.data_model import Event
 from ace.system import ACESystemInterface, get_system, get_logger
 
 #
-# events
-# an event is fired with *args and **kwargs
-# an object is created that transports these things to the target handler
+# Events
 #
-# {
-#   'event': event,
-#   'args': [],
-#   'kwargs': {},
-# }
+# An event has two properties: name and args.
+# name is the identifier of the event (see ace/system/constants.py)
+# args is anything that can be encoded into JSON
+# ace.data_model.custom_json_encoder is used to encode the JSON
 #
-# the arguments are translated into JSON
-# any arguments with to_json() functions are translated into JSON using that function
-# otherwise default json encoding takes place
-#
-# event handlers simply receive the JSON
-# it is up to the hander to understand how to interpret (decode) the json
+# When an even handler receives the event the args property is already decoded
+# into a dict. The caller is responsible for decoding the dict. For example, if
+# the dict is actually a RootAnalysis object, then the caller must call
+# RootAnalysis.from_dict(event.args).
 #
 
 

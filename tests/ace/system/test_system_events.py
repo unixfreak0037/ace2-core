@@ -1,5 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 
+import threading
+
 import pytest
 
 from ace.analysis import RootAnalysis, AnalysisModuleType
@@ -57,19 +59,31 @@ from ace.system.work_queue import add_work_queue, delete_work_queue, put_work, g
 
 
 class TestEventHandler(EventHandler):
-    event = None
-    exception = None
+    __test__ = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.event = None
+        self.exception = None
+        self.sync = threading.Event()
 
     def handle_event(self, event: Event):
         self.event = event
+        self.sync.set()
 
     def handle_exception(self, event: Event, exception: Exception):
         self.event = event
         self.exception = exception
+        self.sync.set()
+
+    def wait(self):
+        self.sync.wait(3)
 
     def reset(self):
         self.event = None
         self.exception = None
+        self.sync = threading.Event()
 
 
 @pytest.mark.integration
@@ -79,8 +93,9 @@ def test_EVENT_ANALYSIS_ROOT_NEW():
     root = RootAnalysis()
     track_root_analysis(root)
 
+    handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_NEW
-    assert handler.event.args == root
+    assert RootAnalysis.from_dict(handler.event.args) == root
 
     handler = TestEventHandler()
     register_event_handler(EVENT_ANALYSIS_ROOT_NEW, handler)
@@ -104,8 +119,9 @@ def test_EVENT_ANALYSIS_ROOT_MODIFIED():
     # already tracked so should fire as modified
     track_root_analysis(root)
 
+    handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_MODIFIED
-    assert handler.event.args == root
+    assert RootAnalysis.from_dict(handler.event.args) == root
 
 
 @pytest.mark.integration
@@ -116,6 +132,7 @@ def test_EVENT_ANALYSIS_ROOT_DELETED():
     register_event_handler(EVENT_ANALYSIS_ROOT_DELETED, handler)
     delete_root_analysis(root)
 
+    handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_DELETED
     assert handler.event.args == root.uuid
 
@@ -135,8 +152,9 @@ def test_EVENT_ANALYSIS_DETAILS_NEW():
     track_root_analysis(root)
     track_analysis_details(root, root.uuid, root.details)
 
+    handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_DETAILS_NEW
-    assert handler.event.args[0] == root
+    assert RootAnalysis.from_dict(handler.event.args[0]) == root
     assert handler.event.args[1] == root.uuid
 
     handler = TestEventHandler()
@@ -161,8 +179,9 @@ def test_EVENT_ANALYSIS_DETAILS_MODIFIED():
     register_event_handler(EVENT_ANALYSIS_DETAILS_MODIFIED, handler)
     track_analysis_details(root, root.uuid, root.details)
 
+    handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_DETAILS_MODIFIED
-    assert handler.event.args[0] == root
+    assert RootAnalysis.from_dict(handler.event.args[0]) == root
     assert handler.event.args[1] == root.uuid
 
 
@@ -176,6 +195,7 @@ def test_EVENT_ANALYSIS_DETAILS_DELETED():
     register_event_handler(EVENT_ANALYSIS_DETAILS_DELETED, handler)
     delete_analysis_details(root.uuid)
 
+    handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_DETAILS_DELETED
     assert handler.event.args == root.uuid
 
@@ -196,16 +216,18 @@ def test_EVENT_ALERT():
     register_event_handler(EVENT_ALERT, handler)
     track_alert(root)
 
+    handler.wait()
     assert handler.event.name == EVENT_ALERT
-    assert handler.event.args == root
+    assert RootAnalysis.from_dict(handler.event.args) == root
 
     # event fires every time
     handler = TestEventHandler()
     register_event_handler(EVENT_ALERT, handler)
     track_alert(root)
 
+    handler.wait()
     assert handler.event.name == EVENT_ALERT
-    assert handler.event.args == root
+    assert RootAnalysis.from_dict(handler.event.args) == root
 
 
 @pytest.mark.integration
@@ -216,8 +238,9 @@ def test_EVENT_AMT_NEW():
     amt = AnalysisModuleType("test", "")
     register_analysis_module_type(amt)
 
+    handler.wait()
     assert handler.event.name == EVENT_AMT_NEW
-    assert handler.event.args == amt
+    assert AnalysisModuleType.from_dict(handler.event.args) == amt
 
     handler = TestEventHandler()
     register_event_handler(EVENT_AMT_NEW, handler)
@@ -255,8 +278,9 @@ def test_EVENT_AMT_MODIFIED():
     # modified this time
     register_analysis_module_type(amt)
 
+    handler.wait()
     assert handler.event.name == EVENT_AMT_MODIFIED
-    assert handler.event.args == amt
+    assert AnalysisModuleType.from_dict(handler.event.args) == amt
 
 
 @pytest.mark.integration
@@ -268,8 +292,9 @@ def test_EVENT_AMT_DELETED():
     register_analysis_module_type(amt)
     delete_analysis_module_type(amt)
 
+    handler.wait()
     assert handler.event.name == EVENT_AMT_DELETED
-    assert handler.event.args == amt
+    assert AnalysisModuleType.from_dict(handler.event.args) == amt
 
     handler = TestEventHandler()
     register_event_handler(EVENT_AMT_DELETED, handler)
@@ -287,16 +312,18 @@ def test_EVENT_AR_NEW():
     request = root.create_analysis_request()
     track_analysis_request(request)
 
+    handler.wait()
     assert handler.event.name == EVENT_AR_NEW
-    assert handler.event.args == request
+    assert AnalysisRequest.from_dict(handler.event.args) == request
 
     handler = TestEventHandler()
     register_event_handler(EVENT_AR_NEW, handler)
     track_analysis_request(request)
 
     # you can re-track a request without harm
+    handler.wait()
     assert handler.event.name == EVENT_AR_NEW
-    assert handler.event.args == request
+    assert AnalysisRequest.from_dict(handler.event.args) == request
 
 
 @pytest.mark.integration
@@ -309,6 +336,7 @@ def test_EVENT_AR_DELETED():
     track_analysis_request(request)
     delete_analysis_request(request)
 
+    handler.wait()
     assert handler.event.name == EVENT_AR_DELETED
     assert handler.event.args == request.id
 
@@ -335,8 +363,9 @@ def test_EVENT_AR_EXPIRED():
 
     process_expired_analysis_requests(amt)
 
+    handler.wait()
     assert handler.event.name == EVENT_AR_EXPIRED
-    assert handler.event.args == request
+    assert AnalysisRequest.from_dict(handler.event.args) == request
 
 
 @pytest.mark.integration
@@ -353,17 +382,19 @@ def test_EVENT_CACHE_NEW():
 
     assert cache_analysis_result(request) is not None
 
+    handler.wait()
     assert handler.event.name == EVENT_CACHE_NEW
     assert handler.event.args[0] == generate_cache_key(observable, amt)
-    assert handler.event.args[1] == request
+    assert AnalysisRequest.from_dict(handler.event.args[1]) == request
 
     # we can potentially see duplicate cache hits
     handler = TestEventHandler()
     register_event_handler(EVENT_CACHE_NEW, handler)
     assert cache_analysis_result(request) is not None
+    handler.wait()
     assert handler.event.name == EVENT_CACHE_NEW
     assert handler.event.args[0] == generate_cache_key(observable, amt)
-    assert handler.event.args[1] == request
+    assert AnalysisRequest.from_dict(handler.event.args[1]) == request
 
 
 @pytest.mark.integration
@@ -372,6 +403,7 @@ def test_EVENT_CONFIG_SET():
     register_event_handler(EVENT_CONFIG_SET, handler)
 
     set_config("test", "value")
+    handler.wait()
     assert handler.event.name == EVENT_CONFIG_SET
     assert handler.event.args[0] == "test"
     assert handler.event.args[1] == "value"
@@ -380,6 +412,7 @@ def test_EVENT_CONFIG_SET():
     handler = TestEventHandler()
     register_event_handler(EVENT_CONFIG_SET, handler)
     set_config("test", "value")
+    handler.wait()
     assert handler.event.name == EVENT_CONFIG_SET
     assert handler.event.args[0] == "test"
     assert handler.event.args[1] == "value"
@@ -393,9 +426,10 @@ def test_EVENT_STORAGE_NEW():
     meta = ContentMetadata(name="test")
     sha256 = store_content("test", meta)
 
+    handler.wait()
     assert handler.event.name == EVENT_STORAGE_NEW
     assert handler.event.args[0] == sha256
-    assert handler.event.args[1] == meta
+    assert ContentMetadata.parse_obj(handler.event.args[1]) == meta
 
     # duplicates are OK
     handler = TestEventHandler()
@@ -404,9 +438,10 @@ def test_EVENT_STORAGE_NEW():
     meta = ContentMetadata(name="test")
     sha256 = store_content("test", meta)
 
+    handler.wait()
     assert handler.event.name == EVENT_STORAGE_NEW
     assert handler.event.args[0] == sha256
-    assert handler.event.args[1] == meta
+    assert ContentMetadata.parse_obj(handler.event.args[1]) == meta
 
 
 @pytest.mark.integration
@@ -417,6 +452,7 @@ def test_EVENT_STORAGE_DELETED():
     sha256 = store_content("test", meta)
     delete_content(sha256)
 
+    handler.wait()
     assert handler.event.name == EVENT_STORAGE_DELETED
     assert handler.event.args == sha256
 
@@ -433,6 +469,7 @@ def test_EVENT_WORK_QUEUE_NEW():
     register_event_handler(EVENT_WORK_QUEUE_NEW, handler)
 
     add_work_queue("test")
+    handler.wait()
     assert handler.event.name == EVENT_WORK_QUEUE_NEW
     assert handler.event.args == "test"
 
@@ -451,6 +488,7 @@ def test_EVENT_WORK_QUEUE_DELETED():
 
     add_work_queue("test")
     delete_work_queue("test")
+    handler.wait()
     assert handler.event.name == EVENT_WORK_QUEUE_DELETED
     assert handler.event.args == "test"
 
@@ -474,9 +512,10 @@ def test_EVENT_WORK_ADD():
     request = AnalysisRequest(root, observable, amt)
     submit_analysis_request(request)
 
+    handler.wait()
     assert handler.event.name == EVENT_WORK_ADD
     assert handler.event.args[0] == amt.name
-    assert handler.event.args[1] == request
+    assert AnalysisRequest.from_dict(handler.event.args[1]) == request
 
 
 @pytest.mark.integration
@@ -492,9 +531,10 @@ def test_EVENT_WORK_REMOVE():
     submit_analysis_request(request)
     work = get_work(amt, 0)
 
+    handler.wait()
     assert handler.event.name == EVENT_WORK_REMOVE
     assert handler.event.args[0] == amt.name
-    assert handler.event.args[1] == work
+    assert AnalysisRequest.from_dict(handler.event.args[1]) == work
 
     # can't get fired if you ain't got no work
     handler = TestEventHandler()
@@ -513,8 +553,9 @@ def test_EVENT_ANALYSIS_ROOT_EXPIRED():
     root = RootAnalysis(expires=True)
     root.submit()
 
+    handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_EXPIRED
-    assert handler.event.args == root
+    assert RootAnalysis.from_dict(handler.event.args) == root
 
 
 @pytest.mark.integration
@@ -539,10 +580,12 @@ def test_EVENT_CACHE_HIT():
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
+    handler.wait()
     assert handler.event.name == EVENT_CACHE_HIT
-    assert handler.event.args[0] == root
-    assert handler.event.args[1] == observable
-    assert isinstance(handler.event.args[2], AnalysisRequest)
+    assert RootAnalysis.from_dict(handler.event.args[0]) == root
+    assert handler.event.args[1]["type"] == observable.type
+    assert handler.event.args[1]["value"] == observable.value
+    assert isinstance(AnalysisRequest.from_dict(handler.event.args[2]), AnalysisRequest)
 
 
 @pytest.mark.integration
@@ -558,8 +601,9 @@ def test_EVENT_WORK_ASSIGNED():
     process_analysis_request(root_request)
     request = get_next_analysis_request("owner", amt, 0)
 
+    handler.wait()
     assert handler.event.name == EVENT_WORK_ASSIGNED
-    assert handler.event.args == request
+    assert AnalysisRequest.from_dict(handler.event.args) == request
 
 
 @pytest.mark.integration
@@ -577,13 +621,15 @@ def test_EVENT_PROCESSING():
     root_request = root.create_analysis_request()
     process_analysis_request(root_request)
 
+    root_handler.wait()
     assert root_handler.event.name == EVENT_PROCESSING_REQUEST_ROOT
-    assert root_handler.event.args == root_request
+    assert AnalysisRequest.from_dict(root_handler.event.args) == root_request
 
     request = get_next_analysis_request("owner", amt, 0)
 
+    observable_request_handler.wait()
     assert observable_request_handler.event.name == EVENT_PROCESSING_REQUEST_OBSERVABLE
-    assert observable_request_handler.event.args == request
+    assert AnalysisRequest.from_dict(observable_request_handler.event.args) == request
 
     result_handler = TestEventHandler()
     register_event_handler(EVENT_PROCESSING_REQUEST_RESULT, result_handler)
@@ -592,5 +638,6 @@ def test_EVENT_PROCESSING():
     request.modified_observable.add_analysis(type=amt, details={"test": "test"})
     process_analysis_request(request)
 
+    result_handler.wait()
     assert result_handler.event.name == EVENT_PROCESSING_REQUEST_RESULT
-    assert result_handler.event.args == request
+    assert AnalysisRequest.from_dict(result_handler.event.args) == request

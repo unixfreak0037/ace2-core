@@ -7,6 +7,7 @@ from typing import Optional, Any, Union
 from ace.time import utc_now
 
 from pydantic import BaseModel, Field
+from pydantic.json import pydantic_encoder
 
 
 class DetectionPointModel(BaseModel):
@@ -324,3 +325,10 @@ class ContentMetadata(BaseModel):
 class Event(BaseModel):
     name: str = Field(description="""Unique name of the event.""")
     args: Optional[Any] = Field(description="""Optional arguments included with the event.""")
+
+
+def custom_json_encoder(obj):
+    if hasattr(obj, "to_dict"):
+        return obj.to_dict()
+    else:
+        return pydantic_encoder(obj)

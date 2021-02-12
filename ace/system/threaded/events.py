@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from ace.data_model import Event
+from ace.data_model import Event, custom_json_encoder
 from ace.system.events import EventInterface, EventHandler
 
 
@@ -31,8 +31,10 @@ class ThreadedEventInterafce(EventInterface):
     def fire_event(self, event: Event):
         assert isinstance(event, Event)
 
-        # have this go through serialization to test for bugs here
-        event = Event.parse_obj(event.dict())
+        # have this go through serialization even though we don't really need to
+        # just to stay consistent with how the event system works
+        event_json = event.json(encoder=custom_json_encoder)
+        event = Event.parse_raw(event_json)
 
         for handler in self.get_event_handlers(event.name):
             try:

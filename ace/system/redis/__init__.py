@@ -2,6 +2,8 @@
 
 from ace.system.config import get_config
 
+import redis
+
 CONFIG_REDIS_HOST = "/ace/core/redis/host"
 CONFIG_REDIS_PORT = "/ace/core/redis/port"
 CONFIG_REDIS_DB = "/ace/core/redis/db"

@@ -5,6 +5,7 @@ import json
 
 from typing import Optional, Any
 
+from ace.data_model import Event
 from ace.system import ACESystemInterface, get_system, get_logger
 
 #
@@ -28,16 +29,15 @@ from ace.system import ACESystemInterface, get_system, get_logger
 
 
 class EventHandler:
-    def handle_event(self, event: str, event_json):
+    def handle_event(self, event: Event):
         """Called when an event is fired.
 
         Args:
             event: the event that fired
-            event_json: any additional arguments passed to the event
         """
         raise NotImplementedError()
 
-    def handle_exception(self, event: str, exception: Exception, event_args_json: str):
+    def handle_exception(self, event: str, exception: Exception):
         """Called when the call to handle_event raises an exception.
 
         This is called with the same parameters as handle_event and an additional parameter that is the exception that was raised.
@@ -60,7 +60,7 @@ class EventInterface(ACESystemInterface):
         """Returns the list of registered event handlers for the given event."""
         raise NotImplementedError()
 
-    def fire_event(self, event: str, event_args_json: str):
+    def fire_event(self, event: Event):
         """Calls all registered event handlers for the given event.
         There is no requirement that handlers are called in any particular order."""
         raise NotImplementedError()
@@ -84,15 +84,5 @@ def fire_event(event: str, event_args: Any):
     """Fires the event with the given JSON argument."""
     assert isinstance(event, str) and event
 
-    class _json_encoder(json.JSONEncoder):
-        def default(self, obj):
-            if hasattr(obj, "to_json"):
-                return obj.to_json()
-            elif dataclasses.is_dataclass(obj):
-                return dataclasses.asdict(obj)
-            else:
-                json.JSONEncoder.default(self, obj)
-
-    event_args_json = json.dumps(event_args, cls=_json_encoder)
     get_logger().debug(f"fired event {event}")
-    return get_system().events.fire_event(event, event_args_json)
+    return get_system().events.fire_event(Event(name=event, args=event_args))

@@ -30,9 +30,9 @@ TEST_NAME = "test.txt"
 @pytest.mark.parametrize(
     "generate_input_data,name,meta",
     [
-        (TEST_STRING, TEST_NAME, ContentMetadata(TEST_NAME)),
-        (TEST_BYTES, TEST_NAME, ContentMetadata(TEST_NAME)),
-        (TEST_IO, TEST_NAME, ContentMetadata(TEST_NAME)),
+        (TEST_STRING, TEST_NAME, ContentMetadata(name=TEST_NAME)),
+        (TEST_BYTES, TEST_NAME, ContentMetadata(name=TEST_NAME)),
+        (TEST_IO, TEST_NAME, ContentMetadata(name=TEST_NAME)),
     ],
 )
 @pytest.mark.integration

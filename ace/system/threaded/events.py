@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+from ace.data_model import Event
 from ace.system.events import EventInterface, EventHandler
 
 
@@ -27,15 +28,17 @@ class ThreadedEventInterafce(EventInterface):
     def get_event_handlers(self, event: str) -> list[EventHandler]:
         return self.event_handlers.get(event, [])
 
-    def fire_event(self, event: str, event_json: str):
-        assert isinstance(event, str) and event
-        assert isinstance(event_json, str) and event_json
+    def fire_event(self, event: Event):
+        assert isinstance(event, Event)
 
-        for handler in self.get_event_handlers(event):
+        # have this go through serialization to test for bugs here
+        event = Event.parse_obj(event.dict())
+
+        for handler in self.get_event_handlers(event.name):
             try:
-                handler.handle_event(event, event_json)
+                handler.handle_event(event)
             except Exception as e:
-                handler.handle_exception(event, e, event_json)
+                handler.handle_exception(event, e)
 
     def reset(self):
         self.event_handlers = {}

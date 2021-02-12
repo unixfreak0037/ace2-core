@@ -1,6 +1,8 @@
 # vim: ts=4:sw=4:et:cc=120
 
 import json
+import threading
+
 from dataclasses import dataclass
 
 import pytest
@@ -11,9 +13,14 @@ from ace.system.events import register_event_handler, remove_event_handler, get_
 
 
 class TestEventHandler(EventHandler):
-    event = None
-    exception = None
-    event_args_json = None
+    __test__ = False
+
+    def __init__(self, *args, **kwargs):
+        self.event = None
+        self.exception = None
+        self.event_args_json = None
+        self.sync = threading.Event()
+        self.count = 0
 
     @property
     def event_args(self):
@@ -21,14 +28,23 @@ class TestEventHandler(EventHandler):
 
     def handle_event(self, event: Event):
         self.event = event
+        self.count += 1
+        self.sync.set()
 
     def handle_exception(self, event: Event, exception: Exception):
         self.event = event
         self.exception = exception
+        self.sync.set()
+
+    def wait(self):
+        if not self.sync.wait(3):
+            raise RuntimeError("wait() timed out")
 
     def reset(self):
+        self.count = 0
         self.event = None
         self.exception = None
+        self.sync = threading.Event()
 
 
 @pytest.mark.unit
@@ -82,6 +98,8 @@ def test_event_handler():
     register_event_handler("test", handler)
     args = ["test", {"kwarg1": "test"}]
     fire_event("test", args)
+
+    handler.wait()
     assert handler.event.name == "test"
     assert handler.event.args == args
 
@@ -92,21 +110,91 @@ def test_event_handler():
 
 
 @pytest.mark.integration
+def test_event_multiple_handlers():
+    handler_1 = TestEventHandler()
+    register_event_handler("test", handler_1)
+
+    handler_2 = TestEventHandler()
+    register_event_handler("test", handler_2)
+
+    args = ["test", {"kwarg1": "test"}]
+    fire_event("test", args)
+
+    handler_1.wait()
+    assert handler_1.event.name == "test"
+    assert handler_1.event.args == args
+
+    handler_2.wait()
+    assert handler_2.event.name == "test"
+    assert handler_2.event.args == args
+
+
+@pytest.mark.integration
+def test_event_handlers_add_fire_remove():
+    # add a handler
+    handler_1 = TestEventHandler()
+    register_event_handler("test", handler_1)
+
+    # fire the event
+    args = ["test", {"kwarg1": "test"}]
+    fire_event("test", args)
+
+    # make sure it fired
+    handler_1.wait()
+    assert handler_1.event.name == "test"
+    assert handler_1.event.args == args
+
+    # add a handler for a different event
+    handler_2 = TestEventHandler()
+    register_event_handler("test_2", handler_2)
+
+    # fire the new event
+    args = ["test_2", {"kwarg1": "test"}]
+    fire_event("test_2", args)
+
+    # make sure it fired
+    handler_2.wait()
+    assert handler_2.event.name == "test_2"
+    assert handler_2.event.args == args
+
+    # delete the new handler
+    remove_event_handler(handler_2)
+
+    # fire the event again (nothing to handle it)
+    fire_event("test_2", args)
+
+
+@pytest.mark.integration
+def test_register_duplicate_handler():
+    handler = TestEventHandler()
+    register_event_handler("test", handler)
+    # registering it twice is OK but it should emit a warning
+    register_event_handler("test", handler)
+    fire_event("test")
+    handler.wait()
+    assert handler.event.name == "test"
+    assert handler.count == 1
+
+
+@pytest.mark.integration
 def test_event_remove_multiple():
     handler = TestEventHandler()
     register_event_handler("test_1", handler)
     register_event_handler("test_2", handler)
     args = ["test", {"kwarg1": "test"}]
     fire_event("test_1", args)
+    handler.wait()
     assert handler.event.name == "test_1"
     handler.reset()
     fire_event("test_2", args)
+    handler.wait()
     assert handler.event.name == "test_2"
     handler.reset()
     remove_event_handler(handler, ["test_1"])
     fire_event("test_1", args)
     assert handler.event is None
     fire_event("test_2", args)
+    handler.wait()
     assert handler.event.name == "test_2"
 
 
@@ -120,6 +208,32 @@ def test_event_handle_exception():
     register_event_handler("test", handler)
     args = ["test", {"kwarg1": "test"}]
     fire_event("test", args)
+    handler.wait()
     assert handler.event.name == "test"
     assert handler.event.args == args
     assert handler.exception is not None
+
+
+@pytest.mark.system
+def test_event_distribution():
+    handlers = [TestEventHandler() for _ in range(100)]
+    for handler in handlers:
+        register_event_handler("test", handler)
+
+    fire_event("test")
+
+    for handler in handlers:
+        handler.wait()
+        assert handler.event.name == "test"
+        assert handler.count == 1
+
+
+@pytest.mark.unit
+def test_get_event_handlers():
+    assert not get_event_handlers("test")
+    handler = TestEventHandler()
+    register_event_handler("test", handler)
+    assert get_event_handlers("test") == [handler]
+    handler = TestEventHandler()
+    register_event_handler("test", handler)
+    assert len(get_event_handlers("test")) == 2

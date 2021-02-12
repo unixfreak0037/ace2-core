@@ -75,7 +75,7 @@ def get_event_handlers(event: str) -> list[EventHandler]:
     return get_system().events.get_event_handlers(event)
 
 
-def fire_event(event: str, event_args: Any):
+def fire_event(event: str, event_args: Optional[Any] = None):
     """Fires the event with the given JSON argument."""
     assert isinstance(event, str) and event
 

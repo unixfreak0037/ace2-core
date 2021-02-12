@@ -4,7 +4,7 @@ import os.path
 
 import ace.system.distributed
 
-from ace.system import ACESystem, get_system, set_system
+from ace.system import ACESystem, get_system, set_system, get_logger
 from ace.system.database import DatabaseACESystem
 from ace.system.distributed import DistributedACESystem
 from ace.system.threaded import ThreadedACESystem
@@ -52,21 +52,26 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
 class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, ThreadedACESystem):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.redis_connection = None
 
     def initialize(self):
         super().initialize()
-        import fakeredis
 
-        rc = fakeredis.FakeStrictRedis()
-        self.work_queue.redis_connection = lambda: rc
+        if os.path.exists("ace.rdb"):
+            os.remove("ace.rdb")
+
+        import redislite
+
+        self.redis_connection = redislite.StrictRedis("ace.rdb")
+        self.work_queue.redis_connection = lambda: self.redis_connection
+        self.events.redis_connection = lambda: self.redis_connection
 
     def reset(self):
         super().reset()
 
-        import fakeredis
-
-        rc = fakeredis.FakeStrictRedis()
-        self.work_queue.redis_connection = lambda: rc
+        # clear everything
+        get_logger().debug("clearing redis...")
+        self.redis_connection.flushall()
 
 
 @pytest.fixture(
@@ -79,7 +84,8 @@ class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, Thre
     ],
 )
 def initialize_ace_system(request):
-    logging.getLogger().setLevel(logging.DEBUG)
+    get_logger().setLevel(logging.DEBUG)
+    # logging.getLogger().setLevel(logging.DEBUG)
     set_system(request.param())
     get_system().initialize()
     get_system().start()

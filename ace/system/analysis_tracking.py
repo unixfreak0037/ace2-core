@@ -159,9 +159,9 @@ def track_analysis_details(root: RootAnalysis, uuid: str, value: Any) -> bool:
     exists = analysis_details_exists(root.uuid)
     get_system().analysis_tracking.track_analysis_details(root.uuid, uuid, value)
     if not exists:
-        fire_event(EVENT_ANALYSIS_DETAILS_NEW, root, root.uuid)
+        fire_event(EVENT_ANALYSIS_DETAILS_NEW, [root, root.uuid])
     else:
-        fire_event(EVENT_ANALYSIS_DETAILS_MODIFIED, root, root.uuid)
+        fire_event(EVENT_ANALYSIS_DETAILS_MODIFIED, [root, root.uuid])
 
     return True
 

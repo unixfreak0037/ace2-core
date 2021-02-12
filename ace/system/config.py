@@ -24,5 +24,5 @@ def get_config(key: str, default: Optional[Any] = None) -> Any:
 def set_config(key: str, value: Any):
     get_logger().debug(f"modified config key {key}")
     result = get_system().config.set_config(key, value)
-    fire_event(EVENT_CONFIG_SET, key, value)
+    fire_event(EVENT_CONFIG_SET, [key, value])
     return result

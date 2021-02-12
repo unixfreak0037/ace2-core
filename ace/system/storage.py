@@ -10,38 +10,12 @@ from dataclasses import dataclass, field
 from typing import Union, Optional, Iterator
 
 from ace.analysis import RootAnalysis
+from ace.data_model import ContentMetadata
 from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.constants import EVENT_STORAGE_NEW, EVENT_STORAGE_DELETED
 from ace.system.events import fire_event
 from ace.time import utc_now
-
-
-@dataclass
-class ContentMetadata:
-    # the meta "name" of the content
-    # can be anything including the name of the file
-    # additional information can be stored in the custom property
-    name: str
-    # the sha256 (lowercase hex) of the content
-    sha256: str = None
-    # the total size of the content (in bytes)
-    size: int = 0
-    # free-form "location" of the content (can be None if not used)
-    # for example, on systems that store data locally this can be the path to the file
-    # or on systems that store the data externally this can be the reference key to the content
-    location: str = None
-    # when the content was created (defaults to now)
-    insert_date: datetime.datetime = field(default_factory=utc_now)
-    # when the content should be discarded (defaults to None which means never)
-    expiration_date: Union[datetime.datetime, None] = None
-    # dict for storing any required custom properties of the content
-    custom: dict = field(default_factory=dict)
-    # the list of RootAnalysis UUIDs that reference this content
-    # an empty list indicates that nothing references it anymore
-    # NOTE this list can reference non-existant root analysis objects
-    # this can happen if the file is uploaded before the root is tracked
-    roots: list = field(default_factory=list)
 
 
 #
@@ -93,7 +67,7 @@ def store_content(content: Union[bytes, str, io.IOBase], meta: ContentMetadata) 
     assert isinstance(meta, ContentMetadata)
     get_logger().debug(f"storing content {meta}")
     sha256 = get_system().storage.store_content(content, meta)
-    fire_event(EVENT_STORAGE_NEW, sha256, meta)
+    fire_event(EVENT_STORAGE_NEW, [sha256, meta])
     return sha256
 
 
@@ -142,7 +116,7 @@ def track_content_root(sha256: str, root: Union[RootAnalysis, str]):
 def store_file(path: str, **kwargs) -> str:
     """Utility function that stores the contents of the given file and returns the sha256 hash."""
     assert isinstance(path, str)
-    meta = ContentMetadata(path, **kwargs)
+    meta = ContentMetadata(name=path, **kwargs)
     with open(path, "rb") as fp:
         return store_content(fp, meta)
 

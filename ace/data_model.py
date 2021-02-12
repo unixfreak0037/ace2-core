@@ -7,6 +7,7 @@ from typing import Optional, Any, Union
 from ace.time import utc_now
 
 from pydantic import BaseModel, Field
+from pydantic.json import pydantic_encoder
 
 
 class DetectionPointModel(BaseModel):
@@ -297,3 +298,37 @@ class AnalysisRequestModel(BaseModel):
     modified_root: Optional[RootAnalysisModel] = Field(
         description="""The root as it existed after analyisis completed."""
     )
+
+
+class ContentMetadata(BaseModel):
+    name: str = Field(description="""Name of the content which can be anything such as the name of the file.""")
+    sha256: Optional[str] = Field(description="""SHA2 (lowercase hex) of the content.""")
+    size: Optional[int] = Field(description="""Size of the content in bytes.""")
+    insert_date: Optional[datetime.datetime] = Field(
+        default_factory=utc_now,
+        description="""When the content was created. Defaults to now.""",
+    )
+    roots: Optional[list[str]] = Field(
+        default_factory=list,
+        description="""List of RootAnalysis UUIDs that reference this content.""",
+    )
+    location: Optional[str] = Field(description="""Free-form location of the content. Can be None if not used.""")
+    expiration_date: Optional[datetime.datetime] = Field(
+        description="""When the content should be discarded. Defaults to None which means never discarded.""",
+    )
+    custom: Optional[dict] = Field(
+        default_factory=dict,
+        description="""Optional dict for storing any other required custom properties of the content.""",
+    )
+
+
+class Event(BaseModel):
+    name: str = Field(description="""Unique name of the event.""")
+    args: Optional[Any] = Field(description="""Optional arguments included with the event.""")
+
+
+def custom_json_encoder(obj):
+    if hasattr(obj, "to_dict"):
+        return obj.to_dict()
+    else:
+        return pydantic_encoder(obj)

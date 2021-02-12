@@ -67,7 +67,7 @@ def get_work(amt: Union[AnalysisModuleType, str], timeout: int) -> Union[Analysi
 
     result = get_system().work_queue.get_work(amt, timeout)
     if result:
-        fire_event(EVENT_WORK_REMOVE, amt, result)
+        fire_event(EVENT_WORK_REMOVE, [amt, result])
 
     return result
 
@@ -81,7 +81,7 @@ def put_work(amt: Union[AnalysisModuleType, str], analysis_request: AnalysisRequ
 
     get_logger().debug(f"adding request {analysis_request} to work queue for {amt}")
     result = get_system().work_queue.put_work(amt, analysis_request)
-    fire_event(EVENT_WORK_ADD, amt, analysis_request)
+    fire_event(EVENT_WORK_ADD, [amt, analysis_request])
     return result
 
 

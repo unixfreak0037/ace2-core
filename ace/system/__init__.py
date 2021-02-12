@@ -8,6 +8,12 @@ import logging
 class ACESystemInterface:
     """The base class that all system interfaces inherit from."""
 
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
     def reset(self):
         pass
 
@@ -41,11 +47,27 @@ class ACESystem:
 
     # called to start the system
     def start(self):
-        pass
+        self.alerting.start()
+        self.analysis_tracking.start()
+        self.caching.start()
+        self.config.start()
+        self.events.start()
+        self.module_tracking.start()
+        self.request_tracking.start()
+        self.storage.start()
+        self.work_queue.start()
 
     # called to stop the system
     def stop(self):
-        pass
+        self.alerting.stop()
+        self.analysis_tracking.stop()
+        self.caching.stop()
+        self.config.stop()
+        self.events.stop()
+        self.module_tracking.stop()
+        self.request_tracking.stop()
+        self.storage.stop()
+        self.work_queue.stop()
 
 
 # the global system object that contains references to all the interfaces

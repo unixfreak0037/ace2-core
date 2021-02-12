@@ -3,10 +3,12 @@
 
 import fastapi.testclient
 
+from ace.system.redis.events import RedisEventInterface
 from ace.system.redis.work_queue import RedisWorkQueueManagerInterface
 
 
 class DistributedACESystem:
     """A partial implementation of the ACE core implemented using various distributed systems."""
 
+    events = RedisEventInterface()
     work_queue = RedisWorkQueueManagerInterface()

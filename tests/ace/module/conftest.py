@@ -25,6 +25,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     def reset(self):
         super().reset()
 
+        self.db = None
+
         # remove the temporary file we used
         if os.path.exists("ace.db"):
             os.remove("ace.db")

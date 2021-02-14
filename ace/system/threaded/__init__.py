@@ -6,7 +6,6 @@
 from ace.system import ACESystem
 from ace.system.threaded.alerting import ThreadedAlertTrackingInterface
 
-from ace.system.threaded.config import ThreadedConfigurationInterface
 from ace.system.threaded.events import ThreadedEventInterafce
 from ace.system.threaded.observables import ThreadedObservableInterface
 from ace.system.threaded.storage import ThreadedStorageInterface
@@ -20,6 +19,5 @@ class ThreadedACESystem(ACESystem):
     work_queue = ThreadedWorkQueueManagerInterface()
     storage = ThreadedStorageInterface()
     observable = ThreadedObservableInterface()
-    config = ThreadedConfigurationInterface()
     alerting = ThreadedAlertTrackingInterface()
     events = ThreadedEventInterafce()

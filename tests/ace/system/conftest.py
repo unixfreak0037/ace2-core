@@ -5,7 +5,7 @@ import os.path
 import ace.system.distributed
 
 from ace.system import ACESystem, get_system, set_system, get_logger
-from ace.system.database import DatabaseACESystem
+from ace.system.database import DatabaseACESystem, CONFIG_DB_URL, CONFIG_DB_KWARGS
 from ace.system.distributed import DistributedACESystem
 from ace.system.threaded import ThreadedACESystem
 
@@ -27,6 +27,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
 
     def reset(self):
         super().reset()
+
+        self.db = None
 
         # remove the temporary file we used
         if os.path.exists("ace.db"):

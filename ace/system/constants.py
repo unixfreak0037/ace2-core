@@ -44,6 +44,7 @@ EVENT_CACHE_NEW = "/core/cache/new"
 EVENT_CACHE_HIT = "/core/cache/hit"
 # config
 EVENT_CONFIG_SET = "/core/config/set"
+EVENT_CONFIG_DELETE = "/core/config/delete"
 # storage
 EVENT_STORAGE_NEW = "/core/storage/new"
 EVENT_STORAGE_DELETED = "/core/storage/deleted"

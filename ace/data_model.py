@@ -327,6 +327,12 @@ class Event(BaseModel):
     args: Optional[Any] = Field(description="""Optional arguments included with the event.""")
 
 
+class ConfigurationSetting(BaseModel):
+    name: str = Field(description="""Unique name of the configuration setting.""")
+    value: Any = Field(description="""Value of the configuration setting.""")
+    documentation: Optional[str] = Field(description="""Documentation that explains the configuration setting.""")
+
+
 def custom_json_encoder(obj):
     if hasattr(obj, "to_dict"):
         return obj.to_dict()

@@ -31,11 +31,12 @@ def get_db() -> scoped_session:
     return get_system().db
 
 
-from ace.system.config import get_config
+from ace.system.config import get_config_value
 from ace.system.database.analysis_module import DatabaseAnalysisModuleTrackingInterface
 from ace.system.database.analysis_request import DatabaseAnalysisRequestTrackingInterface
 from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterface
 from ace.system.database.caching import DatabaseCachingInterface
+from ace.system.database.config import DatabaseConfigurationInterface
 from ace.system.database.observables import DatabaseObservableInterface
 
 
@@ -49,6 +50,7 @@ class DatabaseACESystem:
 
     analysis_tracking = DatabaseAnalysisTrackingInterface()
     caching = DatabaseCachingInterface()
+    config = DatabaseConfigurationInterface()
     module_tracking = DatabaseAnalysisModuleTrackingInterface()
     observable = DatabaseObservableInterface()
     request_tracking = DatabaseAnalysisRequestTrackingInterface()
@@ -64,8 +66,8 @@ class DatabaseACESystem:
         # /usr/local/lib/python3.6/dist-packages/pymysql/cursors.py:170: Warning: (1300, "Invalid utf8mb4 character string: '800363'")
         warnings.filterwarnings(action="ignore", message=".*Invalid utf8mb4 character string.*")
 
-        self.db_url = get_config(CONFIG_DB_URL, default=self.db_url)
-        self.db_kwargs = get_config(CONFIG_DB_KWARGS, default=self.db_kwargs)
+        self.db_url = get_config_value(CONFIG_DB_URL, env="ACE_DB_URL", default=self.db_url)
+        self.db_kwargs = get_config_value(CONFIG_DB_KWARGS, default=self.db_kwargs)
         self.engine = create_engine(self.db_url, **self.db_kwargs)
 
         @event.listens_for(self.engine, "connect")

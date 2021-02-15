@@ -6,7 +6,9 @@ import ace.system.distributed
 
 from ace.system import ACESystem, get_system, set_system, get_logger
 from ace.system.database import DatabaseACESystem, CONFIG_DB_URL, CONFIG_DB_KWARGS
-from ace.system.distributed import DistributedACESystem
+
+# from ace.system.distributed import DistributedACESystem
+from ace.system.redis import RedisACESystem
 from ace.system.threaded import ThreadedACESystem
 
 import fastapi.testclient
@@ -51,7 +53,7 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
             os.remove("ace.db")
 
 
-class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, ThreadedACESystem):
+class RedisACETestSystem(RedisACESystem, DatabaseACETestSystem, ThreadedACESystem):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.redis_connection = None
@@ -80,14 +82,12 @@ class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, Thre
     autouse=True,
     scope="session",
     params=[
-        # ThreadedACETestSystem,
         DatabaseACETestSystem,
-        DistributedACETestSystem,
+        RedisACETestSystem,
     ],
 )
 def initialize_ace_system(request):
     get_logger().setLevel(logging.DEBUG)
-    # logging.getLogger().setLevel(logging.DEBUG)
     set_system(request.param())
     get_system().initialize()
     get_system().start()

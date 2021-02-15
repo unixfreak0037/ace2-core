@@ -16,3 +16,14 @@ def get_redis_connection():
         port=get_config_value(CONFIG_REDIS_PORT, default=6379),
         db=get_config_value(CONFIG_REDIS_DB, default=0),
     )
+
+
+from ace.system.redis.events import RedisEventInterface
+from ace.system.redis.work_queue import RedisWorkQueueManagerInterface
+
+
+class RedisACESystem:
+    """A partial implementation of the ACE core implemented using Redis."""
+
+    events = RedisEventInterface()
+    work_queue = RedisWorkQueueManagerInterface()

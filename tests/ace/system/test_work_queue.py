@@ -70,6 +70,21 @@ def test_get_next_analysis_request():
 
 
 @pytest.mark.integration
+def test_get_next_analysis_request_by_name():
+    register_analysis_module_type(amt_1)
+    root = RootAnalysis()
+    observable = root.add_observable("test", TEST_1)
+    request = AnalysisRequest(root, observable, amt_1)
+    submit_analysis_request(request)
+
+    next_ar = get_next_analysis_request(TEST_OWNER, "test", 0, version="1.0.0")
+    assert next_ar == request
+    assert next_ar.status == TRACKING_STATUS_ANALYZING
+    assert next_ar.owner == TEST_OWNER
+    assert get_next_analysis_request(TEST_OWNER, "test", 0, version="1.0.0") is None
+
+
+@pytest.mark.integration
 def test_get_next_analysis_request_expired():
 
     amt = AnalysisModuleType(

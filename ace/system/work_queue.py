@@ -122,7 +122,11 @@ def add_work_queue(amt: Union[AnalysisModuleType, str]) -> bool:
 
 
 def get_next_analysis_request(
-    owner_uuid: str, amt: Union[AnalysisModuleType, str], timeout: Optional[int] = 0
+    owner_uuid: str,
+    amt: Union[AnalysisModuleType, str],
+    timeout: Optional[int] = 0,
+    version: Optional[str] = None,
+    extended_version: Optional[list[str]] = [],
 ) -> Union[AnalysisRequest, None]:
     """Returns the next AnalysisRequest for the given AnalysisModuleType, or None if nothing is available.
     This function is called by the analysis modules to get the next work item.
@@ -132,13 +136,27 @@ def get_next_analysis_request(
         amt: The AnalysisModuleType that the request is for.
         timeout: How long to wait (in seconds) for a work request to come in.
             Defaults to 0 seconds which immediately returns a result.
+        version: Optional module version. If you pass the name for the amt
+            parameter then you must also pass the version and (optionally) the
+            extended version.
+        extended_version: Optional module extended version.
+
 
     Returns:
         An AnalysisRequest to be processed, or None if no work requests are available."""
 
     assert isinstance(owner_uuid, str) and owner_uuid
-    assert isinstance(amt, AnalysisModuleType) or isinstance(amt, str)
+    assert isinstance(amt, AnalysisModuleType) or (isinstance(amt, str) and amt)
     assert isinstance(timeout, int)
+    assert version is None or (isinstance(version, str) and version)
+    assert isinstance(extended_version, list)
+
+    # did we just pass the name and version?
+    if isinstance(amt, str):
+        if version is None:
+            raise ValueError("missing required version parameter when passing amt as string")
+
+        amt = AnalysisModuleType(name=amt, description="", version=version, additional_cache_keys=extended_version)
 
     # make sure that the requested analysis module hasn't been replaced by a newer version
     # if that's the case then the request fails and the requestor needs to update to the new version

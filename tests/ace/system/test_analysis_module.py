@@ -66,6 +66,11 @@ def test_register_existing_analysis_module_type():
     assert get_analysis_module_type(amt_1_same.name) == amt_1_upgraded_version
     with pytest.raises(AnalysisModuleTypeVersionError):
         get_next_analysis_request("test", amt_1, 0)  # now this request is invalid because am1 is an older version
+    # same but only passing the name and version of the module
+    with pytest.raises(AnalysisModuleTypeVersionError):
+        get_next_analysis_request(
+            "test", "test", 0, version="1.0.0"
+        )  # now this request is invalid because am1 is an older version
     assert get_next_analysis_request("test", amt_1_upgraded_version, 0) is None  # but this works
 
     # extended version data changed
@@ -74,6 +79,15 @@ def test_register_existing_analysis_module_type():
     with pytest.raises(AnalysisModuleTypeExtendedVersionError):
         get_next_analysis_request(
             "test", amt_1, 0
+        )  # now this request is invalid because am1 has different extended version
+    # same but only passing name, version and extended versions of the data
+    with pytest.raises(AnalysisModuleTypeExtendedVersionError):
+        get_next_analysis_request(
+            "test",
+            "test",
+            0,
+            "1.0.0",
+            ["key1"],
         )  # now this request is invalid because am1 has different extended version
     assert get_next_analysis_request("test", amt_1_upgraded_cache_keys, 0) is None  # but this works
 

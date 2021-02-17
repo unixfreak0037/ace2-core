@@ -1,7 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 #
 
-from typing import Union, Any
+from typing import Union, Any, Optional
 
 from ace.analysis import RootAnalysis
 from ace.system import ACESystemInterface, get_system, get_logger
@@ -28,7 +28,7 @@ class AlertTrackingInterface(ACESystemInterface):
         Returns True if at least one system is registered, False otherwise."""
         raise NotImplementedError()
 
-    def get_alerts(self, name: str) -> list[str]:
+    def get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
         raise NotImplementedError()
 
     #
@@ -72,9 +72,9 @@ def submit_alert(root: Union[RootAnalysis, str]) -> bool:
     return result
 
 
-def get_alerts(name: str) -> list[str]:
+def get_alerts(name: str, timeout: Optional[int] = None) -> list[str]:
     assert isinstance(name, str) and name
-    return get_system().alerting.get_alerts(name)
+    return get_system().alerting.get_alerts(name, timeout)
 
 
 def get_alert_count(name: str) -> int:

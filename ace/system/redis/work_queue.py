@@ -11,8 +11,6 @@ from ace.system.redis import CONFIG_REDIS_DB, CONFIG_REDIS_PORT, CONFIG_REDIS_HO
 from ace.system.work_queue import WorkQueueManagerInterface
 from ace.time import utc_now
 
-import redis
-
 #
 # we use two keys for each work queue due to the way redis works
 # one key is used as a marker for when the queue exists

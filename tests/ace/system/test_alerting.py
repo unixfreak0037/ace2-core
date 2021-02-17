@@ -59,6 +59,27 @@ def test_get_alerts():
     assert submit_alert(root)
     assert get_alerts("test") == [root.uuid]
     assert get_alerts("test") == []
+    assert submit_alert(root)
+    assert submit_alert(root)
+    assert get_alerts("test") == [root.uuid, root.uuid]
+    assert get_alerts("test") == []
+
+
+@pytest.mark.unit
+def test_get_alerts_with_timeout():
+    root = RootAnalysis()
+    register_alert_system("test")
+    assert submit_alert(root)
+    assert get_alerts("test", timeout=1) == [root.uuid]
+    assert get_alerts("test") == []
+
+    # if there are two alerts then it takes two calls with a timeout
+    assert submit_alert(root)
+    assert submit_alert(root)
+
+    assert get_alerts("test", timeout=1) == [root.uuid]
+    assert get_alerts("test", timeout=1) == [root.uuid]
+    assert get_alerts("test") == []
 
 
 @pytest.mark.unit

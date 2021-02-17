@@ -71,6 +71,7 @@ class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, Thre
             import redislite
 
             self.redis_connection = redislite.StrictRedis("ace.rdb")
+            self.alerting.redis_connection = lambda: self.redis_connection
             self.work_queue.redis_connection = lambda: self.redis_connection
             self.events.redis_connection = lambda: self.redis_connection
 

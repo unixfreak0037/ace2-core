@@ -4,7 +4,7 @@ import json
 import queue
 import threading
 
-from typing import Union, Any
+from typing import Union, Any, Optional
 
 from ace.analysis import RootAnalysis
 from ace.system.alerting import AlertTrackingInterface, UnknownAlertSystem
@@ -38,12 +38,16 @@ class ThreadedAlertTrackingInterface(AlertTrackingInterface):
 
         return result
 
-    def get_alerts(self, name: str) -> list[str]:
+    def get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
         assert isinstance(name, str) and str
+        assert timeout is None or isinstance(timeout, int) and timeout >= 0
         result = []
         while True:
             try:
-                result.append(self.alert_systems[name].get(block=False))
+                if timeout is None:
+                    result.append(self.alert_systems[name].get(block=False))
+                else:
+                    return [self.alert_systems[name].get(block=True, timeout=timeout)]
             except KeyError:
                 raise UnknownAlertSystem(name)
             except queue.Empty:

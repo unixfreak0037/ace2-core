@@ -1,28 +1,62 @@
 # vim: ts=4:sw=4:et:cc=120
 
 import json
+import queue
+import threading
+
 from typing import Union, Any
 
 from ace.analysis import RootAnalysis
-from ace.system.alerting import AlertTrackingInterface
+from ace.system.alerting import AlertTrackingInterface, UnknownAlertSystem
 
 
 class ThreadedAlertTrackingInterface(AlertTrackingInterface):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.alert_systems = {}  # key = system name, value = queue.Queue(of RootAnalysis.uuid)
+        self.sync_lock = threading.RLock()
 
-    alerts = {}  # key = uuid, value = RootAnalysis.to_json()
+    def register_alert_system(self, name: str) -> bool:
+        with self.sync_lock:
+            if name in self.alert_systems:
+                return False
 
-    def track_alert(self, root: RootAnalysis) -> Any:
-        assert isinstance(root, RootAnalysis)
-        self.alerts[root.uuid] = root.to_json()
-        return root.uuid
+            self.alert_systems[name] = queue.Queue()
+            return True
 
-    def get_alert(self, id: str) -> Union[Any, None]:
-        assert isinstance(id, str)
-        result = self.alerts.get(id, None)
-        if not result:
-            return None
+    def unregister_alert_system(self, name: str) -> bool:
+        with self.sync_lock:
+            return self.alert_systems.pop(name, None) is not None
 
-        return RootAnalysis.from_json(result)
+    def submit_alert(self, root_uuid: str) -> bool:
+        assert isinstance(root_uuid, str) and root_uuid
+
+        result = False
+        for name, queue in self.alert_systems.items():
+            queue.put(root_uuid)
+            result = True
+
+        return result
+
+    def get_alerts(self, name: str) -> list[str]:
+        assert isinstance(name, str) and str
+        result = []
+        while True:
+            try:
+                result.append(self.alert_systems[name].get(block=False))
+            except KeyError:
+                raise UnknownAlertSystem(name)
+            except queue.Empty:
+                break
+
+        return result
+
+    def get_alert_count(self, name: str) -> int:
+        assert isinstance(name, str) and str
+        try:
+            return self.alert_systems[name].qsize()
+        except KeyError:
+            raise UnknownAlertSystem(name)
 
     def reset(self):
-        self.alerts = {}
+        self.alert_systems = {}

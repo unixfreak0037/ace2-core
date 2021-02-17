@@ -35,8 +35,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
         self.db = None
 
         # remove the temporary file we used
-        #if os.path.exists("ace.db"):
-            #os.remove("ace.db")
+        # if os.path.exists("ace.db"):
+        # os.remove("ace.db")
 
         # re-initialize and create the database
         self.initialize()
@@ -51,8 +51,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     def stop(self):
         super().stop()
 
-        #if os.path.exists("ace.db"):
-            #os.remove("ace.db")
+        # if os.path.exists("ace.db"):
+        # os.remove("ace.db")
 
 
 class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, ThreadedACESystem):
@@ -63,8 +63,8 @@ class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, Thre
     def initialize(self):
         super().initialize()
 
-        #if os.path.exists("ace.rdb"):
-            #os.remove("ace.rdb")
+        # if os.path.exists("ace.rdb"):
+        # os.remove("ace.rdb")
 
         # only need to do this once
         if self.redis_connection is None:

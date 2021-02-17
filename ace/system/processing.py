@@ -5,7 +5,7 @@ import copy
 
 from ace.analysis import recurse_tree
 from ace.system import ACESystemInterface, get_system, get_logger
-from ace.system.alerting import track_alert
+from ace.system.alerting import submit_alert
 from ace.system.analysis_tracking import (
     UnknownRootAnalysisError,
     delete_root_analysis,
@@ -139,7 +139,7 @@ def process_analysis_request(ar: AnalysisRequest):
 
     # did we generate an alert?
     if not target_root.analysis_cancelled and target_root.has_detections():
-        track_alert(target_root)
+        submit_alert(target_root)
 
     # for each observable that needs to be analyzed
     if not target_root.analysis_cancelled:

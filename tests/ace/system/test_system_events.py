@@ -6,7 +6,7 @@ import pytest
 
 from ace.analysis import RootAnalysis, AnalysisModuleType
 from ace.data_model import Event, ContentMetadata
-from ace.system.alerting import track_alert
+from ace.system.alerting import submit_alert, register_alert_system, unregister_alert_system
 from ace.system.analysis_module import register_analysis_module_type, delete_analysis_module_type
 from ace.system.analysis_tracking import (
     track_root_analysis,
@@ -24,6 +24,8 @@ from ace.system.caching import generate_cache_key, cache_analysis_result
 from ace.system.config import set_config
 from ace.system.constants import (
     EVENT_ALERT,
+    EVENT_ALERT_SYSTEM_REGISTERED,
+    EVENT_ALERT_SYSTEM_UNREGISTERED,
     EVENT_AMT_DELETED,
     EVENT_AMT_MODIFIED,
     EVENT_AMT_NEW,
@@ -207,27 +209,61 @@ def test_EVENT_ANALYSIS_DETAILS_DELETED():
 
 
 @pytest.mark.integration
+def test_ALERT_SYSTEM_REGISTERED():
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ALERT_SYSTEM_REGISTERED, handler)
+    register_alert_system("test")
+
+    handler.wait()
+    assert handler.event.name == EVENT_ALERT_SYSTEM_REGISTERED
+    assert handler.event.args == "test"
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ALERT_SYSTEM_REGISTERED, handler)
+    register_alert_system("test")
+    assert handler.event is None
+
+
+@pytest.mark.integration
+def test_ALERT_SYSTEM_REGISTERED():
+    register_alert_system("test")
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ALERT_SYSTEM_UNREGISTERED, handler)
+
+    unregister_alert_system("test")
+    handler.wait()
+    assert handler.event.name == EVENT_ALERT_SYSTEM_UNREGISTERED
+    assert handler.event.args == "test"
+
+    handler = TestEventHandler()
+    register_event_handler(EVENT_ALERT_SYSTEM_UNREGISTERED, handler)
+    unregister_alert_system("test")
+    assert handler.event is None
+
+
+@pytest.mark.integration
 def test_EVENT_ALERT():
+    register_alert_system("test")
     root = RootAnalysis()
     track_root_analysis(root)
     root.add_detection_point("test")
 
     handler = TestEventHandler()
     register_event_handler(EVENT_ALERT, handler)
-    track_alert(root)
+    submit_alert(root)
 
     handler.wait()
     assert handler.event.name == EVENT_ALERT
-    assert RootAnalysis.from_dict(handler.event.args) == root
+    assert handler.event.args == root.uuid
 
     # event fires every time
     handler = TestEventHandler()
     register_event_handler(EVENT_ALERT, handler)
-    track_alert(root)
+    submit_alert(root)
 
     handler.wait()
     assert handler.event.name == EVENT_ALERT
-    assert RootAnalysis.from_dict(handler.event.args) == root
+    assert handler.event.args == root.uuid
 
 
 @pytest.mark.integration

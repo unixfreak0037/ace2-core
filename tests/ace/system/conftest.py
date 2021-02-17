@@ -23,7 +23,11 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     # each connection gets its own thread (thanks to session scoping)
     # and this in-memory db only exists for the connection its on
     # engine = create_engine("sqlite://")
-    db_url = "sqlite:///ace.db"
+    # db_url = "sqlite:///ace.db"
+    db_url = "sqlite://"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def reset(self):
         super().reset()
@@ -31,8 +35,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
         self.db = None
 
         # remove the temporary file we used
-        if os.path.exists("ace.db"):
-            os.remove("ace.db")
+        #if os.path.exists("ace.db"):
+            #os.remove("ace.db")
 
         # re-initialize and create the database
         self.initialize()
@@ -47,8 +51,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     def stop(self):
         super().stop()
 
-        if os.path.exists("ace.db"):
-            os.remove("ace.db")
+        #if os.path.exists("ace.db"):
+            #os.remove("ace.db")
 
 
 class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, ThreadedACESystem):
@@ -59,14 +63,16 @@ class DistributedACETestSystem(DistributedACESystem, DatabaseACETestSystem, Thre
     def initialize(self):
         super().initialize()
 
-        if os.path.exists("ace.rdb"):
-            os.remove("ace.rdb")
+        #if os.path.exists("ace.rdb"):
+            #os.remove("ace.rdb")
 
-        import redislite
+        # only need to do this once
+        if self.redis_connection is None:
+            import redislite
 
-        self.redis_connection = redislite.StrictRedis("ace.rdb")
-        self.work_queue.redis_connection = lambda: self.redis_connection
-        self.events.redis_connection = lambda: self.redis_connection
+            self.redis_connection = redislite.StrictRedis("ace.rdb")
+            self.work_queue.redis_connection = lambda: self.redis_connection
+            self.events.redis_connection = lambda: self.redis_connection
 
     def reset(self):
         super().reset()

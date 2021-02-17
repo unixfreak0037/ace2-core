@@ -20,7 +20,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     # each connection gets its own thread (thanks to session scoping)
     # and this in-memory db only exists for the connection its on
     # engine = create_engine("sqlite://")
-    db_url = "sqlite:///ace.db"
+    #db_url = "sqlite:///ace.db"
+    db_url = "sqlite://"
 
     def reset(self):
         super().reset()
@@ -28,8 +29,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
         self.db = None
 
         # remove the temporary file we used
-        if os.path.exists("ace.db"):
-            os.remove("ace.db")
+        #if os.path.exists("ace.db"):
+            #os.remove("ace.db")
 
         # re-initialize and create the database
         self.initialize()
@@ -44,8 +45,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     def stop(self):
         super().stop()
 
-        if os.path.exists("ace.db"):
-            os.remove("ace.db")
+        #if os.path.exists("ace.db"):
+            #os.remove("ace.db")
 
 
 @pytest.fixture(autouse=True, scope="session")

@@ -305,7 +305,7 @@ class AnalysisModuleType:
     # a value of None means it is not cached
     cache_ttl: Optional[int] = None
     # what additional values should be included to determine the cache key?
-    additional_cache_keys: list[str] = field(default_factory=list)
+    extended_version: list[str] = field(default_factory=list)
     # what kind of analysis module does this classify as?
     # examples: [ 'sandbox' ], [ 'splunk' ], etc...
     types: list[str] = field(default_factory=list)
@@ -361,7 +361,7 @@ class AnalysisModuleType:
         return (
             self.name == amt.name
             and self.version == amt.version
-            and sorted(self.additional_cache_keys) == sorted(amt.additional_cache_keys)
+            and sorted(self.extended_version) == sorted(amt.extended_version)
         )
 
     @property
@@ -1430,7 +1430,13 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             if not existing_analysis:
                 # add any missing analysis
                 # NOTE that we create a new analysis here and then merge
-                existing_analysis = self.add_analysis(type=analysis.type, root=self.root, details=analysis.details)
+                existing_analysis = self.add_analysis(
+                    type=analysis.type,
+                    root=self.root,
+                    details=analysis.details,
+                    error_message=analysis.error_message,
+                    stack_trace=analysis.stack_trace,
+                )
 
             # merge existing analysis
             existing_analysis.apply_merge(analysis)
@@ -2038,6 +2044,7 @@ class RootAnalysis(Analysis, MergableObject):
             if self.save():
                 return True
 
+            get_logger().debug(f"sync iteration {_}")
             modified_root = get_root_analysis(self)
             if modified_root.version == self.version:
                 raise RuntimeError("RootAnalysis.save() failed but version matches -- check logs for issues")
@@ -2196,13 +2203,22 @@ class RootAnalysis(Analysis, MergableObject):
 
         return submit_analysis_request(self.create_analysis_request())
 
+    def all_analysis_completed(self) -> bool:
+        """Returns True if all analysis has been completed for this root."""
+        for observable in self.all_observables:
+            for amt, request_id in observable.request_tracking.items():
+                if not observable.analysis_completed(amt):
+                    return False
+
+        return True
+
     def analysis_completed(self, observable: Observable, amt: AnalysisModuleType) -> bool:
         """Returns True if the given analysis has been completed for the given observable."""
         assert isinstance(observable, Observable)
         assert isinstance(amt, AnalysisModuleType)
         observable = self.get_observable(observable)
         if observable is None:
-            raise UnknownObservableError(observable)
+            raise UnknownObservableError(str(observable))
 
         return observable.analysis_completed(amt)
 
@@ -2213,7 +2229,7 @@ class RootAnalysis(Analysis, MergableObject):
 
         observable = self.get_observable(observable)
         if observable is None:
-            raise UnknownObservableError(observable)
+            raise UnknownObservableError(str(observable))
 
         return observable.get_analysis_request_id(amt) is not None
 

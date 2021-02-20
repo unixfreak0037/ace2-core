@@ -8,7 +8,7 @@ from ace.analysis import RootAnalysis, Observable
 from ace.data_model import AnalysisRequestModel, RootAnalysisModel
 from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.analysis_tracking import get_root_analysis
-from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
+from ace.system.analysis_module import AnalysisModuleType
 from ace.system.constants import (
     TRACKING_STATUS_NEW,
     TRACKING_STATUS_QUEUED,
@@ -17,6 +17,7 @@ from ace.system.constants import (
     EVENT_AR_DELETED,
     EVENT_AR_EXPIRED,
 )
+from ace.system.exceptions import UnknownAnalysisModuleTypeError
 from ace.system.events import fire_event
 
 
@@ -83,7 +84,15 @@ class AnalysisRequest:
         return self.id == other.id
 
     def __str__(self):
-        return f"AnalysisRequest(id={self.id},root={self.root},observable={self.observable},type={self.type})"
+        ar_type = "unknown"
+        if self.is_observable_analysis_result:
+            ar_type = "result"
+        elif self.is_root_analysis_request:
+            ar_type = "root"
+        elif self.is_observable_analysis_request:
+            ar_type = "request"
+
+        return f"AnalysisRequest({ar_type},id={self.id},root={self.root},observable={self.observable},type={self.type})"
 
     def to_model(self, *args, **kwargs) -> AnalysisRequestModel:
         return AnalysisRequestModel(
@@ -255,7 +264,7 @@ def track_analysis_request(request: AnalysisRequest):
     from ace.system.analysis_module import get_analysis_module_type
 
     if request.type and get_analysis_module_type(request.type.name) is None:
-        raise UnknownAnalysisModuleTypeError(request.type.name)
+        raise UnknownAnalysisModuleTypeError()
 
     get_logger().debug(f"tracking analysis request {request}")
     result = get_system().request_tracking.track_analysis_request(request)

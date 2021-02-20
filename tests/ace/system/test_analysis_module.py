@@ -5,29 +5,31 @@ import pytest
 from ace.analysis import RootAnalysis, Observable, Analysis
 from ace.system.analysis_module import (
     AnalysisModuleType,
-    AnalysisModuleTypeVersionError,
-    AnalysisModuleTypeExtendedVersionError,
     delete_analysis_module_type,
     get_analysis_module_type,
     register_analysis_module_type,
 )
 from ace.system.caching import get_cached_analysis_result
+from ace.system.exceptions import (
+    AnalysisModuleTypeVersionError,
+    AnalysisModuleTypeExtendedVersionError,
+)
 from ace.system.work_queue import get_queue_size, get_next_analysis_request
 
 amt_1 = AnalysisModuleType(
-    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, additional_cache_keys=["key1"]
+    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, extended_version=["key1"]
 )
 
 amt_1_same = AnalysisModuleType(
-    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, additional_cache_keys=["key1"]
+    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, extended_version=["key1"]
 )
 
 amt_1_upgraded_version = AnalysisModuleType(
-    name="test", description="test", version="2.0.0", timeout=30, additional_cache_keys=["key1"]
+    name="test", description="test", version="2.0.0", timeout=30, extended_version=["key1"]
 )
 
 amt_1_upgraded_cache_keys = AnalysisModuleType(
-    name="test", description="test", version="1.0.0", timeout=30, additional_cache_keys=["key2"]
+    name="test", description="test", version="1.0.0", timeout=30, extended_version=["key2"]
 )
 
 

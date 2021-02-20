@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from ace.analysis import RootAnalysis
-from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError, register_analysis_module_type
+from ace.system.analysis_module import AnalysisModuleType, register_analysis_module_type
 from ace.system.analysis_request import (
     AnalysisRequest,
     delete_analysis_request,
@@ -15,6 +15,7 @@ from ace.system.analysis_request import (
     track_analysis_request,
 )
 from ace.system.constants import *
+from ace.system.exceptions import UnknownAnalysisModuleTypeError
 from ace.system.work_queue import (
     add_work_queue,
     delete_work_queue,

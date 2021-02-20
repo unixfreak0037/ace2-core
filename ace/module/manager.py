@@ -18,7 +18,7 @@ from ace.error_reporting.reporter import format_error_report
 from ace.module.base import AnalysisModule
 from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
 from ace.system import get_logger
-from ace.system.analysis_module import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
+from ace.system.exceptions import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
 
 import psutil
 
@@ -326,7 +326,9 @@ class AnalysisModuleManager:
         request = None
 
         try:
-            request = await get_api().get_next_analysis_request(whoami, module.type, self.wait_time)
+            request = await get_api().get_next_analysis_request(
+                whoami, module.type, self.wait_time, module.type.version, module.type.extended_version
+            )
         except AnalysisModuleTypeExtendedVersionError as e:
             get_logger().warning(f"module {module.type.name} has invalid extended version: {e}")
             if not await self.upgrade_module(module):

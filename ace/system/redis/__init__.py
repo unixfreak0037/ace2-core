@@ -18,6 +18,7 @@ def get_redis_connection():
     )
 
 
+from ace.system.redis.alerting import RedisAlertTrackingInterface
 from ace.system.redis.events import RedisEventInterface
 from ace.system.redis.work_queue import RedisWorkQueueManagerInterface
 
@@ -25,5 +26,6 @@ from ace.system.redis.work_queue import RedisWorkQueueManagerInterface
 class RedisACESystem:
     """A partial implementation of the ACE core implemented using Redis."""
 
+    alerting = RedisAlertTrackingInterface()
     events = RedisEventInterface()
     work_queue = RedisWorkQueueManagerInterface()

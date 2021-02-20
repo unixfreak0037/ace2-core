@@ -63,6 +63,7 @@ class RedisEventInterface(EventInterface):
             # have we initialize our connection to redis pub/sub yet?
             # we can't do this until we've got something registered
             if self._rc is None:
+                get_logger().debug("connecting to redis")
                 self._rc = self.redis_connection()
                 self._rc_p = self._rc.pubsub(ignore_subscribe_messages=True)
 
@@ -77,9 +78,10 @@ class RedisEventInterface(EventInterface):
             redis_handlers = {event: self.redis_message_handler for event, _ in self.event_handlers.items()}
 
             # XXX assuming we can safely resubscribe every time
-            self._rc_p.subscribe(**redis_handlers)
+            result = self._rc_p.subscribe(**redis_handlers)
             if self.event_thread is None:
                 self.event_thread = self._rc_p.run_in_thread(sleep_time=0.001)
+                get_logger().debug(f"started redis event thread {self.event_thread}")
 
     def remove_event_handler(self, handler: EventHandler, events: Optional[list[str]] = []):
         # if we didn't specify which events to remove the handler from then we
@@ -122,10 +124,16 @@ class RedisEventInterface(EventInterface):
     def stop(self):
         if self.event_thread:
             self.event_thread.stop()
+            self.event_thread = None
 
     def reset(self):
         # unsubscribe from all events
         if self._rc_p:
             self._rc_p.unsubscribe()
+            # self._rc_p = None
+
+        # if self._rc:
+        # self._rc.close()
+        # self._rc = None
 
         self.event_handlers = {}  # key = event.name, value = [EventHandler]

@@ -100,7 +100,8 @@ def test_retry_on_deadlock_single_executable():
         return
 
     retry_on_deadlock(Config.__table__.insert().values(key="test", value="value"), commit=True)
-    assert get_db().query(Config).filter(Config.key == "test").one().value == "value"
+    with get_db() as db:
+        assert db.query(Config).filter(Config.key == "test").one().value == "value"
 
 
 @pytest.mark.unit
@@ -116,8 +117,9 @@ def test_retry_on_deadlock_multi_executable():
         commit=True,
     )
 
-    assert get_db().query(Config).filter(Config.key == "test").one().value == "value"
-    assert get_db().query(Config).filter(Config.key == "test2").one().value == "value2"
+    with get_db() as db:
+        assert db.query(Config).filter(Config.key == "test").one().value == "value"
+        assert db.query(Config).filter(Config.key == "test2").one().value == "value2"
 
 
 @pytest.mark.unit
@@ -143,8 +145,9 @@ def test_retry_on_deadlock_rollback():
         )
 
     # neither of these should be set since the entire transaction was rolled back
-    assert get_db().query(Config).filter(Config.key == "test").one_or_none() is None
-    assert get_db().query(Config).filter(Config.key == "test2").one_or_none() is None
+    with get_db() as db:
+        assert db.query(Config).filter(Config.key == "test").one_or_none() is None
+        assert db.query(Config).filter(Config.key == "test2").one_or_none() is None
 
 
 @pytest.mark.unit

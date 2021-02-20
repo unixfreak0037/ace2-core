@@ -1,21 +1,70 @@
 # vim: ts=4:sw=4:et:cc=120
 #
 
+import io
 
-class AsyncAceAPI(AceAPI):
+from contextlib import contextmanager
+from typing import Union, Any, Optional
+
+from ace.data_model import AnalysisRequestQueryModel, ErrorModel
+from ace.analysis import RootAnalysis, AnalysisModuleType, Observable
+from ace.api.base import AceAPI
+from ace.system.analysis_request import AnalysisRequest
+from ace.system.constants import ERROR_AMT_VERSION, ERROR_AMT_EXTENDED_VERSION, ERROR_AMT_DEP
+from ace.system.events import EventHandler
+from ace.system.exceptions import AnalysisModuleTypeDependencyError, exception_map
+from ace.system.storage import ContentMetadata
+from ace.system.work_queue import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
+
+from httpx import AsyncClient
+
+# maps error codes to exceptions
+
+
+def _raise_exception_on_error(response):
+    if response.status_code == 400:
+        _raise_exception_from_error_model(ErrorModel.parse_obj(response.json()))
+
+
+def _raise_exception_from_error_model(error: ErrorModel):
+    """Raises an exception based on the code of the error.
+    If the error code is unknown then a generic RuntimeError is raised."""
+    if error.code in exception_map:
+        raise exception_map[error.code](error.details)
+    else:
+        raise RuntimeError(f"unknown error code {error.code}: {error.details}")
+
+
+class RemoteAceAPI(AceAPI):
+    def get_client(self):
+        return AsyncClient(*self.client_args, **self.client_kwargs)
+
     # alerting
     async def track_alert(self, root: RootAnalysis):
         raise NotImplementedError()
 
     # analysis module
     async def register_analysis_module_type(self, amt: AnalysisModuleType) -> AnalysisModuleType:
-        raise NotImplementedError()
+        assert isinstance(amt, AnalysisModuleType)
+        async with self.get_client() as client:
+            response = await client.post("/amt", json=amt.to_dict())
+
+        _raise_exception_on_error(response)
+        return AnalysisModuleType.from_dict(response.json())
 
     async def track_analysis_module_type(self, amt: AnalysisModuleType):
         raise NotImplementedError()
 
     async def get_analysis_module_type(self, name: str) -> Union[AnalysisModuleType, None]:
-        raise NotImplementedError()
+        assert isinstance(name, str) and name
+        async with self.get_client() as client:
+            response = await client.get(f"/amt/{name}")
+
+        _raise_exception_on_error(response)
+        if response.status_code == 404:
+            return None
+
+        return AnalysisModuleType.from_dict(response.json())
 
     async def delete_analysis_module_type(self, amt: Union[AnalysisModuleType, str]):
         raise NotImplementedError()
@@ -64,7 +113,12 @@ class AsyncAceAPI(AceAPI):
         raise NotImplementedError()
 
     async def submit_analysis_request(self, ar: AnalysisRequest):
-        raise NotImplementedError()
+        assert isinstance(ar, AnalysisRequest)
+
+        async with self.get_client() as client:
+            response = await client.post("/process_request", json=ar.to_dict())
+
+        _raise_exception_on_error(response)
 
     async def process_expired_analysis_requests(
         self,
@@ -157,6 +211,32 @@ class AsyncAceAPI(AceAPI):
     async def track_content_root(self, sha256: str, root: Union[RootAnalysis, str]):
         raise NotImplementedError()
 
+    async def store_file(self, path: str, **kwargs) -> str:
+        """Utility function that stores the contents of the given file and returns the sha256 hash."""
+        assert isinstance(path, str)
+        meta = ContentMetadata(path, **kwargs)
+        with open(path, "rb") as fp:
+            return store_content(fp, meta)
+
+    async def get_file(self, sha256: str, path: Optional[str] = None) -> bool:
+        """Utility function that pulls data out of storage into a local file. The
+        original path is used unless a target path is specified."""
+        assert isinstance(sha256, str)
+        assert path is None or isinstance(path, str)
+
+        meta = get_content_meta(sha256)
+        if meta is None:
+            return False
+
+        if path is None:
+            path = meta.name
+
+        with open(path, "wb") as fp_out:
+            with contextlib.closing(get_content_stream(sha256)) as fp_in:
+                shutil.copyfileobj(fp_in, fp_out)
+
+        return True
+
     # work queue
     async def get_work(self, amt: Union[AnalysisModuleType, str], timeout: int) -> Union[AnalysisRequest, None]:
         raise NotImplementedError()
@@ -174,6 +254,31 @@ class AsyncAceAPI(AceAPI):
         raise NotImplementedError()
 
     async def get_next_analysis_request(
-        self, owner_uuid: str, amt: Union[AnalysisModuleType, str], timeout: Optional[int] = 0
+        self,
+        owner_uuid: str,
+        amt: Union[AnalysisModuleType, str],
+        timeout: Optional[int] = 0,
+        version: Optional[str] = None,
+        extended_version: Optional[list[list]] = [],
     ) -> Union[AnalysisRequest, None]:
-        raise NotImplementedError()
+        if isinstance(amt, AnalysisModuleType):
+            amt = amt.name
+
+        async with self.get_client() as client:
+            response = await client.post(
+                "/work_queue",
+                json=AnalysisRequestQueryModel(
+                    owner=owner_uuid,
+                    amt=amt,
+                    timeout=timeout,
+                    version=version,
+                    extended_version=extended_version,
+                ).dict(),
+            )
+
+        _raise_exception_on_error(response)
+
+        if response.status_code == 204:
+            return None
+        else:
+            return AnalysisRequest.from_dict(response.json())

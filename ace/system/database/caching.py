@@ -19,14 +19,15 @@ from sqlalchemy import func
 
 class DatabaseCachingInterface(CachingInterface):
     def get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
-        result = get_db().query(AnalysisResultCache).filter(AnalysisResultCache.cache_key == cache_key).one_or_none()
-        if result is None:
-            return None
+        with get_db() as db:
+            result = db.query(AnalysisResultCache).filter(AnalysisResultCache.cache_key == cache_key).one_or_none()
+            if result is None:
+                return None
 
-        if result.expiration_date is not None and utc_now() > result.expiration_date:
-            return None
+            if result.expiration_date is not None and utc_now() > result.expiration_date:
+                return None
 
-        return AnalysisRequest.from_json(result.json_data)
+            return AnalysisRequest.from_json(result.json_data)
 
     def cache_analysis_result(self, cache_key: str, request: AnalysisRequest, expiration: Optional[int]) -> str:
         expiration_date = None
@@ -41,27 +42,30 @@ class DatabaseCachingInterface(CachingInterface):
             json_data=request.to_json(),
         )
 
-        get_db().merge(cache_result)
-        get_db().commit()
+        with get_db() as db:
+            db.merge(cache_result)
+            db.commit()
         return cache_key
 
     def delete_expired_cached_analysis_results(self):
-        get_db().execute(AnalysisResultCache.__table__.delete().where(AnalysisResultCache.expiration_date < utc_now()))
-        get_db().commit()
+        with get_db() as db:
+            db.execute(AnalysisResultCache.__table__.delete().where(AnalysisResultCache.expiration_date < utc_now()))
+            db.commit()
 
     def delete_cached_analysis_results_by_module_type(self, amt: AnalysisModuleType):
-        get_db().execute(
-            AnalysisResultCache.__table__.delete().where(AnalysisResultCache.analysis_module_type == amt.name)
-        )
-        get_db().commit()
+        with get_db() as db:
+            db.execute(
+                AnalysisResultCache.__table__.delete().where(AnalysisResultCache.analysis_module_type == amt.name)
+            )
+            db.commit()
 
     def get_total_cache_size(self, amt: Optional[AnalysisModuleType] = None) -> int:
-        if amt:
-            return (
-                get_db()
-                .query(func.count(AnalysisResultCache.cache_key))
-                .filter(AnalysisResultCache.analysis_module_type == amt.name)
-                .scalar()
-            )
-        else:
-            return get_db().query(func.count(AnalysisResultCache.cache_key)).scalar()
+        with get_db() as db:
+            if amt:
+                return (
+                    db.query(func.count(AnalysisResultCache.cache_key))
+                    .filter(AnalysisResultCache.analysis_module_type == amt.name)
+                    .scalar()
+                )
+            else:
+                return db.query(func.count(AnalysisResultCache.cache_key)).scalar()

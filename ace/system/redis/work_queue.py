@@ -5,8 +5,8 @@ import json
 from typing import Union, Optional
 
 from ace.system import ACESystemInterface
-from ace.system.analysis_module import UnknownAnalysisModuleTypeError
 from ace.system.analysis_request import AnalysisRequest
+from ace.system.exceptions import UnknownAnalysisModuleTypeError
 from ace.system.redis import CONFIG_REDIS_DB, CONFIG_REDIS_PORT, CONFIG_REDIS_HOST, get_redis_connection
 from ace.system.work_queue import WorkQueueManagerInterface
 from ace.time import utc_now
@@ -48,14 +48,14 @@ class RedisWorkQueueManagerInterface(WorkQueueManagerInterface):
     def put_work(self, amt: str, analysis_request: AnalysisRequest):
         with self.redis_connection() as rc:
             if not rc.exists(get_marker_name(amt)):
-                raise UnknownAnalysisModuleTypeError(amt)
+                raise UnknownAnalysisModuleTypeError()
 
             rc.rpush(get_queue_name(amt), analysis_request.to_json())
 
     def get_work(self, amt: str, timeout: float) -> Union[AnalysisRequest, None]:
         with self.redis_connection() as rc:
             if not rc.exists(get_marker_name(amt)):
-                raise UnknownAnalysisModuleTypeError(amt)
+                raise UnknownAnalysisModuleTypeError()
 
             # if we're not looking to wait then we use LPOP
             # this always returns a single result
@@ -79,6 +79,6 @@ class RedisWorkQueueManagerInterface(WorkQueueManagerInterface):
     def get_queue_size(self, amt: str) -> int:
         with self.redis_connection() as rc:
             if not rc.exists(get_marker_name(amt)):
-                raise UnknownAnalysisModuleTypeError(amt)
+                raise UnknownAnalysisModuleTypeError()
 
             return rc.llen(get_queue_name(amt))

@@ -5,8 +5,6 @@ from typing import Union, Optional
 from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.analysis_module import (
     AnalysisModuleType,
-    AnalysisModuleTypeVersionError,
-    AnalysisModuleTypeExtendedVersionError,
     track_analysis_module_type,
     get_analysis_module_type,
 )
@@ -25,6 +23,10 @@ from ace.system.constants import (
     EVENT_WORK_REMOVE,
 )
 from ace.system.events import fire_event
+from ace.system.exceptions import (
+    AnalysisModuleTypeVersionError,
+    AnalysisModuleTypeExtendedVersionError,
+)
 
 
 class WorkQueueManagerInterface(ACESystemInterface):
@@ -156,7 +158,7 @@ def get_next_analysis_request(
         if version is None:
             raise ValueError("missing required version parameter when passing amt as string")
 
-        amt = AnalysisModuleType(name=amt, description="", version=version, additional_cache_keys=extended_version)
+        amt = AnalysisModuleType(name=amt, description="", version=version, extended_version=extended_version)
 
     # make sure that the requested analysis module hasn't been replaced by a newer version
     # if that's the case then the request fails and the requestor needs to update to the new version

@@ -20,12 +20,11 @@ from ace.system.analysis_request import (
 from ace.system.analysis_module import (
     AnalysisModuleType,
     register_analysis_module_type,
-    UnknownAnalysisModuleTypeError,
     delete_analysis_module_type,
 )
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.constants import *
-from ace.system.exceptions import InvalidWorkQueueError
+from ace.system.exceptions import InvalidWorkQueueError, UnknownAnalysisModuleTypeError
 from ace.system.work_queue import add_work_queue, get_next_analysis_request
 
 amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600)

@@ -1,5 +1,6 @@
 SQLAlchemy
 fastapi[all]
+httpx
 psutil
 python-dateutil
 pytz

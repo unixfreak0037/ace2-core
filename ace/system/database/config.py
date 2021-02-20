@@ -16,12 +16,14 @@ from ace.system.database.schema import Config
 
 class DatabaseConfigurationInterface(ConfigurationInterface):
     def get_config_obj(self, key: str) -> Config:
-        return get_db().query(Config).filter(Config.key == key).one_or_none()
+        with get_db() as db:
+            return db.query(Config).filter(Config.key == key).one_or_none()
 
     def get_config(self, key: str) -> ConfigurationSetting:
         # this happens when the system first starts up as it collects the configuration of the database
-        if get_db() is None:
-            return None
+        with get_db() as db:
+            if db is None:
+                return None
 
         result = self.get_config_obj(key)
         if result is None:
@@ -43,10 +45,12 @@ class DatabaseConfigurationInterface(ConfigurationInterface):
             kwargs["documentation"] = documentation
 
         config = Config(**kwargs)
-        get_db().merge(config)
-        get_db().commit()
+        with get_db() as db:
+            db.merge(config)
+            db.commit()
 
     def delete_config(self, key: str) -> bool:
-        result = get_db().execute(Config.__table__.delete().where(Config.key == key)).rowcount
-        get_db().commit()
+        with get_db() as db:
+            result = db.execute(Config.__table__.delete().where(Config.key == key)).rowcount
+            db.commit()
         return result == 1

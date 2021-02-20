@@ -36,7 +36,7 @@ def test_add_module():
 @pytest.mark.asyncio
 async def test_verify_registration():
     # registration OK
-    amt = AnalysisModuleType("test", "", additional_cache_keys=["yara:6f5902ac237024bdd0c176cb93063dc4"])
+    amt = AnalysisModuleType("test", "", extended_version=["yara:6f5902ac237024bdd0c176cb93063dc4"])
 
     assert await get_api().register_analysis_module_type(amt)
 
@@ -56,17 +56,17 @@ async def test_verify_registration():
     assert not await manager.verify_registration()
     assert not await manager.run()
     # extended version mismatch
-    amt = AnalysisModuleType("test", "", additional_cache_keys=["yara:71bec09d78fe6abdb94244a4cc89c740"])
+    amt = AnalysisModuleType("test", "", extended_version=["yara:71bec09d78fe6abdb94244a4cc89c740"])
     manager = AnalysisModuleManager()
     manager.add_module(AsyncAnalysisModule(amt))
     assert not await manager.verify_registration()
     # extended version mismatch but upgrade ok
     class UpgradableAnalysisModule(AsyncAnalysisModule):
         async def upgrade(self):
-            self.type.additional_cache_keys = ["yara:6f5902ac237024bdd0c176cb93063dc4"]
+            self.type.extended_version = ["yara:6f5902ac237024bdd0c176cb93063dc4"]
 
     # starts out with the wrong set of yara rules but upgrade() fixes that
-    amt = AnalysisModuleType("test", "", additional_cache_keys=["yara:71bec09d78fe6abdb94244a4cc89c740"])
+    amt = AnalysisModuleType("test", "", extended_version=["yara:71bec09d78fe6abdb94244a4cc89c740"])
     manager = AnalysisModuleManager()
     manager.add_module(UpgradableAnalysisModule(amt))
     assert await manager.verify_registration()

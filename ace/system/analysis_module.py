@@ -9,32 +9,10 @@ from ace.analysis import Observable, RootAnalysis, AnalysisModuleType
 from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.constants import EVENT_AMT_NEW, EVENT_AMT_MODIFIED, EVENT_AMT_DELETED
 from ace.system.events import fire_event
-
-
-class UnknownAnalysisModuleTypeError(Exception):
-    """Raised when a request is made for an unknown (unregistered analysis module type.)"""
-
-    def __init__(self, amt: Union[AnalysisModuleType, str]):
-        super().__init__(f"unknown AnalysisModuleType {amt}")
-
-
-class CircularDependencyError(Exception):
-    """Raised when there is an attempt to register a type that would cause a circular dependency."""
-
-    def __init__(self, chain: list[AnalysisModuleType]):
-        super().__init__("circular dependency error: {}".format(" -> ".join([_.name for _ in chain])))
-
-
-class AnalysisModuleTypeVersionError(Exception):
-    """Raised when a request for a analysis with an out-of-date version is made."""
-
-    pass
-
-
-class AnalysisModuleTypeExtendedVersionError(Exception):
-    """Raised when a request for a analysis with an out-of-date extended version is made."""
-
-    pass
+from ace.system.exceptions import (
+    AnalysisModuleTypeDependencyError,
+    CircularDependencyError,
+)
 
 
 class AnalysisModuleTrackingInterface(ACESystemInterface):
@@ -65,7 +43,7 @@ def _circ_dep_check(
 
     for dep in target_amt.dependencies:
         if source_amt.name == dep:
-            raise CircularDependencyError(chain)
+            raise CircularDependencyError(" -> ".join([_.name for _ in chain]))
 
         _circ_dep_check(source_amt, get_analysis_module_type(dep), chain)
 
@@ -77,8 +55,7 @@ def register_analysis_module_type(amt: AnalysisModuleType) -> AnalysisModuleType
     # make sure all the dependencies exist
     for dep in amt.dependencies:
         if get_analysis_module_type(dep) is None:
-            get_logger().error(f"registration for {amt} failed: dependency on unknown type {dep}")
-            raise UnknownAnalysisModuleTypeError(amt)
+            raise AnalysisModuleTypeDependencyError(f"unknown type {dep}")
 
     # make sure there are no circular (or self) dependencies
     _circ_dep_check(amt)

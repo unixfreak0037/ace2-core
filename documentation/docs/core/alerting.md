@@ -8,7 +8,7 @@ Alerts are simply references to [RootAnalysis]() objects.
 
 ## Alert Systems
 
-Alerts are collected and managed by [other systems]() called **alert management systems**. These systems allow an analysist to visually analyze alert data and respond to the results.
+Alerts are collected and managed by [other systems]() called **alert management systems**. These systems allow an analyst to visually analyze alert data and respond to the results.
 
 Alert collection is performed in two steps.
 
@@ -37,4 +37,4 @@ An alert system can subscribe to the [alert event]() and then issue a collection
 
 #### Waiting for Alerts
 
-An alert system can use the optional `timeout` paramter to `get_alerts` which will block until an alert is available, and then return that alert. If no alert becomes available duing the waiting period, then an empty list is returned, and then the alert system tries again.
+An alert system can use the optional `timeout` parameter to `get_alerts` which will block until an alert is available, and then return that alert. If no alert becomes available during the waiting period, then an empty list is returned, and then the alert system tries again.

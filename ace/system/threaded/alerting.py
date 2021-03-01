@@ -7,7 +7,8 @@ import threading
 from typing import Union, Any, Optional
 
 from ace.analysis import RootAnalysis
-from ace.system.alerting import AlertTrackingInterface, UnknownAlertSystem
+from ace.system.alerting import AlertTrackingInterface
+from ace.system.exceptions import UnknownAlertSystemError
 
 
 class ThreadedAlertTrackingInterface(AlertTrackingInterface):
@@ -49,7 +50,7 @@ class ThreadedAlertTrackingInterface(AlertTrackingInterface):
                 else:
                     return [self.alert_systems[name].get(block=True, timeout=timeout)]
             except KeyError:
-                raise UnknownAlertSystem(name)
+                raise UnknownAlertSystemError(name)
             except queue.Empty:
                 break
 
@@ -60,7 +61,7 @@ class ThreadedAlertTrackingInterface(AlertTrackingInterface):
         try:
             return self.alert_systems[name].qsize()
         except KeyError:
-            raise UnknownAlertSystem(name)
+            raise UnknownAlertSystemError(name)
 
     def reset(self):
         self.alert_systems = {}

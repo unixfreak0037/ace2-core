@@ -7,7 +7,6 @@ from ace.analysis import recurse_tree
 from ace.system import ACESystemInterface, get_system, get_logger
 from ace.system.alerting import submit_alert
 from ace.system.analysis_tracking import (
-    UnknownRootAnalysisError,
     delete_root_analysis,
     get_root_analysis,
     track_root_analysis,
@@ -26,25 +25,21 @@ from ace.system.analysis_request import (
 from ace.system.analysis_module import get_all_analysis_module_types
 from ace.system.caching import cache_analysis_result, get_cached_analysis_result
 from ace.system.constants import (
+    EVENT_ANALYSIS_ROOT_COMPLETED,
     EVENT_ANALYSIS_ROOT_EXPIRED,
     EVENT_CACHE_HIT,
-    EVENT_PROCESSING_REQUEST_ROOT,
     EVENT_PROCESSING_REQUEST_OBSERVABLE,
     EVENT_PROCESSING_REQUEST_RESULT,
+    EVENT_PROCESSING_REQUEST_ROOT,
 )
 from ace.system.events import fire_event
 from ace.system.exceptions import (
-    UnknownAnalysisRequest,
-    ExpiredAnalysisRequest,
+    AnalysisRequestLockedError,
+    ExpiredAnalysisRequestError,
+    UnknownAnalysisRequestError,
     UnknownObservableError,
+    UnknownRootAnalysisError,
 )
-
-
-class AnalysisRequestLockedError(Exception):
-    """Raised when process_analysis_request is unable to lock the request."""
-
-    def __init__(self, request: AnalysisRequest):
-        super().__init__(f"failed to lock analysis request {request}")
 
 
 def process_analysis_request(ar: AnalysisRequest):
@@ -56,7 +51,9 @@ def process_analysis_request(ar: AnalysisRequest):
     # we only need to do this for observable analysis requests because they are the only types of
     # requests that can be modified (by creating linked requests)
     if ar.is_observable_analysis_request and not ar.lock():
-        raise AnalysisRequestLockedError(ar)
+        raise AnalysisRequestLockedError(f"failed to lock analysis request {ar}")
+
+    get_logger().info(f"processing {ar}")
 
     target_root = None
     # did we complete a request?
@@ -66,12 +63,12 @@ def process_analysis_request(ar: AnalysisRequest):
         # is this analysis request gone?
         if not existing_ar:
             get_logger().info(f"requested unknown analysis request {ar.id}")
-            raise UnknownAnalysisRequest(ar)
+            raise UnknownAnalysisRequestError(ar)
 
         # did the ownership change?
         if existing_ar.owner != ar.owner:
             get_logger().info(f"requested expired analysis request {ar.id}")
-            raise ExpiredAnalysisRequest(ar)
+            raise ExpiredAnalysisRequestError(ar)
 
         # get the existing root analysis
         target_root = get_root_analysis(ar.root)
@@ -215,6 +212,11 @@ def process_analysis_request(ar: AnalysisRequest):
 
     # at this point this AnalysisRequest is no longer needed
     delete_analysis_request(ar)
+
+    # has all the analysis completed for this root?
+    if target_root.all_analysis_completed():
+        get_logger().debug(f"completed root analysis {ar.root}")
+        fire_event(EVENT_ANALYSIS_ROOT_COMPLETED, ar.root)
 
     # should this root expire now?
     if ar.root.is_expired():

@@ -5,29 +5,31 @@ import pytest
 from ace.analysis import RootAnalysis, Observable, Analysis
 from ace.system.analysis_module import (
     AnalysisModuleType,
-    AnalysisModuleTypeVersionError,
-    AnalysisModuleTypeExtendedVersionError,
     delete_analysis_module_type,
     get_analysis_module_type,
     register_analysis_module_type,
 )
 from ace.system.caching import get_cached_analysis_result
+from ace.system.exceptions import (
+    AnalysisModuleTypeVersionError,
+    AnalysisModuleTypeExtendedVersionError,
+)
 from ace.system.work_queue import get_queue_size, get_next_analysis_request
 
 amt_1 = AnalysisModuleType(
-    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, additional_cache_keys=["key1"]
+    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, extended_version=["key1"]
 )
 
 amt_1_same = AnalysisModuleType(
-    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, additional_cache_keys=["key1"]
+    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, extended_version=["key1"]
 )
 
 amt_1_upgraded_version = AnalysisModuleType(
-    name="test", description="test", version="2.0.0", timeout=30, additional_cache_keys=["key1"]
+    name="test", description="test", version="2.0.0", timeout=30, extended_version=["key1"]
 )
 
 amt_1_upgraded_cache_keys = AnalysisModuleType(
-    name="test", description="test", version="1.0.0", timeout=30, additional_cache_keys=["key2"]
+    name="test", description="test", version="1.0.0", timeout=30, extended_version=["key2"]
 )
 
 
@@ -66,6 +68,11 @@ def test_register_existing_analysis_module_type():
     assert get_analysis_module_type(amt_1_same.name) == amt_1_upgraded_version
     with pytest.raises(AnalysisModuleTypeVersionError):
         get_next_analysis_request("test", amt_1, 0)  # now this request is invalid because am1 is an older version
+    # same but only passing the name and version of the module
+    with pytest.raises(AnalysisModuleTypeVersionError):
+        get_next_analysis_request(
+            "test", "test", 0, version="1.0.0"
+        )  # now this request is invalid because am1 is an older version
     assert get_next_analysis_request("test", amt_1_upgraded_version, 0) is None  # but this works
 
     # extended version data changed
@@ -74,6 +81,15 @@ def test_register_existing_analysis_module_type():
     with pytest.raises(AnalysisModuleTypeExtendedVersionError):
         get_next_analysis_request(
             "test", amt_1, 0
+        )  # now this request is invalid because am1 has different extended version
+    # same but only passing name, version and extended versions of the data
+    with pytest.raises(AnalysisModuleTypeExtendedVersionError):
+        get_next_analysis_request(
+            "test",
+            "test",
+            0,
+            "1.0.0",
+            ["key1"],
         )  # now this request is invalid because am1 has different extended version
     assert get_next_analysis_request("test", amt_1_upgraded_cache_keys, 0) is None  # but this works
 

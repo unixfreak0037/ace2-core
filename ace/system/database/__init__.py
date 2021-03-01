@@ -13,22 +13,34 @@ import time
 import warnings
 import sqlite3
 
+from contextlib import contextmanager
+
 import ace
 
 from ace.system import ACESystem, get_system, get_logger
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import DBAPIError, IntegrityError
-from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import Executable
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
 
-def get_db() -> scoped_session:
+@contextmanager
+def get_db() -> Session:
     """Returns the global scoped_session object."""
-    return get_system().db
+    try:
+        session = None
+        if get_system().engine is None:
+            yield None
+        else:
+            session = Session(bind=get_system().engine)
+            yield session
+    finally:
+        if session:
+            session.close()
 
 
 from ace.system.config import get_config_value
@@ -55,8 +67,8 @@ class DatabaseACESystem:
     observable = DatabaseObservableInterface()
     request_tracking = DatabaseAnalysisRequestTrackingInterface()
 
-    DatabaseSession = None
-    db: scoped_session = None
+    # DatabaseSession = None
+    # db: scoped_session = None
     engine = None
 
     def initialize(self):
@@ -72,34 +84,34 @@ class DatabaseACESystem:
 
         @event.listens_for(self.engine, "connect")
         def connect(dbapi_connection, connection_record):
-            pid = os.getpid()
-            tid = threading.get_ident()
-            connection_record.info["pid"] = pid
-            connection_record.info["tid"] = tid
+            # pid = os.getpid()
+            # tid = threading.get_ident()
+            # connection_record.info["pid"] = pid
+            # connection_record.info["tid"] = tid
 
             # XXX check for sqlite
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
 
-        @event.listens_for(self.engine, "checkout")
-        def checkout(dbapi_connection, connection_record, connection_proxy):
-            pid = os.getpid()
-            if connection_record.info["pid"] != pid:
-                connection_record.connection = connection_proxy.connection = None
-                message = f"connection record belongs to pid {connection_record.info['pid']} attempting to check out in pid {pid}"
-                get_logger().debug(message)
-                raise exc.DisconnectionError(message)
+        # @event.listens_for(self.engine, "checkout")
+        # def checkout(dbapi_connection, connection_record, connection_proxy):
+        # pid = os.getpid()
+        # if connection_record.info["pid"] != pid:
+        # connection_record.connection = connection_proxy.connection = None
+        # message = f"connection record belongs to pid {connection_record.info['pid']} attempting to check out in pid {pid}"
+        # get_logger().debug(message)
+        # raise exc.DisconnectionError(message)
 
-            tid = threading.get_ident()
-            if connection_record.info["tid"] != tid:
-                connection_record.connection = connection_proxy.connection = None
-                message = f"connection record belongs to tid {connection_record.info['tid']} attempting to check out in tid {tid}"
-                get_logger().debug(message)
-                raise exc.DisconnectionError(message)
+        # tid = threading.get_ident()
+        # if connection_record.info["tid"] != tid:
+        # connection_record.connection = connection_proxy.connection = None
+        # message = f"connection record belongs to tid {connection_record.info['tid']} attempting to check out in tid {tid}"
+        # get_logger().debug(message)
+        # raise exc.DisconnectionError(message)
 
-        self.DatabaseSession = sessionmaker(bind=self.engine)
-        self.db = scoped_session(self.DatabaseSession)
+        # self.DatabaseSession = sessionmaker(bind=self.engine)
+        # self.db = scoped_session(self.DatabaseSession)
 
 
 def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=False):
@@ -261,48 +273,49 @@ def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
 
     current_attempt = 0
     while True:
-        try:
-            last_result = None
-            for target in targets:
-                if isinstance(target, Executable) or isinstance(target, str):
-                    get_db().execute(target, *args, **kwargs)
-                elif callable(target):
-                    last_result = target(*args, **kwargs)
+        with get_db() as db:
+            try:
+                last_result = None
+                for target in targets:
+                    if isinstance(target, Executable) or isinstance(target, str):
+                        db.execute(target, *args, **kwargs)
+                    elif callable(target):
+                        last_result = target(*args, **kwargs)
 
-            if commit:
-                get_db().commit()
+                if commit:
+                    db.commit()
 
-            return last_result
+                return last_result
 
-        except (DBAPIError, IntegrityError) as e:
-            # catch the deadlock error ids 1213 and 1205
-            # NOTE this is for MySQL only
-            if (
-                e.orig.args[0] == 1213
-                or e.orig.args[0] == 1205
-                or (isinstance(e.orig.args[0], str) and e.orig.args[0] == "DEADLOCK")
-                and current_attempt < attempts
-            ):
-                get_logger().debug(
-                    f"DEADLOCK STATEMENT attempt #{current_attempt + 1} SQL {e.statement} PARAMS {e.params}"
-                )
+            except (DBAPIError, IntegrityError) as e:
+                # catch the deadlock error ids 1213 and 1205
+                # NOTE this is for MySQL only
+                if (
+                    e.orig.args[0] == 1213
+                    or e.orig.args[0] == 1205
+                    or (isinstance(e.orig.args[0], str) and e.orig.args[0] == "DEADLOCK")
+                    and current_attempt < attempts
+                ):
+                    get_logger().debug(
+                        f"DEADLOCK STATEMENT attempt #{current_attempt + 1} SQL {e.statement} PARAMS {e.params}"
+                    )
 
-                try:
-                    get_db().rollback()  # rolls back to the begin_nested()
-                except Exception as e:
-                    get_logger().error(f"unable to roll back transaction: {e}")
+                    try:
+                        db.rollback()  # rolls back to the begin_nested()
+                    except Exception as e:
+                        get_logger().error(f"unable to roll back transaction: {e}")
 
-                    et, ei, tb = sys.exc_info()
-                    raise e.with_traceback(tb)
+                        et, ei, tb = sys.exc_info()
+                        raise e.with_traceback(tb)
 
-                # ... and try again
-                time.sleep(0.1)  # ... after a bit
-                current_attempt += 1
-                continue
+                    # ... and try again
+                    time.sleep(0.1)  # ... after a bit
+                    current_attempt += 1
+                    continue
 
-            # otherwise we propagate the error
-            et, ei, tb = sys.exc_info()
-            raise e.with_traceback(tb)
+                # otherwise we propagate the error
+                et, ei, tb = sys.exc_info()
+                raise e.with_traceback(tb)
 
 
 def retry_function_on_deadlock(function, *args, **kwargs):

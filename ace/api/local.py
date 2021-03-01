@@ -199,6 +199,11 @@ class LocalAceAPI(AceAPI):
         return ace.system.work_queue.add_work_queue(amt)
 
     async def get_next_analysis_request(
-        self, owner_uuid: str, amt: Union[AnalysisModuleType, str], timeout: Optional[int] = 0
+        self,
+        owner_uuid: str,
+        amt: Union[AnalysisModuleType, str],
+        timeout: Optional[int] = 0,
+        version: Optional[str] = None,
+        extended_version: Optional[list[list]] = [],
     ) -> Union[AnalysisRequest, None]:
-        return ace.system.work_queue.get_next_analysis_request(owner_uuid, amt, timeout)
+        return ace.system.work_queue.get_next_analysis_request(owner_uuid, amt, timeout, version, extended_version)

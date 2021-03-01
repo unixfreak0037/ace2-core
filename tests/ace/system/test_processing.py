@@ -1,15 +1,16 @@
 import uuid
 
 from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis
-from ace.system.analysis_module import (
-    register_analysis_module_type,
-    UnknownAnalysisModuleTypeError,
-    CircularDependencyError,
-)
+from ace.system.analysis_module import register_analysis_module_type
 from ace.system.analysis_request import AnalysisRequest, get_analysis_request, get_linked_analysis_requests
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.caching import get_cached_analysis_result
 from ace.system.constants import TRACKING_STATUS_ANALYZING
+from ace.system.exceptions import (
+    AnalysisModuleTypeDependencyError,
+    UnknownAnalysisModuleTypeError,
+    CircularDependencyError,
+)
 from ace.system.processing import process_analysis_request
 from ace.system.work_queue import get_next_analysis_request, get_queue_size
 
@@ -18,6 +19,31 @@ import pytest
 ANALYSIS_TYPE_TEST = "test"
 ANALYSIS_TYPE_TEST_DEP = "test_dep"
 OWNER_UUID = str(uuid.uuid4())
+
+
+@pytest.mark.integration
+def test_all_analysis_completed():
+    amt = AnalysisModuleType(name=ANALYSIS_TYPE_TEST, description="blah", cache_ttl=60)
+    assert register_analysis_module_type(amt) == amt
+
+    root = RootAnalysis()
+    test_observable = root.add_observable("test", "test")
+    # this is technically correct because the root has not been presented to a core yet
+    assert root.all_analysis_completed()
+
+    root.submit()
+    # now this is False because we have an outstanding analysis request
+    root = get_root_analysis(root)
+    assert not root.all_analysis_completed()
+
+    request = get_next_analysis_request("test", amt, 0)
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details={"Hello": "World"})
+    request.submit()
+
+    # and then finally the root is complete once all requested analysis is present
+    root = get_root_analysis(root)
+    assert root.all_analysis_completed()
 
 
 @pytest.mark.integration
@@ -389,7 +415,7 @@ def test_process_existing_analysis_merge():
 def test_unknown_dependency():
     # amt_dep depends on amt which has not registered yet
     amt_dep = AnalysisModuleType(ANALYSIS_TYPE_TEST_DEP, "test", dependencies=[ANALYSIS_TYPE_TEST])
-    with pytest.raises(UnknownAnalysisModuleTypeError):
+    with pytest.raises(AnalysisModuleTypeDependencyError):
         assert register_analysis_module_type(amt_dep)
 
 
@@ -492,7 +518,7 @@ def test_circ_dependency():
 def test_self_dependency():
     # depending on amt when amt isn' registered yet
     amt_1 = AnalysisModuleType("test_1", "", dependencies=["test_1"])
-    with pytest.raises(UnknownAnalysisModuleTypeError):
+    with pytest.raises(AnalysisModuleTypeDependencyError):
         assert register_analysis_module_type(amt_1)
 
     # define it

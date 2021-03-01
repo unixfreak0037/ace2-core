@@ -1,16 +1,11 @@
 # vim: ts=4:sw=4:et:cc=120
 #
 
-import fastapi.testclient
+from fastapi import FastAPI
 
-from ace.system.redis.alerting import RedisAlertTrackingInterface
-from ace.system.redis.events import RedisEventInterface
-from ace.system.redis.work_queue import RedisWorkQueueManagerInterface
+app = FastAPI()
 
-
-class DistributedACESystem:
-    """A partial implementation of the ACE core implemented using various distributed systems."""
-
-    alerting = RedisAlertTrackingInterface()
-    events = RedisEventInterface()
-    work_queue = RedisWorkQueueManagerInterface()
+# importing these modules is what ends up loading the routes
+import ace.system.distributed.analysis_module
+import ace.system.distributed.work_queue
+import ace.system.distributed.processing

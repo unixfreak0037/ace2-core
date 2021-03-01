@@ -25,6 +25,7 @@ EVENT_ANALYSIS_ROOT_NEW = "/core/analysis/root/new"
 EVENT_ANALYSIS_ROOT_MODIFIED = "/core/analysis/root/modified"
 EVENT_ANALYSIS_ROOT_EXPIRED = "/core/analysis/root/expired"
 EVENT_ANALYSIS_ROOT_DELETED = "/core/analysis/root/deleted"
+EVENT_ANALYSIS_ROOT_COMPLETED = "/core/analysis/root/completed"
 # analysis details tracking
 EVENT_ANALYSIS_DETAILS_NEW = "/core/analysis/details/new"
 EVENT_ANALYSIS_DETAILS_MODIFIED = "/core/analysis/details/modified"
@@ -60,3 +61,21 @@ EVENT_WORK_ASSIGNED = "/core/work/assigned"
 EVENT_PROCESSING_REQUEST_OBSERVABLE = "/core/processing/request/observable"
 EVENT_PROCESSING_REQUEST_ROOT = "/core/processing/request/root"
 EVENT_PROCESSING_REQUEST_RESULT = "/core/processing/request/result"
+
+#
+# error codes
+#
+
+ERROR_AMT_UNKNOWN = "unknown_amt"
+ERROR_AMT_VERSION = "amt_version"
+ERROR_AMT_EXTENDED_VERSION = "amt_extended_version"
+ERROR_AMT_DEP = "invalid_amt_dependency"
+ERROR_AMT_CIRC = "amt_circ_dependency"
+ERROR_AR_LOCKED = "locked_analysis_request"
+ERROR_AR_UNKNOWN = "unknown_analysis_request"
+ERROR_AR_EXPIRED = "expired_analysis_request"
+ERROR_WQ_INVALID = "invalid_work_queue"
+ERROR_ROOT_EXISTS = "root_exists"
+ERROR_ROOT_UNKNOWN = "unknown_root"
+ERROR_OBS_UNKNOWN = "unknown_observable"
+ERROR_AMS_UNKNOWN = "unknown_ams"

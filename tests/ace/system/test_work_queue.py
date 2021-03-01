@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from ace.analysis import RootAnalysis
-from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError, register_analysis_module_type
+from ace.system.analysis_module import AnalysisModuleType, register_analysis_module_type
 from ace.system.analysis_request import (
     AnalysisRequest,
     delete_analysis_request,
@@ -15,6 +15,7 @@ from ace.system.analysis_request import (
     track_analysis_request,
 )
 from ace.system.constants import *
+from ace.system.exceptions import UnknownAnalysisModuleTypeError
 from ace.system.work_queue import (
     add_work_queue,
     delete_work_queue,
@@ -67,6 +68,21 @@ def test_get_next_analysis_request():
     assert next_ar.status == TRACKING_STATUS_ANALYZING
     assert next_ar.owner == TEST_OWNER
     assert get_next_analysis_request(TEST_OWNER, amt_1, 0) is None
+
+
+@pytest.mark.integration
+def test_get_next_analysis_request_by_name():
+    register_analysis_module_type(amt_1)
+    root = RootAnalysis()
+    observable = root.add_observable("test", TEST_1)
+    request = AnalysisRequest(root, observable, amt_1)
+    submit_analysis_request(request)
+
+    next_ar = get_next_analysis_request(TEST_OWNER, "test", 0, version="1.0.0")
+    assert next_ar == request
+    assert next_ar.status == TRACKING_STATUS_ANALYZING
+    assert next_ar.owner == TEST_OWNER
+    assert get_next_analysis_request(TEST_OWNER, "test", 0, version="1.0.0") is None
 
 
 @pytest.mark.integration

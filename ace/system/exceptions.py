@@ -1,33 +1,125 @@
 # vim: ts=4:sw=4:et:cc=120
 
+from ace.system.constants import (
+    ERROR_AMS_UNKNOWN,
+    ERROR_AMT_CIRC,
+    ERROR_AMT_DEP,
+    ERROR_AMT_EXTENDED_VERSION,
+    ERROR_AMT_UNKNOWN,
+    ERROR_AMT_VERSION,
+    ERROR_AR_EXPIRED,
+    ERROR_AR_LOCKED,
+    ERROR_AR_UNKNOWN,
+    ERROR_OBS_UNKNOWN,
+    ERROR_ROOT_EXISTS,
+    ERROR_ROOT_UNKNOWN,
+    ERROR_WQ_INVALID,
+)
 
-class InvalidWorkQueueError(Exception):
+
+class ACEError(Exception):
+    code = None
+
+
+class AnalysisRequestLockedError(ACEError):
+    """Raised when process_analysis_request is unable to lock the request."""
+
+    code = ERROR_AR_LOCKED
+
+
+class InvalidWorkQueueError(ACEError):
     """Raised when a request to an invalid work queue is made."""
 
-    pass
+    code = ERROR_WQ_INVALID
 
 
-class AnalysisRequestError(Exception):
-    pass
+class UnknownAnalysisRequestError(ACEError):
+    code = ERROR_AR_UNKNOWN
 
 
-class UnknownAnalysisRequest(AnalysisRequestError):
-    pass
+class ExpiredAnalysisRequestError(ACEError):
+    code = ERROR_AR_EXPIRED
 
 
-class ExpiredAnalysisRequest(AnalysisRequestError):
-    pass
-
-
-class UnknownObservableError(ValueError):
+class UnknownObservableError(ACEError):
     """Raised when there is an attempt to modify an unknown Observable object."""
 
-    def __init__(self, uuid: str):
-        super().__init__(f"unknown Observable {uuid}")
+    code = ERROR_OBS_UNKNOWN
 
 
-class RootAnalysisExistsError(ValueError):
+class RootAnalysisExistsError(ACEError):
     """Raised when there is an attempt to track an existing RootAnalysis object."""
 
-    def __init__(self, uuid: str):
-        super().__init__(f"RootAnalysis {uuid} is already tracked")
+    code = ERROR_ROOT_EXISTS
+
+    # def __init__(self, uuid: str):
+    # super().__init__(f"RootAnalysis {uuid} is already tracked")
+
+
+class UnknownAlertSystemError(ACEError):
+    code = ERROR_AMS_UNKNOWN
+
+
+class UnknownAnalysisModuleTypeError(ACEError):
+    """Raised when a request is made for an unknown (unregistered analysis module type.)"""
+
+    code = ERROR_AMT_UNKNOWN
+
+    # def __init__(self, amt: Union[AnalysisModuleType, str]):
+    # super().__init__(f"unknown AnalysisModuleType {amt}")
+
+
+class AnalysisModuleTypeDependencyError(ACEError):
+    """Raised when a request is made to register a module with a dependency on an unknown module."""
+
+    code = ERROR_AMT_DEP
+
+    # def __init__(self, amt: Union[AnalysisModuleType, str], dep: str):
+    # super().__init__(f"invalid dependency for {amt}: {dep}")
+
+
+class CircularDependencyError(Exception):
+    """Raised when there is an attempt to register a type that would cause a circular dependency."""
+
+    code = ERROR_AMT_CIRC
+
+    # def __init__(self, chain: list[AnalysisModuleType]):
+    # super().__init__("circular dependency error: {}".format(" -> ".join([_.name for _ in chain])))
+
+
+class AnalysisModuleTypeVersionError(Exception):
+    """Raised when a request for a analysis with an out-of-date version is made."""
+
+    code = ERROR_AMT_VERSION
+
+
+class AnalysisModuleTypeExtendedVersionError(Exception):
+    """Raised when a request for a analysis with an out-of-date extended version is made."""
+
+    code = ERROR_AMT_EXTENDED_VERSION
+
+
+class UnknownRootAnalysisError(ValueError):
+    """Raised when there is an attempt to modify an unknown RootAnalysis object."""
+
+    code = ERROR_ROOT_UNKNOWN
+
+    # def __init__(self, uuid: str):
+    # super().__init__(f"unknown RootAnalysis {uuid}")
+
+
+exception_map = {
+    ERROR_AMS_UNKNOWN: UnknownAlertSystemError,
+    ERROR_AMT_CIRC: CircularDependencyError,
+    ERROR_AMT_DEP: AnalysisModuleTypeDependencyError,
+    ERROR_AMT_EXTENDED_VERSION: AnalysisModuleTypeExtendedVersionError,
+    ERROR_AMT_UNKNOWN: UnknownAnalysisModuleTypeError,
+    ERROR_AMT_VERSION: AnalysisModuleTypeVersionError,
+    ERROR_AR_EXPIRED: ExpiredAnalysisRequestError,
+    ERROR_AR_LOCKED: AnalysisRequestLockedError,
+    ERROR_AR_UNKNOWN: UnknownAnalysisRequestError,
+    ERROR_OBS_UNKNOWN: UnknownObservableError,
+    ERROR_ROOT_EXISTS: RootAnalysisExistsError,
+    ERROR_ROOT_UNKNOWN: UnknownRootAnalysisError,
+    ERROR_WQ_INVALID: InvalidWorkQueueError,
+}

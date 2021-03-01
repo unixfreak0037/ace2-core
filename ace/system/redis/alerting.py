@@ -7,7 +7,8 @@
 
 from typing import Optional
 
-from ace.system.alerting import AlertTrackingInterface, UnknownAlertSystem
+from ace.system.alerting import AlertTrackingInterface
+from ace.system.exceptions import UnknownAlertSystemError
 from ace.system.redis import get_redis_connection
 from ace.time import utc_now
 
@@ -43,7 +44,7 @@ class RedisAlertTrackingInterface(AlertTrackingInterface):
     def get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
         with self.redis_connection() as rc:
             if not rc.hexists(KEY_ALERT_SYSTEMS, name):
-                raise UnknownAlertSystem(name)
+                raise UnknownAlertSystemError(name)
 
             result = []
 
@@ -71,6 +72,6 @@ class RedisAlertTrackingInterface(AlertTrackingInterface):
     def get_alert_count(self, name: str) -> int:
         with self.redis_connection() as rc:
             if not rc.hexists(KEY_ALERT_SYSTEMS, name):
-                raise UnknownAlertSystem(name)
+                raise UnknownAlertSystemError(name)
 
             return rc.llen(get_alert_queue(name))

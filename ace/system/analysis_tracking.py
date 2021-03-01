@@ -16,13 +16,7 @@ from ace.system.constants import (
     EVENT_ANALYSIS_DETAILS_DELETED,
 )
 from ace.system.events import fire_event
-
-
-class UnknownRootAnalysisError(ValueError):
-    """Raised when there is an attempt to modify an unknown RootAnalysis object."""
-
-    def __init__(self, uuid: str):
-        super().__init__(f"unknown RootAnalysis {uuid}")
+from ace.system.exceptions import UnknownRootAnalysisError
 
 
 class AnalysisTrackingInterface(ACESystemInterface):

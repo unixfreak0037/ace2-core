@@ -10,10 +10,6 @@ from ace.system.constants import EVENT_ALERT, EVENT_ALERT_SYSTEM_REGISTERED, EVE
 from ace.system.events import fire_event
 
 
-class UnknownAlertSystem(KeyError):
-    pass
-
-
 class AlertTrackingInterface(ACESystemInterface):
     """Tracks alerts as they are detected during the processing of analysis requests."""
 

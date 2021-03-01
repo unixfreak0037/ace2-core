@@ -29,32 +29,32 @@ amt_fast_expire_cache = AnalysisModuleType(
     name="test_fast_expire_cache", description="test_fast_expire_cache", cache_ttl=0
 )
 
-amt_additional_cache_keys_1 = AnalysisModuleType(
-    name="test_additional_cache_keys",
-    description="test_additional_cache_keys",
+amt_extended_version_1 = AnalysisModuleType(
+    name="test_extended_version",
+    description="test_extended_version",
     cache_ttl=600,
-    additional_cache_keys=["yara_rules:v1.0.0"],
+    extended_version=["yara_rules:v1.0.0"],
 )
 
-amt_additional_cache_keys_2 = AnalysisModuleType(
-    name="test_additional_cache_keys",
-    description="test_additional_cache_keys",
+amt_extended_version_2 = AnalysisModuleType(
+    name="test_extended_version",
+    description="test_extended_version",
     cache_ttl=600,
-    additional_cache_keys=["yara_rules:v1.0.1"],
+    extended_version=["yara_rules:v1.0.1"],
 )
 
 amt_multiple_cache_keys_1 = AnalysisModuleType(
     name="test_multiple_cache_keys",
     description="test_multiple_cache_keys",
     cache_ttl=600,
-    additional_cache_keys=["key_a", "key_b"],
+    extended_version=["key_a", "key_b"],
 )
 
 amt_multiple_cache_keys_2 = AnalysisModuleType(
     name="test_multiple_cache_keys",
     description="test_multiple_cache_keys",
     cache_ttl=600,
-    additional_cache_keys=["key_b", "key_a"],
+    extended_version=["key_b", "key_a"],
 )
 
 TEST_1 = "test_1"
@@ -80,9 +80,9 @@ observable_1_with_time = Observable("test", TEST_2, time=datetime.datetime.now()
         # same observable same amt but different amt version
         (observable_1, amt_1, observable_1, amt_1_v2, False),
         # same observable same amt same additional cache keys
-        (observable_1, amt_additional_cache_keys_1, observable_1, amt_additional_cache_keys_1, True),
+        (observable_1, amt_extended_version_1, observable_1, amt_extended_version_1, True),
         # same observable same amt different additional cache keys
-        (observable_1, amt_additional_cache_keys_1, observable_1, amt_additional_cache_keys_2, False),
+        (observable_1, amt_extended_version_1, observable_1, amt_extended_version_2, False),
         # order of cache keys should not matter
         (observable_1, amt_multiple_cache_keys_1, observable_1, amt_multiple_cache_keys_2, True),
     ],

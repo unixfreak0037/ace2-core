@@ -11,10 +11,7 @@ import threading
 from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis, Observable
 from ace.system.analysis_module import (
     register_analysis_module_type,
-    AnalysisModuleTypeVersionError,
-    AnalysisModuleTypeExtendedVersionError,
     delete_analysis_module_type,
-    UnknownAnalysisModuleTypeError,
 )
 from ace.system.analysis_request import (
     AnalysisRequest,
@@ -25,6 +22,11 @@ from ace.system.analysis_request import (
 )
 from ace.system.analysis_tracking import get_root_analysis, track_root_analysis
 from ace.system.constants import *
+from ace.system.exceptions import (
+    AnalysisModuleTypeVersionError,
+    AnalysisModuleTypeExtendedVersionError,
+    UnknownAnalysisModuleTypeError,
+)
 from ace.system.processing import process_analysis_request
 from ace.system.work_queue import get_next_analysis_request, get_queue_size
 
@@ -213,7 +215,7 @@ def test_expected_status():
 @pytest.mark.system
 def test_amt_version_upgrade():
     # register an analysis module for a specific version of the "intel"
-    amt = register_analysis_module_type(AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"]))
+    amt = register_analysis_module_type(AnalysisModuleType("test", "", extended_version=["intel:v1"]))
 
     # (assume amt goes offline)
     # add something to be analyzed
@@ -222,14 +224,14 @@ def test_amt_version_upgrade():
     root.submit()
 
     # amt comes back on, re-register
-    amt = register_analysis_module_type(AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"]))
+    amt = register_analysis_module_type(AnalysisModuleType("test", "", extended_version=["intel:v1"]))
     request = get_next_analysis_request("test", amt, 0)
     request.initialize_result()
     request.modified_observable.add_analysis(type=amt).add_observable("test", "other")
     process_analysis_request(request)
 
     # amt gets upgraded from another process
-    amt_upgraded = register_analysis_module_type(AnalysisModuleType("test", "", additional_cache_keys=["intel:v2"]))
+    amt_upgraded = register_analysis_module_type(AnalysisModuleType("test", "", extended_version=["intel:v2"]))
 
     # but we're still using the old one so this should fail
     with pytest.raises(AnalysisModuleTypeExtendedVersionError):

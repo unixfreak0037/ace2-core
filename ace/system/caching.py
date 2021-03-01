@@ -33,7 +33,7 @@ def generate_cache_key(observable: Observable, amt: AnalysisModuleType) -> str:
     h.update(amt.name.encode("utf8", errors="ignore"))
     h.update(amt.version.encode("utf8", errors="ignore"))
 
-    for key in sorted(amt.additional_cache_keys):
+    for key in sorted(amt.extended_version):
         h.update(key.encode("utf8", errors="ignore"))
 
     return h.hexdigest()

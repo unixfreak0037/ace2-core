@@ -4,7 +4,8 @@ import queue
 from typing import Union
 
 from ace.system.analysis_request import AnalysisRequest
-from ace.system.analysis_module import AnalysisModuleType, UnknownAnalysisModuleTypeError
+from ace.system.analysis_module import AnalysisModuleType
+from ace.system.exceptions import UnknownAnalysisModuleTypeError
 from ace.system.work_queue import WorkQueueManagerInterface
 
 
@@ -33,7 +34,7 @@ class ThreadedWorkQueueManagerInterface(WorkQueueManagerInterface):
         try:
             return self.work_queues[amt].get(block=True, timeout=timeout)
         except KeyError:
-            raise UnknownAnalysisModuleTypeError(amt)
+            raise UnknownAnalysisModuleTypeError()
         except queue.Empty:
             return None
 
@@ -44,7 +45,7 @@ class ThreadedWorkQueueManagerInterface(WorkQueueManagerInterface):
         try:
             self.work_queues[amt].put(analysis_request)
         except KeyError:
-            raise UnknownAnalysisModuleTypeError(amt)
+            raise UnknownAnalysisModuleTypeError()
 
     def get_queue_size(self, amt: str) -> int:
         assert isinstance(amt, str)
@@ -52,7 +53,7 @@ class ThreadedWorkQueueManagerInterface(WorkQueueManagerInterface):
         try:
             return self.work_queues[amt].qsize()
         except KeyError:
-            raise UnknownAnalysisModuleTypeError(amt)
+            raise UnknownAnalysisModuleTypeError()
 
     def reset(self):
         self.work_queues = {}

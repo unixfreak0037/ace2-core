@@ -177,7 +177,7 @@ def test_analysis_details_exists():
     track_root_analysis(root)
     track_analysis_details(root, root.uuid, root.details)
     assert analysis_details_exists(root.uuid)
-    delete_root_analysis(root)
+    assert delete_root_analysis(root)
     assert not analysis_details_exists(root.uuid)
 
 

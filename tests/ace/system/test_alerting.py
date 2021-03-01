@@ -13,10 +13,10 @@ from ace.system.alerting import (
     get_alert_count,
     submit_alert,
     get_alerts,
-    UnknownAlertSystem,
 )
 from ace.system.constants import EVENT_ALERT
 from ace.system.events import Event, EventHandler, register_event_handler
+from ace.system.exceptions import UnknownAlertSystemError
 from ace.system.processing import process_analysis_request
 from ace.system.work_queue import get_next_analysis_request
 
@@ -84,10 +84,10 @@ def test_get_alerts_with_timeout():
 
 @pytest.mark.unit
 def test_get_alerts_unknown_alert_system():
-    with pytest.raises(UnknownAlertSystem):
+    with pytest.raises(UnknownAlertSystemError):
         get_alerts("test")
 
-    with pytest.raises(UnknownAlertSystem):
+    with pytest.raises(UnknownAlertSystemError):
         get_alert_count("test")
 
 

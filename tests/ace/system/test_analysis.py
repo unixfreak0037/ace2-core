@@ -246,7 +246,7 @@ def test_analysis_module_type_serialization():
         tags=["test1", "test2"],
         modes=["test1", "test2"],
         cache_ttl=60,
-        additional_cache_keys=["test1", "test2"],
+        extended_version=["test1", "test2"],
         types=["test1", "test2"],
     )
 
@@ -969,12 +969,32 @@ def test_apply_merge_analysis():
 
     target_root = RootAnalysis()
     target_observable = target_root.add_observable("some_type", "some_value")
-    target_observable.add_analysis(Analysis(type=amt))
+    target_observable.add_analysis(Analysis(type=amt, details={"test": "test"}))
 
     assert not observable.analysis
     observable.apply_merge(target_observable)
     assert observable.analysis
     assert observable.get_analysis("test") is not None
+    assert observable.get_analysis("test").details == {"test": "test"}
+
+
+@pytest.mark.integration
+def test_apply_merge_error_analysis():
+    amt = AnalysisModuleType("test", "")
+    root = RootAnalysis()
+    observable = root.add_observable("some_type", "some_value")
+
+    target_root = RootAnalysis()
+    target_observable = target_root.add_observable("some_type", "some_value")
+    target_observable.add_analysis(Analysis(type=amt, error_message="test", stack_trace="test"))
+
+    assert not observable.analysis
+    observable.apply_merge(target_observable)
+    assert observable.analysis
+    assert observable.get_analysis("test") is not None
+    assert observable.get_analysis("test").details is None
+    assert observable.get_analysis("test").error_message == "test"
+    assert observable.get_analysis("test").stack_trace == "test"
 
 
 @pytest.mark.integration

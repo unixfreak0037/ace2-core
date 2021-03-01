@@ -12,8 +12,11 @@ import ace.analysis
 import ace.api.analysis
 
 from ace.analysis import RootAnalysis, Observable
+from ace.system import get_logger
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.analysis_module import register_analysis_module_type
+from ace.system.constants import EVENT_ANALYSIS_ROOT_COMPLETED
+from ace.system.events import register_event_handler, EventHandler, Event
 from ace.api.analysis import AnalysisModuleType, Analysis
 from ace.module.base import AnalysisModule, AsyncAnalysisModule
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
@@ -236,7 +239,10 @@ class CrashingAnalysisModule(AnalysisModule):
     def execute_analysis(self, root, observable, analysis):
         import os, signal
 
-        os.kill(os.getpid(), signal.SIGKILL)
+        if observable.value == "crash":
+            os.kill(os.getpid(), signal.SIGKILL)
+        else:
+            analysis.details = {"test": "test"}
 
 
 class SimpleSyncAnalysisModule(AnalysisModule):
@@ -244,9 +250,28 @@ class SimpleSyncAnalysisModule(AnalysisModule):
         analysis.details = {"test": "test"}
 
 
+#
+# XXX this test has a timing issue
+#
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_crashing_sync_analysis_module():
+
+    import threading
+
+    sync = threading.Event()
+
+    class CustomEventHandler(EventHandler):
+        def handle_event(self, event: Event):
+            sync.set()
+
+        def handle_exception(self, event: str, exception: Exception):
+            pass
+
+    register_event_handler(EVENT_ANALYSIS_ROOT_COMPLETED, CustomEventHandler())
+
     amt_crashing = ace.api.analysis.AnalysisModuleType("crash_test", "")
     amt_ok = ace.api.analysis.AnalysisModuleType("ok", "")
     register_analysis_module_type(amt_crashing)
@@ -261,23 +286,29 @@ async def test_crashing_sync_analysis_module():
     manager.add_module(ok_module)
 
     root = RootAnalysis()
-    observable = root.add_observable("test", "test")
+    observable = root.add_observable("test", "crash")
     root.submit()
 
     await manager.run_once()
+
+    # wait for analysis to complete
+    assert sync.wait(3)
 
     root = get_root_analysis(root)
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt_crashing)
 
-    assert analysis.error_message == "crash_testv1.0.0 process crashed when analyzing type test value test"
+    assert analysis.error_message == "crash_testv1.0.0 process crashed when analyzing type test value crash"
     assert analysis.stack_trace
 
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt_ok)
 
-    assert analysis.error_message == "okv1.0.0 process crashed when analyzing type test value test"
-    assert analysis.stack_trace
+    # this one may or may not work depending on if you're using a local or remote api client
+    assert (
+        analysis.error_message == "okv1.0.0 process crashed when analyzing type test value crash"
+        and analysis.stack_trace
+    ) or analysis.details == {"test": "test"}
 
 
 @pytest.mark.integration
@@ -346,7 +377,7 @@ async def test_upgraded_extended_version_async_analysis_module():
     class CustomAnalysisModule(AsyncAnalysisModule):
         async def execute_analysis(self, root, observable, analysis):
             nonlocal step_1
-            analysis.details = {"additional_cache_keys": self.type.additional_cache_keys}
+            analysis.details = {"extended_version": self.type.extended_version}
             if not step_1.is_set():
                 step_1.set()
                 return
@@ -354,9 +385,9 @@ async def test_upgraded_extended_version_async_analysis_module():
             step_2.set()
 
         async def upgrade(self):
-            self.type.additional_cache_keys = ["intel:v2"]
+            self.type.extended_version = ["intel:v2"]
 
-    amt = ace.api.analysis.AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"])
+    amt = ace.api.analysis.AnalysisModuleType("test", "", extended_version=["intel:v1"])
     register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager()
@@ -375,7 +406,7 @@ async def test_upgraded_extended_version_async_analysis_module():
         nonlocal root_2
         await step_1.wait()
         # update the extended version data for this module type
-        updated_amt = ace.api.analysis.AnalysisModuleType("test", "", additional_cache_keys=["intel:v2"])
+        updated_amt = ace.api.analysis.AnalysisModuleType("test", "", extended_version=["intel:v2"])
         register_analysis_module_type(updated_amt)
         root_2.submit()
 
@@ -393,15 +424,15 @@ async def test_upgraded_extended_version_async_analysis_module():
 
     root = get_root_analysis(root_2)
     observable = root.get_observable(observable)
-    assert observable.get_analysis(amt).details["additional_cache_keys"] == ["intel:v2"]
+    assert observable.get_analysis(amt).details["extended_version"] == ["intel:v2"]
 
 
 class UpgradableAnalysisModule(AnalysisModule):
     def execute_analysis(self, root, observable, analysis):
-        analysis.details = {"additional_cache_keys": self.type.additional_cache_keys}
+        analysis.details = {"extended_version": self.type.extended_version}
 
     def upgrade(self):
-        self.type.additional_cache_keys = ["intel:v2"]
+        self.type.extended_version = ["intel:v2"]
 
 
 @pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
@@ -410,7 +441,7 @@ class UpgradableAnalysisModule(AnalysisModule):
 async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode):
     """Tests the ability of a sync analysis module to update extended version data."""
 
-    amt = AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"])
+    amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
     register_analysis_module_type(amt)
 
     # we want to bail after the first execution of the module
@@ -435,7 +466,7 @@ async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode):
         # wait for the event loop to start
         await manager.event_loop_starting_event.wait()
         # update the extended version data for this module type
-        updated_amt = AnalysisModuleType("test", "", additional_cache_keys=["intel:v2"])
+        updated_amt = AnalysisModuleType("test", "", extended_version=["intel:v2"])
         register_analysis_module_type(updated_amt)
         # and then submit for analysis
         root.submit()
@@ -446,7 +477,7 @@ async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode):
 
     root = get_root_analysis(root)
     observable = root.get_observable(observable)
-    assert observable.get_analysis(amt).details["additional_cache_keys"] == ["intel:v2"]
+    assert observable.get_analysis(amt).details["extended_version"] == ["intel:v2"]
 
 
 @pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
@@ -454,7 +485,7 @@ async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode):
 @pytest.mark.asyncio
 async def test_upgrade_analysis_module_failure(concurrency_mode):
 
-    amt = AnalysisModuleType("test", "", additional_cache_keys=["intel:v1"])
+    amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
     register_analysis_module_type(amt)
 
     class CustomAnalysisModule(AnalysisModule):
@@ -468,7 +499,7 @@ async def test_upgrade_analysis_module_failure(concurrency_mode):
     module = CustomAnalysisModule(type=amt)
     manager.add_module(module)
 
-    amt = AnalysisModuleType("test", "", additional_cache_keys=["intel:v2"])
+    amt = AnalysisModuleType("test", "", extended_version=["intel:v2"])
     register_analysis_module_type(amt)
 
     # this should fail since the upgrade fails

@@ -50,6 +50,7 @@ from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterf
 from ace.system.database.caching import DatabaseCachingInterface
 from ace.system.database.config import DatabaseConfigurationInterface
 from ace.system.database.observables import DatabaseObservableInterface
+from ace.system.local.storage import LocalStorageInterface
 
 
 class DatabaseACESystem:
@@ -66,6 +67,7 @@ class DatabaseACESystem:
     module_tracking = DatabaseAnalysisModuleTrackingInterface()
     observable = DatabaseObservableInterface()
     request_tracking = DatabaseAnalysisRequestTrackingInterface()
+    storage = LocalStorageInterface()
 
     # DatabaseSession = None
     # db: scoped_session = None

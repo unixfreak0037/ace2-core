@@ -9,8 +9,6 @@ from ace.system import get_logger
 from ace.system.events import EventInterface, EventHandler
 from ace.system.redis import CONFIG_REDIS_HOST, CONFIG_REDIS_PORT, CONFIG_REDIS_DB, get_redis_connection
 
-from pydantic.json import pydantic_encoder
-
 
 class RedisEventInterface(EventInterface):
 

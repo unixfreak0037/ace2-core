@@ -1,7 +1,9 @@
 # vim: sw=4:ts=4:et:cc=120
 
 import datetime
+import json
 import uuid
+
 from typing import Optional, Any, Union
 
 from ace.time import utc_now
@@ -350,4 +352,9 @@ def custom_json_encoder(obj):
     if hasattr(obj, "to_dict"):
         return obj.to_dict()
     else:
+        return pydantic_encoder(obj)
+
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
         return pydantic_encoder(obj)

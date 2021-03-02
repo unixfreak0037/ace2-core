@@ -217,3 +217,39 @@ class Config(Base):
     value = Column(String, nullable=True)
 
     documentation = Column(String, nullable=True)
+
+
+class Storage(Base):
+
+    __tablename__ = "storage"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+    }
+
+    sha256 = Column(String, primary_key=True)
+
+    # content metadata
+    name = Column(String, index=True, nullable=False)
+    size = Column(Integer, nullable=False)
+    location = Column(String, nullable=False)
+    insert_date = Column(TimeStamp, nullable=False, index=True, server_default=text("CURRENT_TIMESTAMP"))
+    expiration_date = Column(TimeStamp, nullable=True, index=True)
+    custom = Column(String, nullable=True)
+
+    roots = relationship("StorageRootTracking", backref="storage")
+
+
+class StorageRootTracking(Base):
+
+    __tablename__ = "storage_root_tracking"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+    }
+
+    sha256 = Column(String, ForeignKey("storage.sha256", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True)
+
+    root_uuid = Column(
+        String, ForeignKey("root_analysis_tracking.uuid", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True
+    )

@@ -9,13 +9,16 @@ from typing import Union
 from ace.analysis import Observable
 from ace.system import get_system
 from ace.system.observables import ObservableInterface
-from ace.system.storage import get_file
+
+# XXX this should come from the api
+from ace.system.storage import load_file
 
 
 class FileObservable(Observable):
     def __init__(self, *args, **kwargs):
         super().__init__("file", *args, **kwargs)
         self._loaded = False
+        self.meta = None
         self.path = None
 
     def load(self) -> bool:
@@ -27,7 +30,8 @@ class FileObservable(Observable):
         self.root.initialize_storage()
         # store the contents of the file inside this directory named after the hash
         self.path = os.path.join(self.root.storage_dir, self.value)
-        self._loaded = get_file(self.value, path=self.path)
+        self.meta = load_file(self.value, path=self.path)
+        self._loaded = self.meta is not None
         return self._loaded
 
 

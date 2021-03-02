@@ -7,6 +7,8 @@
 
 import os
 import os.path
+import tempfile
+import shutil
 
 from ace.system.threaded import ThreadedACESystem
 from ace.system.database import DatabaseACESystem
@@ -27,6 +29,7 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.storage_root = tempfile.mkdtemp()
 
     def reset(self):
         super().reset()
@@ -40,6 +43,10 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
         # re-initialize and create the database
         self.initialize()
         self.create_database()
+
+        # reset the storage_root
+        shutil.rmtree(self.storage_root)
+        self.storage_root = tempfile.mkdtemp()
 
     def create_database(self):
         from ace.system.database import Base

@@ -844,11 +844,12 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
 
         return observable
 
+    # XXX this functionality belongs to the API
     def add_file(self, path: str, **kwargs) -> "Observable":
         """Utility function that adds a file observable to the root analysis by passing a path to the file."""
-        from ace.system.storage import store_file
+        from ace.system.storage import save_file
 
-        return self.add_observable("file", store_file(path, roots=[self.uuid], **kwargs))
+        return self.add_observable("file", save_file(path, roots=[self.uuid], **kwargs))
 
     def __str__(self):
         return f"Analysis({self.uuid},{self.type},{self.observable})"

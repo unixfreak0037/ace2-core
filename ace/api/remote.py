@@ -1,6 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 #
 
+import os.path
 import io
 
 from contextlib import contextmanager
@@ -15,6 +16,8 @@ from ace.system.events import EventHandler
 from ace.system.exceptions import AnalysisModuleTypeDependencyError, exception_map
 from ace.system.storage import ContentMetadata
 from ace.system.work_queue import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
+
+import aiofiles
 
 from httpx import AsyncClient
 
@@ -189,12 +192,30 @@ class RemoteAceAPI(AceAPI):
         raise NotImplementedError()
 
     # processing
-    async def process_analysis_request(self, ar: AnalysisRequest):
-        raise NotImplementedError()
+    # async def process_analysis_request(self, ar: AnalysisRequest):
+    # raise NotImplementedError()
 
     # storage
     async def store_content(self, content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
-        raise NotImplementedError()
+        if isinstance(content, str):
+            content = io.BytesIO(content.encode())
+        elif isinstance(content, bytes):
+            content = io.BytesIO(content)
+
+        files = {"file": content}
+        data = {"name": meta.name}
+
+        if meta.expiration_date:
+            data["expiration_date"] = meta.expiration_date.isoformat()
+
+        if meta.custom:
+            data["custom"] = meta.custom
+
+        async with self.get_client() as client:
+            response = await client.post("/storage", files=files, data=data)
+
+        _raise_exception_on_error(response)
+        return ContentMetadata(**response.json()).sha256
 
     async def get_content_bytes(self, sha256: str) -> Union[bytes, None]:
         raise NotImplementedError()
@@ -203,7 +224,14 @@ class RemoteAceAPI(AceAPI):
         raise NotImplementedError()
 
     async def get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:
-        raise NotImplementedError()
+        async with self.get_client() as client:
+            response = client.get(f"/storage/meta/{sha256}")
+
+        _raise_exception_on_error(response)
+        if response.status_code == 404:
+            return None
+
+        return ContentMetadata.from_dict(response.json())
 
     async def delete_content(self, sha256: str) -> bool:
         raise NotImplementedError()
@@ -211,31 +239,18 @@ class RemoteAceAPI(AceAPI):
     async def track_content_root(self, sha256: str, root: Union[RootAnalysis, str]):
         raise NotImplementedError()
 
-    async def store_file(self, path: str, **kwargs) -> str:
-        """Utility function that stores the contents of the given file and returns the sha256 hash."""
-        assert isinstance(path, str)
-        meta = ContentMetadata(path, **kwargs)
+    async def save_file(self, path: str, **kwargs) -> Union[str, None]:
+        meta = ContentMetadata(name=os.path.basename(path), **kwargs)
         with open(path, "rb") as fp:
-            return store_content(fp, meta)
+            return await self.store_content(fp, meta)
 
-    async def get_file(self, sha256: str, path: Optional[str] = None) -> bool:
-        """Utility function that pulls data out of storage into a local file. The
-        original path is used unless a target path is specified."""
-        assert isinstance(sha256, str)
-        assert path is None or isinstance(path, str)
-
-        meta = get_content_meta(sha256)
-        if meta is None:
-            return False
-
-        if path is None:
-            path = meta.name
-
-        with open(path, "wb") as fp_out:
-            with contextlib.closing(get_content_stream(sha256)) as fp_in:
-                shutil.copyfileobj(fp_in, fp_out)
-
-        return True
+    async def load_file(self, sha256: str, path: str) -> Union[ContentMetadata, None]:
+        async with aiofiles.open(path, "wb") as fp:
+            async with self.get_client() as client:
+                async with client.stream("GET", f"/storage/{sha256}") as response:
+                    _raise_exception_on_error(response)
+                    async for chunk in response.aiter_bytes():
+                        await fp.write(chunk)
 
     # work queue
     async def get_work(self, amt: Union[AnalysisModuleType, str], timeout: int) -> Union[AnalysisRequest, None]:

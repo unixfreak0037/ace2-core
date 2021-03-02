@@ -177,31 +177,11 @@ class AceAPI:
     async def track_content_root(self, sha256: str, root: Union[RootAnalysis, str]):
         raise NotImplementedError()
 
-    async def store_file(self, path: str, **kwargs) -> str:
-        """Utility function that stores the contents of the given file and returns the sha256 hash."""
-        assert isinstance(path, str)
-        meta = ContentMetadata(path, **kwargs)
-        with open(path, "rb") as fp:
-            return store_content(fp, meta)
+    async def save_file(self, path: str, **kwargs) -> Union[ContentMetadata, None]:
+        raise NotImplementedError()
 
-    async def get_file(self, sha256: str, path: Optional[str] = None) -> bool:
-        """Utility function that pulls data out of storage into a local file. The
-        original path is used unless a target path is specified."""
-        assert isinstance(sha256, str)
-        assert path is None or isinstance(path, str)
-
-        meta = get_content_meta(sha256)
-        if meta is None:
-            return False
-
-        if path is None:
-            path = meta.name
-
-        with open(path, "wb") as fp_out:
-            with contextlib.closing(get_content_stream(sha256)) as fp_in:
-                shutil.copyfileobj(fp_in, fp_out)
-
-        return True
+    async def load_file(self, sha256: str, path: str) -> Union[ContentMetadata, None]:
+        raise NotImplementedError()
 
     # work queue
     async def get_work(self, amt: Union[AnalysisModuleType, str], timeout: int) -> Union[AnalysisRequest, None]:

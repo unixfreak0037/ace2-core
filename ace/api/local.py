@@ -182,6 +182,12 @@ class LocalAceAPI(AceAPI):
     async def track_content_root(self, sha256: str, root: Union[RootAnalysis, str]):
         return ace.system.storage.track_content_root(sha256, root)
 
+    async def save_file(self, path: str, **kwargs) -> Union[ContentMetadata, None]:
+        return ace.system.storage.save_file(path, **kwargs)
+
+    async def load_file(self, sha256: str, path: str) -> Union[ContentMetadata, None]:
+        return ace.system.storage.load_file(sha256, path)
+
     # work queue
     async def get_work(self, amt: Union[AnalysisModuleType, str], timeout: int) -> Union[AnalysisRequest, None]:
         return ace.system.work_queue.get_work(amt, timeout)

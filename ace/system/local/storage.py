@@ -96,13 +96,13 @@ class LocalStorageInterface(DatabaseStorageInterface):
 
         return sha256
 
-    def save_file(self, path, **kwargs) -> Union[ContentMetadata, None]:
+    def save_file(self, path, **kwargs) -> Union[str, None]:
         assert isinstance(path, str) and path
-        meta = ContentMetadata(name=path, **kwargs)
+        meta = ContentMetadata(name=os.path.basename(path), **kwargs)
         with open(path, "rb") as fp:
             store_content(fp, meta)
 
-        return meta
+        return meta.sha256
 
     def get_content_bytes(self, sha256: str) -> Union[bytes, None]:
         try:

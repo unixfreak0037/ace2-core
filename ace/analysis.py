@@ -849,7 +849,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
         """Utility function that adds a file observable to the root analysis by passing a path to the file."""
         from ace.system.storage import save_file
 
-        return self.add_observable("file", save_file(path, roots=[self.uuid], **kwargs).sha256)
+        return self.add_observable("file", save_file(path, roots=[self.uuid], **kwargs))
 
     def __str__(self):
         return f"Analysis({self.uuid},{self.type},{self.observable})"

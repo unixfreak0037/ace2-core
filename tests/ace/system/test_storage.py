@@ -66,10 +66,32 @@ def test_get_store_delete_content(generate_input_data, name, meta, tmpdir):
     assert delete_content(sha256)
     assert get_content_meta(sha256) is None
     assert get_content_bytes(sha256) is None
-    assert get_content_stream(sha256) is None
+    with get_content_stream(sha256) as stream:
+        assert stream is None
 
     # make sure copied file still exists
     assert os.path.exists(target_path)
+
+
+@pytest.mark.parametrize(
+    "generate_input_data,name,meta",
+    [
+        (TEST_STRING, TEST_NAME, ContentMetadata(name=TEST_NAME)),
+        (TEST_BYTES, TEST_NAME, ContentMetadata(name=TEST_NAME)),
+        (TEST_IO, TEST_NAME, ContentMetadata(name=TEST_NAME)),
+    ],
+)
+@pytest.mark.integration
+def test_get_content_stream(generate_input_data, name, meta, tmpdir):
+    input_data = generate_input_data()
+    sha256 = store_content(input_data, meta)
+    meta = get_content_meta(sha256)
+
+    with get_content_stream(sha256) as fp:
+        assert fp.read()
+
+    with get_content_stream("unknown") as fp:
+        assert fp is None
 
 
 @pytest.mark.integration
@@ -79,10 +101,8 @@ def test_store_duplicate(tmpdir):
         fp.write("Hello, world!")
 
     # store the file content
-    meta = save_file(path, custom={"a": "1"})
-    assert meta
-
-    sha256 = meta.sha256
+    sha256 = save_file(path, custom={"a": "1"})
+    assert sha256
 
     previous_meta = get_content_meta(sha256)
     assert previous_meta
@@ -104,15 +124,15 @@ def test_store_get_file(tmpdir):
     with open(path, "w") as fp:
         fp.write("Hello, world!")
 
-    meta = save_file(path)
-    assert meta
+    sha256 = save_file(path)
+    assert sha256
 
     # XXX skipping this check for now since we lose milliseconds in isoformat for json
     # assert get_content_meta(meta.sha256) == meta
 
     os.remove(path)
 
-    load_file(meta.sha256, path)
+    load_file(sha256, path)
     assert os.path.exists(path)
 
     with open(path, "r") as fp:
@@ -126,8 +146,8 @@ def test_file_expiration(tmpdir):
         fp.write("Hello, world!")
 
     # store the file and have it expire right away
-    meta = save_file(path, expiration_date=utc_now())
-    assert meta
+    sha256 = save_file(path, expiration_date=utc_now())
+    assert sha256
 
     # we should have a single expired file now
     assert len(list(iter_expired_content())) == 1
@@ -139,7 +159,7 @@ def test_file_expiration(tmpdir):
     assert len(list(iter_expired_content())) == 0
 
     # and the file should be gone
-    assert get_content_meta(meta.sha256) is None
+    assert get_content_meta(sha256) is None
 
 
 @pytest.mark.integration
@@ -149,8 +169,8 @@ def test_file_no_expiration(tmpdir):
         fp.write("Hello, world!")
 
     # store the file and have it never expire
-    meta = save_file(path)  # defaults to never expire
-    assert meta
+    sha256 = save_file(path)  # defaults to never expire
+    assert sha256
 
     # we should have no files expired
     assert len(list(iter_expired_content())) == 0
@@ -159,7 +179,7 @@ def test_file_no_expiration(tmpdir):
     delete_expired_content()
 
     # the file should still be there
-    assert get_content_meta(meta.sha256) is not None
+    assert get_content_meta(sha256) is not None
 
     # should still have no files expired
     assert len(list(iter_expired_content())) == 0
@@ -269,19 +289,19 @@ def test_root_analysis_association(tmp_path):
     target_path = str(target_path)
 
     # we store the file with no initial root analysis set to expire now
-    meta = save_file(target_path, expiration_date=utc_now())
-    assert get_content_meta(meta.sha256)
+    sha256 = save_file(target_path, expiration_date=utc_now())
+    assert get_content_meta(sha256)
 
     # submit a root analysis with the given file *after* we upload it
     root = RootAnalysis()
-    observable = root.add_observable("file", meta.sha256)
+    observable = root.add_observable("file", sha256)
     root.submit()
 
     # now attempt to delete all expired content
     delete_expired_content()
 
     # we should still have the content
-    assert get_content_meta(meta.sha256)
+    assert get_content_meta(sha256)
 
     # delete the root
     delete_root_analysis(root)
@@ -290,4 +310,4 @@ def test_root_analysis_association(tmp_path):
     delete_expired_content()
 
     # should be gone
-    assert get_content_meta(meta.sha256) is None
+    assert get_content_meta(sha256) is None

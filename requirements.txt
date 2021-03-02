@@ -1,8 +1,10 @@
 SQLAlchemy
+aiofiles
 fastapi[all]
 httpx
 psutil
 python-dateutil
+python-multipart
 pytz
 redis
 tld

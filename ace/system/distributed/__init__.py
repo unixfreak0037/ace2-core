@@ -9,3 +9,4 @@ app = FastAPI()
 import ace.system.distributed.analysis_module
 import ace.system.distributed.work_queue
 import ace.system.distributed.processing
+import ace.system.distributed.storage

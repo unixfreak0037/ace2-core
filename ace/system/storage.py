@@ -51,10 +51,10 @@ class StorageInterface(ACESystemInterface):
         """Returns the requested stored content as some kind of stream, or None if the content does not exist."""
         raise NotImplementedError()
 
-    def save_file(self, path: str, **kwargs) -> Union[ContentMetadata, None]:
-        """Stores the contents of the given file and returns the created
-        metadata.  The purpose of this function is to transfer the content from
-        the target file in the most efficient way possible."""
+    def save_file(self, path: str, **kwargs) -> Union[str, None]:
+        """Stores the contents of the given file and returns the sha256 hash.
+        The purpose of this function is to transfer the content from the target
+        file in the most efficient way possible."""
         raise NotImplementedError()
 
     def get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:
@@ -83,7 +83,7 @@ def store_content(content: Union[bytes, str, io.IOBase], meta: ContentMetadata) 
     return sha256
 
 
-def save_file(path: str, **kwargs) -> Union[ContentMetadata, None]:
+def save_file(path: str, **kwargs) -> Union[str, None]:
     return get_system().storage.save_file(path, **kwargs)
 
 
@@ -91,8 +91,14 @@ def get_content_bytes(sha256: str) -> Union[bytes, None]:
     return get_system().storage.get_content_bytes(sha256)
 
 
+@contextlib.contextmanager
 def get_content_stream(sha256: str) -> Union[io.IOBase, None]:
-    return get_system().storage.get_content_stream(sha256)
+    try:
+        fp = get_system().storage.get_content_stream(sha256)
+        yield fp
+    finally:
+        if fp:
+            fp.close()
 
 
 def get_content_meta(sha256: str) -> Union[ContentMetadata, None]:

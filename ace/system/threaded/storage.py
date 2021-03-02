@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Union, Optional, Iterator
 
 from ace.system import ACESystemInterface
-from ace.system.storage import StorageInterface, ContentMetadata, has_valid_root_reference
+from ace.system.storage import StorageInterface, ContentMetadata, has_valid_root_reference, store_content
 from ace.time import utc_now
 
 
@@ -60,6 +60,14 @@ class ThreadedStorageInterface(ACESystemInterface):
 
         return sha256
 
+    def save_file(self, path, **kwargs) -> Union[ContentMetadata, None]:
+        assert isinstance(path, str) and path
+        meta = ContentMetadata(name=path, **kwargs)
+        with open(path, "rb") as fp:
+            return store_content(fp, meta)
+
+        return meta
+
     def get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:
         return self.content.get(sha256)
 
@@ -72,6 +80,16 @@ class ThreadedStorageInterface(ACESystemInterface):
             return None
 
         return io.BytesIO(data)
+
+    def load_file(self, sha256: str, path: str) -> Union[ContentMetadata, None]:
+        meta = self.get_content_meta(sha256)
+        if meta is None:
+            return None
+
+        with open(path, "wb") as fp:
+            fp.write(self.get_content_bytes(sha256))
+
+        return meta
 
     def delete_content(self, sha256: str) -> bool:
         content = self.content.pop(sha256, None)

@@ -78,7 +78,7 @@ class DetectionPoint:
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, detection_point: Optional["DetectionPoint"] = None, _cls_map=None) -> "DetectionPoint":
+    def from_dict(value: dict, detection_point: Optional["DetectionPoint"] = None) -> "DetectionPoint":
         assert isinstance(value, dict)
         assert detection_point is None or isinstance(detection_point, DetectionPoint)
         data = DetectionPointModel(**value)
@@ -332,22 +332,14 @@ class AnalysisModuleType:
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, _cls_map=None) -> "AnalysisModuleType":
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
+    def from_dict(value: dict) -> "AnalysisModuleType":
         data = AnalysisModuleTypeModel(**value)
-        return _cls_map["AnalysisModuleType"](**data.dict())
+        return AnalysisModuleType(**data.dict())
 
     @staticmethod
-    def from_json(value: str, _cls_map=None) -> "AnalysisModuleType":
+    def from_json(value: str) -> "AnalysisModuleType":
         assert isinstance(value, str)
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
-        return _cls_map["AnalysisModuleType"].from_dict(
-            AnalysisModuleTypeModel.parse_raw(value).dict(), _cls_map=_cls_map
-        )
+        return AnalysisModuleType.from_dict(AnalysisModuleTypeModel.parse_raw(value).dict())
 
     # ========================================================================
 
@@ -613,24 +605,19 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(
-        value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None
-    ) -> "Analysis":
+    def from_dict(value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
         assert isinstance(value, dict)
         assert isinstance(root, RootAnalysis)
         assert analysis is None or isinstance(analysis, Analysis)
 
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
-        result = analysis or _cls_map["Analysis"](root=root)
+        result = analysis or Analysis(root=root)
         result = TaggableObject.from_dict(value, result)
         result = DetectableObject.from_dict(value, result)
 
         data = AnalysisModel(**value)
 
         if data.type:
-            result.type = _cls_map["AnalysisModuleType"].from_dict(data.type.dict())
+            result.type = AnalysisModuleType.from_dict(data.type.dict())
 
         # if value[Analysis.KEY_TYPE]:
         # result.type = AnalysisModuleType.from_dict(value[Analysis.KEY_TYPE])
@@ -657,12 +644,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
         return result
 
     @staticmethod
-    def from_json(value: str, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None) -> "Analysis":
+    def from_json(value: str, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
         assert isinstance(value, str)
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
-        return _cls_map["Analysis"].from_dict(AnalysisModel.parse_raw(value).dict(), root, analysis, _cls_map=_cls_map)
+        return Analysis.from_dict(AnalysisModel.parse_raw(value).dict(), root, analysis)
 
     # =========================================================================
 
@@ -964,15 +948,10 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(
-        value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None
-    ) -> "Observable":
+    def from_dict(value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None) -> "Observable":
         assert isinstance(value, dict)
         assert isinstance(root, RootAnalysis)
         assert observable is None or isinstance(observable, Observable)
-
-        if _cls_map is None:
-            _cls_map = default_cls_map()
 
         data = ObservableModel(**value)
 
@@ -987,7 +966,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         observable.time = data.time
         observable.value = data.value
         observable.analysis = {
-            key: _cls_map["Analysis"].from_dict(analysis.dict(), root=root) for key, analysis in data.analysis.items()
+            key: Analysis.from_dict(analysis.dict(), root=root) for key, analysis in data.analysis.items()
         }
         observable.directives = data.directives
         observable._redirection = data.redirection
@@ -1002,16 +981,10 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return observable
 
     @staticmethod
-    def from_json(
-        value: str, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None
-    ) -> "Observable":
+    def from_json(value: str, root: "RootAnalysis", observable: Optional["Observable"] = None) -> "Observable":
         assert isinstance(value, str)
-        if _cls_map is None:
-            _cls_map = default_cls_map()
 
-        return _cls_map["Observable"].from_dict(
-            ObservableModel.parse_raw(value).dict(), root, observable, _cls_map=_cls_map
-        )
+        return Observable.from_dict(ObservableModel.parse_raw(value).dict(), root, observable)
 
     # ========================================================================
 
@@ -1717,22 +1690,18 @@ class RootAnalysis(Analysis, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, _cls_map=None) -> "RootAnalysis":
+    def from_dict(value: dict) -> "RootAnalysis":
         assert isinstance(value, dict)
-
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
         data = RootAnalysisModel(**value)
 
-        root = _cls_map["RootAnalysis"]()
+        root = RootAnalysis()
         root.observable_store = {
             # XXX should probably be using create_observable here, eh?
-            id: _cls_map["Observable"].from_dict(observable.dict(), root=root)
+            id: Observable.from_dict(observable.dict(), root=root)
             for id, observable in data.observable_store.items()
         }
 
-        root = _cls_map["Analysis"].from_dict(value, root, analysis=root)
+        root = Analysis.from_dict(value, root, analysis=root)
 
         root._analysis_mode = data.analysis_mode
         root._uuid = data.uuid
@@ -1752,12 +1721,9 @@ class RootAnalysis(Analysis, MergableObject):
         return root
 
     @staticmethod
-    def from_json(value: str, _cls_map=None) -> "RootAnalysis":
+    def from_json(value: str) -> "RootAnalysis":
         assert isinstance(value, str)
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
-        return _cls_map["RootAnalysis"].from_dict(RootAnalysisModel.parse_raw(value).dict(), _cls_map=_cls_map)
+        return RootAnalysis.from_dict(RootAnalysisModel.parse_raw(value).dict())
 
     # ========================================================================
 
@@ -2359,12 +2325,3 @@ def recurse_tree(target: Union[Observable, Analysis], callback):
                     _recurse(analysis, callback)
 
     _recurse(target, callback)
-
-
-def default_cls_map() -> dict:
-    return {
-        "Analysis": Analysis,
-        "AnalysisModuleType": AnalysisModuleType,
-        "Observable": Observable,
-        "RootAnalysis": RootAnalysis,
-    }

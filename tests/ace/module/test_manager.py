@@ -2,7 +2,7 @@
 #
 
 from ace.api import get_api
-from ace.api.analysis import AnalysisModuleType
+from ace.analysis import AnalysisModuleType
 from ace.api.local import LocalAceAPI
 from ace.module.base import AnalysisModule, AsyncAnalysisModule
 from ace.module.manager import AnalysisModuleManager, SCALE_UP, SCALE_DOWN, NO_SCALING

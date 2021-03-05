@@ -1,23 +1,16 @@
 # vim: ts=4:sw=4:et:cc=120
 #
 
-#
-# XXX this in particular is going to be super confusing
-# we're using ace.system.analysis and ace.api.analysis in the same code here
-#
-
 import asyncio
 
 import ace.analysis
-import ace.api.analysis
 
-from ace.analysis import RootAnalysis, Observable
+from ace.analysis import RootAnalysis, Observable, AnalysisModuleType, Analysis
 from ace.system import get_logger
 from ace.system.analysis_tracking import get_root_analysis
 from ace.system.analysis_module import register_analysis_module_type
 from ace.system.constants import EVENT_ANALYSIS_ROOT_COMPLETED
 from ace.system.events import register_event_handler, EventHandler, Event
-from ace.api.analysis import AnalysisModuleType, Analysis
 from ace.module.base import AnalysisModule, AsyncAnalysisModule
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
 
@@ -31,7 +24,7 @@ async def test_basic_analysis_async():
     # basic analysis module
     class TestAsyncAnalysisModule(AsyncAnalysisModule):
         # define the type for this analysis module
-        type = ace.api.analysis.AnalysisModuleType("test", "")
+        type = AnalysisModuleType("test", "")
 
         # define it as an async module
         async def execute_analysis(self, root, observable, analysis):
@@ -68,7 +61,7 @@ class TestSyncAnalysisModule(AnalysisModule):
     __test__ = False
 
     # define the type for this analysis module
-    type = ace.api.analysis.AnalysisModuleType("test", "")
+    type = AnalysisModuleType("test", "")
 
     # define it as an sync module
     def execute_analysis(self, root, observable, analysis):
@@ -122,7 +115,7 @@ async def test_force_stop_stuck_async_task():
             await asyncio.sleep(sys.maxsize)
 
     # register the type to the core
-    amt = ace.api.analysis.AnalysisModuleType("test", "")
+    amt = AnalysisModuleType("test", "")
     register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager()
@@ -156,7 +149,7 @@ class StuckAnalysisModule(AnalysisModule):
 @pytest.mark.asyncio
 async def test_force_stop_stuck_sync_task():
     # register the type to the core
-    amt = ace.api.analysis.AnalysisModuleType("test", "")
+    amt = AnalysisModuleType("test", "")
     register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager(concurrency_mode=CONCURRENCY_MODE_PROCESS)
@@ -185,7 +178,7 @@ async def test_raised_exception_during_async_analysis():
         async def execute_analysis(self, root, observable, analysis):
             raise RuntimeError("failure")
 
-    amt = ace.api.analysis.AnalysisModuleType("test", "")
+    amt = AnalysisModuleType("test", "")
     register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager()
@@ -214,7 +207,7 @@ class FailingAnalysisModule(AnalysisModule):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_raised_exception_during_sync_analysis():
-    amt = ace.api.analysis.AnalysisModuleType("test", "")
+    amt = AnalysisModuleType("test", "")
     register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager()
@@ -272,8 +265,8 @@ async def test_crashing_sync_analysis_module():
 
     register_event_handler(EVENT_ANALYSIS_ROOT_COMPLETED, CustomEventHandler())
 
-    amt_crashing = ace.api.analysis.AnalysisModuleType("crash_test", "")
-    amt_ok = ace.api.analysis.AnalysisModuleType("ok", "")
+    amt_crashing = AnalysisModuleType("crash_test", "")
+    amt_ok = AnalysisModuleType("ok", "")
     register_analysis_module_type(amt_crashing)
     register_analysis_module_type(amt_ok)
 
@@ -326,7 +319,7 @@ async def test_upgraded_version_analysis_module():
                 step_1.set()
                 return
 
-    amt = ace.api.analysis.AnalysisModuleType("test", "", version="1.0.0")
+    amt = AnalysisModuleType("test", "", version="1.0.0")
     register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager()
@@ -344,7 +337,7 @@ async def test_upgraded_version_analysis_module():
         nonlocal step_1
         nonlocal root_2
         await step_1.wait()
-        updated_amt = ace.api.analysis.AnalysisModuleType("test", "", version="1.0.1")
+        updated_amt = AnalysisModuleType("test", "", version="1.0.1")
         register_analysis_module_type(updated_amt)
         root_2.submit()
 
@@ -387,7 +380,7 @@ async def test_upgraded_extended_version_async_analysis_module():
         async def upgrade(self):
             self.type.extended_version = ["intel:v2"]
 
-    amt = ace.api.analysis.AnalysisModuleType("test", "", extended_version=["intel:v1"])
+    amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
     register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager()
@@ -406,7 +399,7 @@ async def test_upgraded_extended_version_async_analysis_module():
         nonlocal root_2
         await step_1.wait()
         # update the extended version data for this module type
-        updated_amt = ace.api.analysis.AnalysisModuleType("test", "", extended_version=["intel:v2"])
+        updated_amt = AnalysisModuleType("test", "", extended_version=["intel:v2"])
         register_analysis_module_type(updated_amt)
         root_2.submit()
 

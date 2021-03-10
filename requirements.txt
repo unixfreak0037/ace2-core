@@ -9,3 +9,4 @@ pytz
 redis
 tld
 tzlocal
+pycryptodome

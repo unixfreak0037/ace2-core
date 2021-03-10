@@ -6,22 +6,8 @@ import pytest
 
 from ace.analysis import RootAnalysis, AnalysisModuleType
 from ace.data_model import Event, ContentMetadata
-from ace.system.alerting import submit_alert, register_alert_system, unregister_alert_system
-from ace.system.analysis_module import register_analysis_module_type, delete_analysis_module_type
-from ace.system.analysis_tracking import (
-    track_root_analysis,
-    delete_root_analysis,
-    track_analysis_details,
-    delete_analysis_details,
-)
-from ace.system.analysis_request import (
-    track_analysis_request,
-    delete_analysis_request,
-    process_expired_analysis_requests,
-    AnalysisRequest,
-)
-from ace.system.caching import generate_cache_key, cache_analysis_result
-from ace.system.config import set_config
+from ace.system.analysis_request import AnalysisRequest
+from ace.system.caching import generate_cache_key
 from ace.system.constants import (
     EVENT_ALERT,
     EVENT_ALERT_SYSTEM_REGISTERED,
@@ -54,10 +40,7 @@ from ace.system.constants import (
     EVENT_WORK_REMOVE,
     TRACKING_STATUS_ANALYZING,
 )
-from ace.system.events import register_event_handler, remove_event_handler, get_event_handlers, fire_event, EventHandler
-from ace.system.processing import submit_analysis_request, process_analysis_request
-from ace.system.storage import delete_content, store_content
-from ace.system.work_queue import add_work_queue, delete_work_queue, put_work, get_work, get_next_analysis_request
+from ace.system.events import EventHandler
 
 
 class TestEventHandler(EventHandler):
@@ -88,51 +71,54 @@ class TestEventHandler(EventHandler):
         self.sync = threading.Event()
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_ANALYSIS_ROOT_NEW():
+async def test_EVENT_ANALYSIS_ROOT_NEW(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_ROOT_NEW, handler)
-    root = RootAnalysis()
-    track_root_analysis(root)
+    await system.register_event_handler(EVENT_ANALYSIS_ROOT_NEW, handler)
+    root = system.new_root()
+    await system.track_root_analysis(root)
 
     handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_NEW
-    assert RootAnalysis.from_dict(handler.event.args) == root
+    assert RootAnalysis.from_dict(handler.event.args, system) == root
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_ROOT_NEW, handler)
+    await system.register_event_handler(EVENT_ANALYSIS_ROOT_NEW, handler)
     # already tracked
-    track_root_analysis(root)
+    await system.track_root_analysis(root)
 
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_ANALYSIS_ROOT_MODIFIED():
+async def test_EVENT_ANALYSIS_ROOT_MODIFIED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_ROOT_MODIFIED, handler)
-    root = RootAnalysis()
-    track_root_analysis(root)
+    await system.register_event_handler(EVENT_ANALYSIS_ROOT_MODIFIED, handler)
+    root = system.new_root()
+    await system.track_root_analysis(root)
 
     assert handler.event is None
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_ROOT_MODIFIED, handler)
+    await system.register_event_handler(EVENT_ANALYSIS_ROOT_MODIFIED, handler)
     # already tracked so should fire as modified
-    track_root_analysis(root)
+    await system.track_root_analysis(root)
 
     handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_MODIFIED
-    assert RootAnalysis.from_dict(handler.event.args) == root
+    assert RootAnalysis.from_dict(handler.event.args, system) == root
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_ANALYSIS_ROOT_DELETED():
-    root = RootAnalysis()
-    track_root_analysis(root)
+async def test_EVENT_ANALYSIS_ROOT_DELETED(system):
+    root = system.new_root()
+    await system.track_root_analysis(root)
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_ROOT_DELETED, handler)
-    delete_root_analysis(root)
+    await system.register_event_handler(EVENT_ANALYSIS_ROOT_DELETED, handler)
+    await system.delete_root_analysis(root)
 
     handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_DELETED
@@ -140,117 +126,123 @@ def test_EVENT_ANALYSIS_ROOT_DELETED():
 
     # since the root was already deleted this should not fire twice
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_ROOT_DELETED, handler)
-    delete_root_analysis(root)
+    await system.register_event_handler(EVENT_ANALYSIS_ROOT_DELETED, handler)
+    await system.delete_root_analysis(root)
 
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_ANALYSIS_DETAILS_NEW():
+async def test_EVENT_ANALYSIS_DETAILS_NEW(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_DETAILS_NEW, handler)
-    root = RootAnalysis(details={"test": "test"})
-    track_root_analysis(root)
-    track_analysis_details(root, root.uuid, root.details)
+    await system.register_event_handler(EVENT_ANALYSIS_DETAILS_NEW, handler)
+    root = system.new_root(details={"test": "test"})
+    await system.track_root_analysis(root)
+    await system.track_analysis_details(root, root.uuid, await root.get_details())
 
     handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_DETAILS_NEW
-    assert RootAnalysis.from_dict(handler.event.args[0]) == root
+    assert RootAnalysis.from_dict(handler.event.args[0], system) == root
     assert handler.event.args[1] == root.uuid
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_DETAILS_NEW, handler)
+    await system.register_event_handler(EVENT_ANALYSIS_DETAILS_NEW, handler)
     # already tracked
-    track_analysis_details(root, root.uuid, root.details)
+    await system.track_analysis_details(root, root.uuid, await root.get_details())
 
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_ANALYSIS_DETAILS_MODIFIED():
+async def test_EVENT_ANALYSIS_DETAILS_MODIFIED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_DETAILS_MODIFIED, handler)
-    root = RootAnalysis(details={"test": "test"})
-    track_root_analysis(root)
-    track_analysis_details(root, root.uuid, root.details)
+    await system.register_event_handler(EVENT_ANALYSIS_DETAILS_MODIFIED, handler)
+    root = system.new_root(details={"test": "test"})
+    await system.track_root_analysis(root)
+    await system.track_analysis_details(root, root.uuid, await root.get_details())
 
     assert handler.event is None
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_DETAILS_MODIFIED, handler)
-    track_analysis_details(root, root.uuid, root.details)
+    await system.register_event_handler(EVENT_ANALYSIS_DETAILS_MODIFIED, handler)
+    await system.track_analysis_details(root, root.uuid, await root.get_details())
 
     handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_DETAILS_MODIFIED
-    assert RootAnalysis.from_dict(handler.event.args[0]) == root
+    assert RootAnalysis.from_dict(handler.event.args[0], system) == root
     assert handler.event.args[1] == root.uuid
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_ANALYSIS_DETAILS_DELETED():
+async def test_EVENT_ANALYSIS_DETAILS_DELETED(system):
     handler = TestEventHandler()
     root = RootAnalysis(details={"test": "test"})
-    track_root_analysis(root)
-    track_analysis_details(root, root.uuid, root.details)
+    await system.track_root_analysis(root)
+    await system.track_analysis_details(root, root.uuid, await root.get_details())
 
-    register_event_handler(EVENT_ANALYSIS_DETAILS_DELETED, handler)
-    delete_analysis_details(root.uuid)
+    await system.register_event_handler(EVENT_ANALYSIS_DETAILS_DELETED, handler)
+    await system.delete_analysis_details(root.uuid)
 
     handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_DETAILS_DELETED
     assert handler.event.args == root.uuid
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_DETAILS_DELETED, handler)
-    delete_analysis_details(root.uuid)
+    await system.register_event_handler(EVENT_ANALYSIS_DETAILS_DELETED, handler)
+    await system.delete_analysis_details(root.uuid)
 
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_ALERT_SYSTEM_REGISTERED():
+async def test_ALERT_SYSTEM_REGISTERED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_ALERT_SYSTEM_REGISTERED, handler)
-    register_alert_system("test")
+    await system.register_event_handler(EVENT_ALERT_SYSTEM_REGISTERED, handler)
+    await system.register_alert_system("test")
 
     handler.wait()
     assert handler.event.name == EVENT_ALERT_SYSTEM_REGISTERED
     assert handler.event.args == "test"
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_ALERT_SYSTEM_REGISTERED, handler)
-    register_alert_system("test")
+    await system.register_event_handler(EVENT_ALERT_SYSTEM_REGISTERED, handler)
+    await system.register_alert_system("test")
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_ALERT_SYSTEM_REGISTERED():
-    register_alert_system("test")
+async def test_ALERT_SYSTEM_REGISTERED(system):
+    await system.register_alert_system("test")
     handler = TestEventHandler()
-    register_event_handler(EVENT_ALERT_SYSTEM_UNREGISTERED, handler)
+    await system.register_event_handler(EVENT_ALERT_SYSTEM_UNREGISTERED, handler)
 
-    unregister_alert_system("test")
+    await system.unregister_alert_system("test")
     handler.wait()
     assert handler.event.name == EVENT_ALERT_SYSTEM_UNREGISTERED
     assert handler.event.args == "test"
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_ALERT_SYSTEM_UNREGISTERED, handler)
-    unregister_alert_system("test")
+    await system.register_event_handler(EVENT_ALERT_SYSTEM_UNREGISTERED, handler)
+    await system.unregister_alert_system("test")
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_ALERT():
-    register_alert_system("test")
-    root = RootAnalysis()
-    track_root_analysis(root)
+async def test_EVENT_ALERT(system):
+    await system.register_alert_system("test")
+    root = system.new_root()
+    await system.track_root_analysis(root)
     root.add_detection_point("test")
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_ALERT, handler)
-    submit_alert(root)
+    await system.register_event_handler(EVENT_ALERT, handler)
+    await system.submit_alert(root)
 
     handler.wait()
     assert handler.event.name == EVENT_ALERT
@@ -258,50 +250,52 @@ def test_EVENT_ALERT():
 
     # event fires every time
     handler = TestEventHandler()
-    register_event_handler(EVENT_ALERT, handler)
-    submit_alert(root)
+    await system.register_event_handler(EVENT_ALERT, handler)
+    await system.submit_alert(root)
 
     handler.wait()
     assert handler.event.name == EVENT_ALERT
     assert handler.event.args == root.uuid
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_AMT_NEW():
+async def test_EVENT_AMT_NEW(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_AMT_NEW, handler)
+    await system.register_event_handler(EVENT_AMT_NEW, handler)
 
     amt = AnalysisModuleType("test", "")
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
     handler.wait()
     assert handler.event.name == EVENT_AMT_NEW
     assert AnalysisModuleType.from_dict(handler.event.args) == amt
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_AMT_NEW, handler)
+    await system.register_event_handler(EVENT_AMT_NEW, handler)
 
     # already registered so should not be new
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_AMT_MODIFIED():
+async def test_EVENT_AMT_MODIFIED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_AMT_MODIFIED, handler)
+    await system.register_event_handler(EVENT_AMT_MODIFIED, handler)
 
     amt = AnalysisModuleType("test", "")
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
     assert handler.event is None
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_AMT_MODIFIED, handler)
+    await system.register_event_handler(EVENT_AMT_MODIFIED, handler)
 
     # still not modified yet
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
     assert handler.event is None
 
@@ -309,136 +303,142 @@ def test_EVENT_AMT_MODIFIED():
     amt.version = "1.0.1"
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_AMT_MODIFIED, handler)
+    await system.register_event_handler(EVENT_AMT_MODIFIED, handler)
 
     # modified this time
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
     handler.wait()
     assert handler.event.name == EVENT_AMT_MODIFIED
     assert AnalysisModuleType.from_dict(handler.event.args) == amt
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_AMT_DELETED():
+async def test_EVENT_AMT_DELETED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_AMT_DELETED, handler)
+    await system.register_event_handler(EVENT_AMT_DELETED, handler)
 
     amt = AnalysisModuleType("test", "")
-    register_analysis_module_type(amt)
-    delete_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
+    await system.delete_analysis_module_type(amt)
 
     handler.wait()
     assert handler.event.name == EVENT_AMT_DELETED
     assert AnalysisModuleType.from_dict(handler.event.args) == amt
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_AMT_DELETED, handler)
-    delete_analysis_module_type(amt)
+    await system.register_event_handler(EVENT_AMT_DELETED, handler)
+    await system.delete_analysis_module_type(amt)
 
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_AR_NEW():
+async def test_EVENT_AR_NEW(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_AR_NEW, handler)
+    await system.register_event_handler(EVENT_AR_NEW, handler)
 
-    root = RootAnalysis()
+    root = system.new_root()
     request = root.create_analysis_request()
-    track_analysis_request(request)
+    await system.track_analysis_request(request)
 
     handler.wait()
     assert handler.event.name == EVENT_AR_NEW
-    assert AnalysisRequest.from_dict(handler.event.args) == request
+    assert AnalysisRequest.from_dict(handler.event.args, system) == request
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_AR_NEW, handler)
-    track_analysis_request(request)
+    await system.register_event_handler(EVENT_AR_NEW, handler)
+    await system.track_analysis_request(request)
 
     # you can re-track a request without harm
     handler.wait()
     assert handler.event.name == EVENT_AR_NEW
-    assert AnalysisRequest.from_dict(handler.event.args) == request
+    assert AnalysisRequest.from_dict(handler.event.args, system) == request
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_AR_DELETED():
+async def test_EVENT_AR_DELETED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_AR_DELETED, handler)
+    await system.register_event_handler(EVENT_AR_DELETED, handler)
 
-    root = RootAnalysis()
+    root = system.new_root()
     request = root.create_analysis_request()
-    track_analysis_request(request)
-    delete_analysis_request(request)
+    await system.track_analysis_request(request)
+    await system.delete_analysis_request(request)
 
     handler.wait()
     assert handler.event.name == EVENT_AR_DELETED
     assert handler.event.args == request.id
 
     handler = TestEventHandler()
-    register_event_handler(EVENT_AR_DELETED, handler)
-    delete_analysis_request(request)
+    await system.register_event_handler(EVENT_AR_DELETED, handler)
+    await system.delete_analysis_request(request)
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_AR_EXPIRED():
+async def test_EVENT_AR_EXPIRED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_AR_EXPIRED, handler)
+    await system.register_event_handler(EVENT_AR_EXPIRED, handler)
 
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     request = observable.create_analysis_request(amt)
-    track_analysis_request(request)
+    await system.track_analysis_request(request)
     request.status = TRACKING_STATUS_ANALYZING
-    track_analysis_request(request)
+    await system.track_analysis_request(request)
 
-    process_expired_analysis_requests(amt)
+    await system.process_expired_analysis_requests(amt)
 
     handler.wait()
     assert handler.event.name == EVENT_AR_EXPIRED
-    assert AnalysisRequest.from_dict(handler.event.args) == request
+    assert AnalysisRequest.from_dict(handler.event.args, system) == request
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_CACHE_NEW():
+async def test_EVENT_CACHE_NEW(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_CACHE_NEW, handler)
+    await system.register_event_handler(EVENT_CACHE_NEW, handler)
 
     amt = AnalysisModuleType(name="test", description="", cache_ttl=600)
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     request = observable.create_analysis_request(amt)
     request.initialize_result()
     analysis = request.modified_observable.add_analysis(type=amt)
 
-    assert cache_analysis_result(request) is not None
+    assert await system.cache_analysis_result(request) is not None
 
     handler.wait()
     assert handler.event.name == EVENT_CACHE_NEW
     assert handler.event.args[0] == generate_cache_key(observable, amt)
-    assert AnalysisRequest.from_dict(handler.event.args[1]) == request
+    assert AnalysisRequest.from_dict(handler.event.args[1], system) == request
 
     # we can potentially see duplicate cache hits
     handler = TestEventHandler()
-    register_event_handler(EVENT_CACHE_NEW, handler)
-    assert cache_analysis_result(request) is not None
+    await system.register_event_handler(EVENT_CACHE_NEW, handler)
+    assert await system.cache_analysis_result(request) is not None
     handler.wait()
     assert handler.event.name == EVENT_CACHE_NEW
     assert handler.event.args[0] == generate_cache_key(observable, amt)
-    assert AnalysisRequest.from_dict(handler.event.args[1]) == request
+    assert AnalysisRequest.from_dict(handler.event.args[1], system) == request
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_CONFIG_SET():
+async def test_EVENT_CONFIG_SET(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_CONFIG_SET, handler)
+    await system.register_event_handler(EVENT_CONFIG_SET, handler)
 
-    set_config("test", "value")
+    await system.set_config("test", "value")
     handler.wait()
     assert handler.event.name == EVENT_CONFIG_SET
     assert handler.event.args[0] == "test"
@@ -446,47 +446,55 @@ def test_EVENT_CONFIG_SET():
 
     # duplicate OK
     handler = TestEventHandler()
-    register_event_handler(EVENT_CONFIG_SET, handler)
-    set_config("test", "value")
+    await system.register_event_handler(EVENT_CONFIG_SET, handler)
+    await system.set_config("test", "value")
     handler.wait()
     assert handler.event.name == EVENT_CONFIG_SET
     assert handler.event.args[0] == "test"
     assert handler.event.args[1] == "value"
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_STORAGE_NEW():
+async def test_EVENT_STORAGE_NEW(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_STORAGE_NEW, handler)
+    await system.register_event_handler(EVENT_STORAGE_NEW, handler)
 
     meta = ContentMetadata(name="test")
-    sha256 = store_content("test", meta)
+    sha256 = await system.store_content("test", meta)
 
     handler.wait()
     assert handler.event.name == EVENT_STORAGE_NEW
     assert handler.event.args[0] == sha256
-    assert ContentMetadata.parse_obj(handler.event.args[1]) == meta
+    event_meta = ContentMetadata.parse_obj(handler.event.args[1])
+    assert event_meta.name == "test"
+    assert event_meta.sha256 == sha256
+    assert event_meta.size == 4
 
     # duplicates are OK
     handler = TestEventHandler()
-    register_event_handler(EVENT_STORAGE_NEW, handler)
+    await system.register_event_handler(EVENT_STORAGE_NEW, handler)
 
     meta = ContentMetadata(name="test")
-    sha256 = store_content("test", meta)
+    sha256 = await system.store_content("test", meta)
 
     handler.wait()
     assert handler.event.name == EVENT_STORAGE_NEW
     assert handler.event.args[0] == sha256
-    assert ContentMetadata.parse_obj(handler.event.args[1]) == meta
+    event_meta = ContentMetadata.parse_obj(handler.event.args[1])
+    assert event_meta.name == "test"
+    assert event_meta.sha256 == sha256
+    assert event_meta.size == 4
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_STORAGE_DELETED():
+async def test_EVENT_STORAGE_DELETED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_STORAGE_DELETED, handler)
+    await system.register_event_handler(EVENT_STORAGE_DELETED, handler)
     meta = ContentMetadata(name="test")
-    sha256 = store_content("test", meta)
-    delete_content(sha256)
+    sha256 = await system.store_content("test", meta)
+    await system.delete_content(sha256)
 
     handler.wait()
     assert handler.event.name == EVENT_STORAGE_DELETED
@@ -494,186 +502,196 @@ def test_EVENT_STORAGE_DELETED():
 
     # duplicate does not fire event (already gone)
     handler = TestEventHandler()
-    register_event_handler(EVENT_STORAGE_DELETED, handler)
-    delete_content(sha256)
+    await system.register_event_handler(EVENT_STORAGE_DELETED, handler)
+    await system.delete_content(sha256)
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_WORK_QUEUE_NEW():
+async def test_EVENT_WORK_QUEUE_NEW(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_WORK_QUEUE_NEW, handler)
+    await system.register_event_handler(EVENT_WORK_QUEUE_NEW, handler)
 
-    add_work_queue("test")
+    await system.add_work_queue("test")
     handler.wait()
     assert handler.event.name == EVENT_WORK_QUEUE_NEW
     assert handler.event.args == "test"
 
     # duplicate should not fire
     handler = TestEventHandler()
-    register_event_handler(EVENT_WORK_QUEUE_NEW, handler)
+    await system.register_event_handler(EVENT_WORK_QUEUE_NEW, handler)
 
-    add_work_queue("test")
+    await system.add_work_queue("test")
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_WORK_QUEUE_DELETED():
+async def test_EVENT_WORK_QUEUE_DELETED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_WORK_QUEUE_DELETED, handler)
+    await system.register_event_handler(EVENT_WORK_QUEUE_DELETED, handler)
 
-    add_work_queue("test")
-    delete_work_queue("test")
+    await system.add_work_queue("test")
+    await system.delete_work_queue("test")
     handler.wait()
     assert handler.event.name == EVENT_WORK_QUEUE_DELETED
     assert handler.event.args == "test"
 
     # duplicate should not fire
     handler = TestEventHandler()
-    register_event_handler(EVENT_WORK_QUEUE_DELETED, handler)
+    await system.register_event_handler(EVENT_WORK_QUEUE_DELETED, handler)
 
-    delete_work_queue("test")
+    await system.delete_work_queue("test")
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_WORK_ADD():
+async def test_EVENT_WORK_ADD(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_WORK_ADD, handler)
+    await system.register_event_handler(EVENT_WORK_ADD, handler)
 
     amt = AnalysisModuleType("test", "")
-    register_analysis_module_type(amt)
-    root = RootAnalysis()
+    await system.register_analysis_module_type(amt)
+    root = system.new_root()
     observable = root.add_observable("test", "test")
-    request = AnalysisRequest(root, observable, amt)
-    submit_analysis_request(request)
+    request = AnalysisRequest(system, root, observable, amt)
+    await system.submit_analysis_request(request)
 
     handler.wait()
     assert handler.event.name == EVENT_WORK_ADD
     assert handler.event.args[0] == amt.name
-    assert AnalysisRequest.from_dict(handler.event.args[1]) == request
+    assert AnalysisRequest.from_dict(handler.event.args[1], system) == request
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_WORK_REMOVE():
+async def test_EVENT_WORK_REMOVE(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_WORK_REMOVE, handler)
+    await system.register_event_handler(EVENT_WORK_REMOVE, handler)
 
     amt = AnalysisModuleType("test", "")
-    register_analysis_module_type(amt)
-    root = RootAnalysis()
+    await system.register_analysis_module_type(amt)
+    root = system.new_root()
     observable = root.add_observable("test", "test")
-    request = AnalysisRequest(root, observable, amt)
-    submit_analysis_request(request)
-    work = get_work(amt, 0)
+    request = AnalysisRequest(system, root, observable, amt)
+    await system.submit_analysis_request(request)
+    work = await system.get_work(amt, 0)
 
     handler.wait()
     assert handler.event.name == EVENT_WORK_REMOVE
     assert handler.event.args[0] == amt.name
-    assert AnalysisRequest.from_dict(handler.event.args[1]) == work
+    assert AnalysisRequest.from_dict(handler.event.args[1], system) == work
 
     # can't get fired if you ain't got no work
     handler = TestEventHandler()
-    register_event_handler(EVENT_WORK_REMOVE, handler)
+    await system.register_event_handler(EVENT_WORK_REMOVE, handler)
 
-    work = get_work(amt, 0)
+    work = await system.get_work(amt, 0)
 
     assert handler.event is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_ANALYSIS_ROOT_EXPIRED():
+async def test_EVENT_ANALYSIS_ROOT_EXPIRED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_ANALYSIS_ROOT_EXPIRED, handler)
+    await system.register_event_handler(EVENT_ANALYSIS_ROOT_EXPIRED, handler)
 
-    root = RootAnalysis(expires=True)
-    root.submit()
+    root = system.new_root(expires=True)
+    await root.submit()
 
     handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_EXPIRED
-    assert RootAnalysis.from_dict(handler.event.args) == root
+    event_root = RootAnalysis.from_dict(handler.event.args, system)
+    assert event_root.uuid == root.uuid and event_root.version is not None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_CACHE_HIT():
+async def test_EVENT_CACHE_HIT(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_CACHE_HIT, handler)
+    await system.register_event_handler(EVENT_CACHE_HIT, handler)
 
     amt = AnalysisModuleType("test", "", cache_ttl=60)
-    register_analysis_module_type(amt)
-    root = RootAnalysis()
+    await system.register_analysis_module_type(amt)
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     root_request = root.create_analysis_request()
-    process_analysis_request(root_request)
-    request = get_next_analysis_request("owner", amt, 0)
+    await system.process_analysis_request(root_request)
+    request = await system.get_next_analysis_request("owner", amt, 0)
     request.initialize_result()
     request.modified_observable.add_analysis(type=amt, details={"test": "test"})
-    process_analysis_request(request)
+    await system.process_analysis_request(request)
     assert handler.event is None
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     root_request = root.create_analysis_request()
-    process_analysis_request(root_request)
+    await system.process_analysis_request(root_request)
 
     handler.wait()
     assert handler.event.name == EVENT_CACHE_HIT
-    assert RootAnalysis.from_dict(handler.event.args[0]) == root
+    event_root = RootAnalysis.from_dict(handler.event.args[0], system)
+    assert event_root.uuid == root.uuid and event_root.version is not None
     assert handler.event.args[1]["type"] == observable.type
     assert handler.event.args[1]["value"] == observable.value
-    assert isinstance(AnalysisRequest.from_dict(handler.event.args[2]), AnalysisRequest)
+    assert isinstance(AnalysisRequest.from_dict(handler.event.args[2], system), AnalysisRequest)
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_WORK_ASSIGNED():
+async def test_EVENT_WORK_ASSIGNED(system):
     handler = TestEventHandler()
-    register_event_handler(EVENT_WORK_ASSIGNED, handler)
+    await system.register_event_handler(EVENT_WORK_ASSIGNED, handler)
 
     amt = AnalysisModuleType("test", "", cache_ttl=60)
-    register_analysis_module_type(amt)
-    root = RootAnalysis()
+    await system.register_analysis_module_type(amt)
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     root_request = root.create_analysis_request()
-    process_analysis_request(root_request)
-    request = get_next_analysis_request("owner", amt, 0)
+    await system.process_analysis_request(root_request)
+    request = await system.get_next_analysis_request("owner", amt, 0)
 
     handler.wait()
     assert handler.event.name == EVENT_WORK_ASSIGNED
-    assert AnalysisRequest.from_dict(handler.event.args) == request
+    assert AnalysisRequest.from_dict(handler.event.args, system) == request
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_EVENT_PROCESSING():
+async def test_EVENT_PROCESSING(system):
     root_handler = TestEventHandler()
-    register_event_handler(EVENT_PROCESSING_REQUEST_ROOT, root_handler)
+    await system.register_event_handler(EVENT_PROCESSING_REQUEST_ROOT, root_handler)
 
     observable_request_handler = TestEventHandler()
-    register_event_handler(EVENT_PROCESSING_REQUEST_OBSERVABLE, observable_request_handler)
+    await system.register_event_handler(EVENT_PROCESSING_REQUEST_OBSERVABLE, observable_request_handler)
 
     amt = AnalysisModuleType("test", "", cache_ttl=60)
-    register_analysis_module_type(amt)
-    root = RootAnalysis()
+    await system.register_analysis_module_type(amt)
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     root_request = root.create_analysis_request()
-    process_analysis_request(root_request)
+    await system.process_analysis_request(root_request)
 
     root_handler.wait()
     assert root_handler.event.name == EVENT_PROCESSING_REQUEST_ROOT
-    assert AnalysisRequest.from_dict(root_handler.event.args) == root_request
+    assert AnalysisRequest.from_dict(root_handler.event.args, system) == root_request
 
-    request = get_next_analysis_request("owner", amt, 0)
+    request = await system.get_next_analysis_request("owner", amt, 0)
 
     observable_request_handler.wait()
     assert observable_request_handler.event.name == EVENT_PROCESSING_REQUEST_OBSERVABLE
-    assert AnalysisRequest.from_dict(observable_request_handler.event.args) == request
+    assert AnalysisRequest.from_dict(observable_request_handler.event.args, system) == request
 
     result_handler = TestEventHandler()
-    register_event_handler(EVENT_PROCESSING_REQUEST_RESULT, result_handler)
+    await system.register_event_handler(EVENT_PROCESSING_REQUEST_RESULT, result_handler)
 
     request.initialize_result()
     request.modified_observable.add_analysis(type=amt, details={"test": "test"})
-    process_analysis_request(request)
+    await system.process_analysis_request(request)
 
     result_handler.wait()
     assert result_handler.event.name == EVENT_PROCESSING_REQUEST_RESULT
-    assert AnalysisRequest.from_dict(result_handler.event.args) == request
+    assert AnalysisRequest.from_dict(result_handler.event.args, system) == request

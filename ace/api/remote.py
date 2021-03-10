@@ -1,21 +1,33 @@
 # vim: ts=4:sw=4:et:cc=120
 #
 
-import os.path
+import contextlib
 import io
+import json
+import os.path
 
-from contextlib import contextmanager
-from typing import Union, Any, Optional
+from typing import Union, Any, Optional, AsyncGenerator
 
-from ace.data_model import AnalysisRequestQueryModel, ErrorModel
+from ace.data_model import (
+    AlertListModel,
+    AnalysisRequestQueryModel,
+    ConfigurationSetting,
+    ContentMetadata,
+    CustomJSONEncoder,
+    ErrorModel,
+    Event,
+)
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable
 from ace.api.base import AceAPI
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.constants import ERROR_AMT_VERSION, ERROR_AMT_EXTENDED_VERSION, ERROR_AMT_DEP
 from ace.system.events import EventHandler
-from ace.system.exceptions import AnalysisModuleTypeDependencyError, exception_map
-from ace.system.storage import ContentMetadata
-from ace.system.work_queue import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
+from ace.system.exceptions import (
+    AnalysisModuleTypeDependencyError,
+    exception_map,
+    AnalysisModuleTypeVersionError,
+    AnalysisModuleTypeExtendedVersionError,
+)
 
 import aiofiles
 
@@ -39,11 +51,53 @@ def _raise_exception_from_error_model(error: ErrorModel):
 
 
 class RemoteAceAPI(AceAPI):
+
+    api_key = None
+
     def get_client(self):
-        return AsyncClient(*self.client_args, **self.client_kwargs)
+        kwargs = {}
+        kwargs.update(self.client_kwargs)
+        if "headers" not in kwargs:
+            kwargs["headers"] = {}
+
+        kwargs["headers"].update({"X-API-Key": self.api_key})
+        return AsyncClient(*self.client_args, **kwargs)
 
     # alerting
-    async def track_alert(self, root: RootAnalysis):
+    async def register_alert_system(self, name: str) -> bool:
+        assert isinstance(name, str) and name
+        async with self.get_client() as client:
+            response = await client.put(f"/ams/{name}")
+
+        _raise_exception_on_error(response)
+        return response.status_code == 201
+
+    async def unregister_alert_system(self, name: str) -> bool:
+        assert isinstance(name, str) and name
+        async with self.get_client() as client:
+            response = await client.delete(f"/ams/{name}")
+
+        _raise_exception_on_error(response)
+        return response.status_code == 200
+
+    async def submit_alert(self, root: Union[RootAnalysis, str]) -> bool:
+        raise NotImplementedError()
+
+    async def get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
+        assert isinstance(name, str) and name
+        assert timeout is None or isinstance(timeout, int)
+
+        params = {}
+        if timeout is not None:
+            params["timeout"] = str(timeout)
+
+        async with self.get_client() as client:
+            response = await client.get(f"/ams/{name}", params=params)
+
+        _raise_exception_on_error(response)
+        return AlertListModel.parse_obj(response.json()).root_uuids
+
+    async def get_alert_count(self, name: str) -> int:
         raise NotImplementedError()
 
     # analysis module
@@ -123,9 +177,7 @@ class RemoteAceAPI(AceAPI):
 
         _raise_exception_on_error(response)
 
-    async def process_expired_analysis_requests(
-        self,
-    ):
+    async def process_expired_analysis_requests(self, amt: AnalysisModuleType):
         raise NotImplementedError()
 
     # analysis tracking
@@ -135,7 +187,13 @@ class RemoteAceAPI(AceAPI):
     async def track_root_analysis(self, root: RootAnalysis):
         raise NotImplementedError()
 
+    async def update_root_analysis(self, root: RootAnalysis) -> bool:
+        raise NotImplementedError()
+
     async def delete_root_analysis(self, root: Union[RootAnalysis, str]) -> bool:
+        raise NotImplementedError()
+
+    async def root_analysis_exists(self, root: Union[RootAnalysis, str]) -> bool:
         raise NotImplementedError()
 
     async def get_analysis_details(self, uuid: str) -> Any:
@@ -145,6 +203,9 @@ class RemoteAceAPI(AceAPI):
         raise NotImplementedError()
 
     async def delete_analysis_details(self, uuid: str) -> bool:
+        raise NotImplementedError()
+
+    async def analysis_details_exists(self, uuid: str) -> bool:
         raise NotImplementedError()
 
     # caching
@@ -168,11 +229,45 @@ class RemoteAceAPI(AceAPI):
         raise NotImplementedError()
 
     # config
-    async def get_config(self, key: str, default: Optional[Any] = None) -> Any:
-        raise NotImplementedError()
+    async def get_config(
+        self, key: str, default: Optional[Any] = None, env: Optional[str] = None
+    ) -> ConfigurationSetting:
+        assert isinstance(key, str) and key
 
-    async def set_config(self, key: str, value: Any):
-        raise NotImplementedError()
+        async with self.get_client() as client:
+            response = await client.get(f"/config", params={"key": key})
+
+        _raise_exception_on_error(response)
+        if response.status_code == 404:
+            return None
+
+        return ConfigurationSetting(**response.json())
+
+    async def set_config(self, key: str, value: Any, documentation: Optional[str] = None):
+        async with self.get_client() as client:
+            response = await client.put(
+                f"/config", json=ConfigurationSetting(name=key, value=value, documentation=documentation).dict()
+            )
+
+        _raise_exception_on_error(response)
+        if response.status_code == 401:
+            return True
+
+        return False
+
+    async def delete_config(self, key: str) -> bool:
+        assert isinstance(key, str) and key
+
+        async with self.get_client() as client:
+            response = await client.delete(f"/config", params={"key": key})
+
+        _raise_exception_on_error(response)
+        if response.status_code == 200:
+            return True
+        elif response.status_code == 404:
+            return False
+        else:
+            raise RuntimeError(f"unexpected status code {response.status_code}")
 
     # events
     async def register_event_handler(self, event: str, handler: EventHandler):
@@ -184,7 +279,7 @@ class RemoteAceAPI(AceAPI):
     async def get_event_handlers(self, event: str) -> list[EventHandler]:
         raise NotImplementedError()
 
-    async def fire_event(self, event: str, *args, **kwargs):
+    async def fire_event(self, event: Event):
         raise NotImplementedError()
 
     # observables
@@ -192,8 +287,11 @@ class RemoteAceAPI(AceAPI):
         raise NotImplementedError()
 
     # processing
-    # async def process_analysis_request(self, ar: AnalysisRequest):
-    # raise NotImplementedError()
+    async def process_analysis_request(self, ar: AnalysisRequest):
+        async with self.get_client() as client:
+            response = await client.post("/process_request", json=ar.to_dict())
+
+        _raise_exception_on_error(response)
 
     # storage
     async def store_content(self, content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
@@ -209,7 +307,7 @@ class RemoteAceAPI(AceAPI):
             data["expiration_date"] = meta.expiration_date.isoformat()
 
         if meta.custom:
-            data["custom"] = meta.custom
+            data["custom"] = json.dumps(meta.custom, cls=CustomJSONEncoder)
 
         async with self.get_client() as client:
             response = await client.post("/storage", files=files, data=data)
@@ -218,20 +316,34 @@ class RemoteAceAPI(AceAPI):
         return ContentMetadata(**response.json()).sha256
 
     async def get_content_bytes(self, sha256: str) -> Union[bytes, None]:
-        raise NotImplementedError()
+        async with self.get_client() as client:
+            async with client.stream("GET", f"/storage/{sha256}") as response:
+                _raise_exception_on_error(response)
+                if response.status_code == 404:
+                    return None
 
-    async def get_content_stream(self, sha256: str) -> Union[io.IOBase, None]:
-        raise NotImplementedError()
+                return await response.aread()
+
+    async def iter_content(self, sha256: str, buffer_size: int) -> Union[AsyncGenerator[bytes, None], None]:
+        async with self.get_client() as client:
+            async with client.stream("GET", f"/storage/{sha256}") as response:
+                _raise_exception_on_error(response)
+                if response.status_code == 404:
+                    yield None
+                    return
+
+                async for data in response.aiter_bytes():
+                    yield data
 
     async def get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:
         async with self.get_client() as client:
-            response = client.get(f"/storage/meta/{sha256}")
+            response = await client.get(f"/storage/meta/{sha256}")
 
         _raise_exception_on_error(response)
         if response.status_code == 404:
             return None
 
-        return ContentMetadata.from_dict(response.json())
+        return ContentMetadata(**response.json())
 
     async def delete_content(self, sha256: str) -> bool:
         raise NotImplementedError()
@@ -245,12 +357,18 @@ class RemoteAceAPI(AceAPI):
             return await self.store_content(fp, meta)
 
     async def load_file(self, sha256: str, path: str) -> Union[ContentMetadata, None]:
+        meta = await self.get_content_meta(sha256)
+        if meta is None:
+            return None
+
         async with aiofiles.open(path, "wb") as fp:
             async with self.get_client() as client:
                 async with client.stream("GET", f"/storage/{sha256}") as response:
                     _raise_exception_on_error(response)
                     async for chunk in response.aiter_bytes():
                         await fp.write(chunk)
+
+        return meta
 
     # work queue
     async def get_work(self, amt: Union[AnalysisModuleType, str], timeout: int) -> Union[AnalysisRequest, None]:
@@ -277,6 +395,8 @@ class RemoteAceAPI(AceAPI):
         extended_version: Optional[list[list]] = [],
     ) -> Union[AnalysisRequest, None]:
         if isinstance(amt, AnalysisModuleType):
+            version = amt.version
+            extended_version = amt.extended_version
             amt = amt.name
 
         async with self.get_client() as client:
@@ -296,4 +416,4 @@ class RemoteAceAPI(AceAPI):
         if response.status_code == 204:
             return None
         else:
-            return AnalysisRequest.from_dict(response.json())
+            return AnalysisRequest.from_dict(response.json(), self.system)

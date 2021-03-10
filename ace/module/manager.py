@@ -12,12 +12,11 @@ from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from typing import Optional
 
-from ace.api import get_api
 from ace.api.base import AceAPI, AnalysisRequest
 from ace.error_reporting.reporter import format_error_report
 from ace.module.base import AnalysisModule
 from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
-from ace.system import get_logger
+from ace.system import get_logger, ACESystem
 from ace.system.exceptions import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
 
 import psutil
@@ -70,9 +69,19 @@ def _initialize_executor(module_map):
         # load any additional resources
         sync_module_map[module_name].load()
 
+    import logging
+
+    get_logger().setLevel(logging.DEBUG)
+
 
 def _execute_sync_module(module_type: str, request_json: str) -> str:
-    request = AnalysisRequest.from_json(request_json)
+    # XXX ???
+    # use a dummy system here...
+    from ace.system.threaded import ThreadedACESystem
+
+    system = ThreadedACESystem()
+
+    request = AnalysisRequest.from_json(request_json, system)
     amt = AnalysisModuleType.from_json(module_type)
     module = sync_module_map[amt.name]
     if not module.type.extended_version_matches(amt):
@@ -99,7 +108,14 @@ def _upgrade_sync_module(amt_json: str) -> str:
 class AnalysisModuleManager:
     """Executes and manages ace.module.AnalysisModule objects."""
 
-    def __init__(self, concurrency_mode=CONCURRENCY_MODE_THREADED, wait_time=0):
+    def __init__(self, system: ACESystem, concurrency_mode=CONCURRENCY_MODE_THREADED, wait_time=0):
+        assert isinstance(system, ACESystem)
+        assert isinstance(concurrency_mode, int)
+        assert isinstance(wait_time, int) and wait_time >= 0
+
+        # reference to the remote system
+        self.system = system
+
         # the analysis modules this manager is running
         self.analysis_modules = []
 
@@ -137,7 +153,7 @@ class AnalysisModuleManager:
         for module in self.analysis_modules:
 
             async def check_type(module):
-                result = await get_api().get_analysis_module_type(module.type.name)
+                result = await self.system.get_analysis_module_type(module.type.name)
                 return module, result
 
             task = asyncio.get_event_loop().create_task(check_type(module))
@@ -326,7 +342,7 @@ class AnalysisModuleManager:
         request = None
 
         try:
-            request = await get_api().get_next_analysis_request(
+            request = await self.system.get_next_analysis_request(
                 whoami, module.type, self.wait_time, module.type.version, module.type.extended_version
             )
         except AnalysisModuleTypeExtendedVersionError as e:
@@ -356,7 +372,7 @@ class AnalysisModuleManager:
         # it is ok to wait here
         # we continue analysis on a new task
         if request:
-            await get_api().submit_analysis_request(request)
+            await self.system.submit_analysis_request(request)
 
         return module
 
@@ -397,7 +413,7 @@ class AnalysisModuleManager:
                 request_result_json = await asyncio.get_event_loop().run_in_executor(
                     self.executor, _execute_sync_module, module.type.to_json(), request_json
                 )
-                return AnalysisRequest.from_json(request_result_json)
+                return AnalysisRequest.from_json(request_result_json, self.system)
             except BrokenProcessPool as e:
                 # when this happens you have to create and start a new one
                 self.process_exception(
@@ -434,6 +450,7 @@ class AnalysisModuleManager:
             analysis.error_message = f"{type(e).__name__}: {e}"
         else:
             analysis.error_message = error_message
+
         analysis.stack_trace = format_error_report(e)
         get_logger().error(error_message)
         return request

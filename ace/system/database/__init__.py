@@ -17,7 +17,7 @@ from contextlib import contextmanager
 
 import ace
 
-from ace.system import ACESystem, get_system, get_logger
+from ace.system import ACESystem, get_logger
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import DBAPIError, IntegrityError
@@ -25,35 +25,29 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import Executable
 from sqlalchemy.ext.declarative import declarative_base
 
+
 Base = declarative_base()
 
 
-@contextmanager
-def get_db() -> Session:
-    """Returns the global scoped_session object."""
-    try:
-        session = None
-        if get_system().engine is None:
-            yield None
-        else:
-            session = Session(bind=get_system().engine)
-            yield session
-    finally:
-        if session:
-            session.close()
-
-
-from ace.system.config import get_config_value
 from ace.system.database.analysis_module import DatabaseAnalysisModuleTrackingInterface
 from ace.system.database.analysis_request import DatabaseAnalysisRequestTrackingInterface
 from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterface
+from ace.system.database.auth import DatabaseAuthenticationInterface
 from ace.system.database.caching import DatabaseCachingInterface
 from ace.system.database.config import DatabaseConfigurationInterface
-from ace.system.database.observables import DatabaseObservableInterface
 from ace.system.local.storage import LocalStorageInterface
 
 
-class DatabaseACESystem:
+class DatabaseACESystem(
+    DatabaseAnalysisTrackingInterface,
+    DatabaseAnalysisModuleTrackingInterface,
+    DatabaseAnalysisRequestTrackingInterface,
+    DatabaseCachingInterface,
+    DatabaseConfigurationInterface,
+    LocalStorageInterface,
+    DatabaseAuthenticationInterface,
+    ACESystem,
+):
     """A partial ACE core system that uses SQLAlchemy to manage data."""
 
     # the URL to use to connect to the database (first argument to create_engine)
@@ -61,287 +55,251 @@ class DatabaseACESystem:
     # optional args to create_engine
     db_kwargs: dict = {}
 
-    analysis_tracking = DatabaseAnalysisTrackingInterface()
-    caching = DatabaseCachingInterface()
-    config = DatabaseConfigurationInterface()
-    module_tracking = DatabaseAnalysisModuleTrackingInterface()
-    observable = DatabaseObservableInterface()
-    request_tracking = DatabaseAnalysisRequestTrackingInterface()
-    storage = LocalStorageInterface()
-
-    # DatabaseSession = None
-    # db: scoped_session = None
     engine = None
 
-    def initialize(self):
+    async def initialize(self):
         """Initializes database connections by creating the SQLAlchemy engine and session objects."""
 
         # see https://github.com/PyMySQL/PyMySQL/issues/644
         # /usr/local/lib/python3.6/dist-packages/pymysql/cursors.py:170: Warning: (1300, "Invalid utf8mb4 character string: '800363'")
         warnings.filterwarnings(action="ignore", message=".*Invalid utf8mb4 character string.*")
 
-        self.db_url = get_config_value(CONFIG_DB_URL, env="ACE_DB_URL", default=self.db_url)
-        self.db_kwargs = get_config_value(CONFIG_DB_KWARGS, default=self.db_kwargs)
+        self.db_url = await self.get_config_value(CONFIG_DB_URL, env="ACE_DB_URL", default=self.db_url)
+        self.db_kwargs = await self.get_config_value(CONFIG_DB_KWARGS, default=self.db_kwargs)
         self.engine = create_engine(self.db_url, **self.db_kwargs)
 
         @event.listens_for(self.engine, "connect")
         def connect(dbapi_connection, connection_record):
-            # pid = os.getpid()
-            # tid = threading.get_ident()
-            # connection_record.info["pid"] = pid
-            # connection_record.info["tid"] = tid
-
             # XXX check for sqlite
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
 
-        # @event.listens_for(self.engine, "checkout")
-        # def checkout(dbapi_connection, connection_record, connection_proxy):
-        # pid = os.getpid()
-        # if connection_record.info["pid"] != pid:
-        # connection_record.connection = connection_proxy.connection = None
-        # message = f"connection record belongs to pid {connection_record.info['pid']} attempting to check out in pid {pid}"
-        # get_logger().debug(message)
-        # raise exc.DisconnectionError(message)
-
-        # tid = threading.get_ident()
-        # if connection_record.info["tid"] != tid:
-        # connection_record.connection = connection_proxy.connection = None
-        # message = f"connection record belongs to tid {connection_record.info['tid']} attempting to check out in tid {tid}"
-        # get_logger().debug(message)
-        # raise exc.DisconnectionError(message)
-
-        # self.DatabaseSession = sessionmaker(bind=self.engine)
-        # self.db = scoped_session(self.DatabaseSession)
-
-
-def execute_with_retry(db, cursor, sql_or_func, params=(), attempts=3, commit=False):
-    """Executes the given SQL or function (and params) against the given cursor with
-    re-attempts up to N times (defaults to 2) on deadlock detection.
-
-    NOTE: deadlock detection is supported for MySQL only.
-
-    NOTE: This is for working with raw SQL execution. If you need to
-    retry-on-deadlock using SQLAlchemy look at the retry_on_deadlock function
-    instead.
-
-    If sql_or_func is a callable then the function will be called as
-    sql_or_func(db, cursor, *params).
-
-    example:
-    def my_function(db, cursor, param_1):
-        cursor.execute("INSERT INTO table ( column ) VALUES ( ? )", (param_1,))
-
-    execute_with_retry(my_function, ("my_value",))
-
-    To execute a single statement, sql is the parameterized SQL statement
-    and params is the tuple of parameter values.  params is optional and defaults
-    to an empty tuple.
-
-    example:
-    execute_with_retry("INSERT INTO table ( column ) VALUES ( ? )", (param_1,))
-
-    To execute multi-statement transactions, sql is a list of parameterized
-    SQL statements, and params is a matching list of tuples of parameters.
-
-    example:
-    execute_with_retry([
-        "INSERT INTO table_1 ( column ) VALUES ( ? )",
-        "INSERT INTO table_2 ( column ) VALUES ( ? )",
-    ], [
-        (param_1,),
-        (param_2,),
-    ])
-
-    Returns the rowcount for a single statement, or a list of rowcount for multiple statements,
-    or the result of the function call."""
-
-    assert callable(sql_or_func) or isinstance(sql_or_func, str) or isinstance(sql_or_func, list)
-    assert (
-        params is None
-        or isinstance(params, tuple)
-        or (isinstance(params, list) and all([isinstance(_, tuple) for _ in params]))
-    )
-
-    # if we are executing sql then make sure we have a list of SQL statements and a matching list
-    # of tuple parameters
-    if not callable(sql_or_func):
-        if isinstance(sql_or_func, str):
-            sql_or_func = [sql_or_func]
-
-        if isinstance(params, tuple):
-            params = [params]
-        elif params is None:
-            params = [() for _ in sql_or_func]
-
-        if len(sql_or_func) != len(params):
-            raise ValueError(
-                "the length of sql statements does not match the length of parameter tuples: {} {}".format(
-                    sql_or_func, params
-                )
-            )
-
-    count = 1
-
-    while True:
+    @contextmanager
+    def get_db(self) -> Session:
+        """Returns the global scoped_session object."""
         try:
-            results = []
-            if callable(sql_or_func):
-                results.append(sql_or_func(db, cursor, *params))
+            session = None
+            if self.engine is None:
+                yield None
             else:
-                for (_sql, _params) in zip(sql_or_func, params):
-                    # if ace.CONFIG['global'].getboolean('log_sql'):
-                    # get_logger().debug(f"executing with retry (attempt #{count}) sql {_sql} with paramters {_params}")
-                    cursor.execute(_sql, _params)
-                    results.append(cursor.rowcount)
+                session = Session(bind=self.engine)
+                yield session
+        finally:
+            if session:
+                session.close()
 
-            if commit:
-                db.commit()
+    def execute_with_retry(self, db, cursor, sql_or_func, params=(), attempts=3, commit=False):
+        """Executes the given SQL or function (and params) against the given cursor with
+        re-attempts up to N times (defaults to 2) on deadlock detection.
 
-            if len(results) == 1:
-                return results[0]
+        NOTE: deadlock detection is supported for MySQL only.
 
-            return results
+        NOTE: This is for working with raw SQL execution. If you need to
+        retry-on-deadlock using SQLAlchemy look at the retry_on_deadlock function
+        instead.
 
-        except (DBAPIError, sqlite3.IntegrityError) as e:
+        If sql_or_func is a callable then the function will be called as
+        sql_or_func(db, cursor, *params).
 
-            #
-            # XXX
-            # this is a hack, not sure how to accomplish this in a db-agnostic way
-            # need to determine if the exception thrown was thrown because of a deadlock
-            # for MySQL it's this
-            # see http://stackoverflow.com/questions/25026244/how-to-get-the-mysql-type-of-error-with-pymysql
-            # to explain e.args[0]
-            # not sure you can even have a deadlock in sqlite since it's not meant to be multi-threaded
-            # so we can fake it with the RAISE command in our testing and use the string DEADLOCK
-            #
+        example:
+        def my_function(db, cursor, param_1):
+            cursor.execute("INSERT INTO table ( column ) VALUES ( ? )", (param_1,))
 
-            if (
-                e.args[0] == 1213 or e.args[0] == 1205 or (isinstance(e.args[0], str) and e.args[0] == "DEADLOCK")
-            ) and count < attempts:
-                get_logger().warning("deadlock detected -- trying again (attempt #{})".format(count))
-                try:
-                    db.rollback()
-                except Exception as rollback_error:
-                    get_logger().error("rollback failed for transaction in deadlock: {}".format(rollback_error))
-                    raise e
+        execute_with_retry(my_function, ("my_value",))
 
-                count += 1
-                time.sleep(random.uniform(0, 1))
-                continue
-            else:
-                if not callable(sql_or_func):
-                    i = 0
-                    for _sql, _params in zip(sql_or_func, params):
-                        get_logger().warning(
-                            "DEADLOCK STATEMENT #{} SQL {} PARAMS {}".format(
-                                i, _sql, ",".join([str(_) for _ in _params])
-                            )
-                        )
-                        i += 1
+        To execute a single statement, sql is the parameterized SQL statement
+        and params is the tuple of parameter values.  params is optional and defaults
+        to an empty tuple.
 
-                    # TODO log innodb lock status
-                    raise e
+        example:
+        execute_with_retry("INSERT INTO table ( column ) VALUES ( ? )", (param_1,))
 
+        To execute multi-statement transactions, sql is a list of parameterized
+        SQL statements, and params is a matching list of tuples of parameters.
 
-# if target is an executable, then *args is to session.execute function
-# if target is a callable, then *args is to the callable function (whatever that is)
-def retry_on_deadlock(targets, *args, attempts=2, commit=False, **kwargs):
-    """Executes the given targets, in order. If a deadlock condition is detected, the database session
-    is rolled back and the targets are executed in order, again. This can happen up to :param:attempts times
-    before the failure is raised as an exception.
+        example:
+        execute_with_retry([
+            "INSERT INTO table_1 ( column ) VALUES ( ? )",
+            "INSERT INTO table_2 ( column ) VALUES ( ? )",
+        ], [
+            (param_1,),
+            (param_2,),
+        ])
 
-    :param targets Can be any of the following
-    * A callable.
-    * A list of callables.
-    * A sqlalchemy.sql.expression.Executable object.
-    * A list of sqlalchemy.sql.expression.Executable objects.
-    :param int attempts The maximum number of times the operations are tried before passing the exception on.
-    :param bool commit If set to True then the ``commit`` function is called on the session object before returning
-    from the function. If a deadlock occurs during the commit then further attempts are made.
+        Returns the rowcount for a single statement, or a list of rowcount for multiple statements,
+        or the result of the function call."""
 
-    In the case where targets are functions, session can be omitted, in which case :meth:ace.system.database.get_db is used to
-    acquire a Session to use. When this is the case, the acquired Session object is passed as a keyword parameter
-    to the functions.
+        assert callable(sql_or_func) or isinstance(sql_or_func, str) or isinstance(sql_or_func, list)
+        assert (
+            params is None
+            or isinstance(params, tuple)
+            or (isinstance(params, list) and all([isinstance(_, tuple) for _ in params]))
+        )
 
-    In the case where targets are executables, session cannot be omitted. The executables are passed to the
-    ``execute`` function of the Session object as if you had called ``session.execute(target)``.
+        # if we are executing sql then make sure we have a list of SQL statements and a matching list
+        # of tuple parameters
+        if not callable(sql_or_func):
+            if isinstance(sql_or_func, str):
+                sql_or_func = [sql_or_func]
 
-    :return This function returns the last operation in the list of targets."""
+            if isinstance(params, tuple):
+                params = [params]
+            elif params is None:
+                params = [() for _ in sql_or_func]
 
-    if not isinstance(targets, list):
-        targets = [targets]
+            if len(sql_or_func) != len(params):
+                raise ValueError(
+                    "the length of sql statements does not match the length of parameter tuples: {} {}".format(
+                        sql_or_func, params
+                    )
+                )
 
-    current_attempt = 0
-    while True:
-        with get_db() as db:
+        count = 1
+
+        while True:
             try:
-                last_result = None
-                for target in targets:
-                    if isinstance(target, Executable) or isinstance(target, str):
-                        db.execute(target, *args, **kwargs)
-                    elif callable(target):
-                        last_result = target(*args, **kwargs)
+                results = []
+                if callable(sql_or_func):
+                    results.append(sql_or_func(db, cursor, *params))
+                else:
+                    for (_sql, _params) in zip(sql_or_func, params):
+                        # if ace.CONFIG['global'].getboolean('log_sql'):
+                        # get_logger().debug(f"executing with retry (attempt #{count}) sql {_sql} with paramters {_params}")
+                        cursor.execute(_sql, _params)
+                        results.append(cursor.rowcount)
 
                 if commit:
                     db.commit()
 
-                return last_result
+                if len(results) == 1:
+                    return results[0]
 
-            except (DBAPIError, IntegrityError) as e:
-                # catch the deadlock error ids 1213 and 1205
-                # NOTE this is for MySQL only
+                return results
+
+            except (DBAPIError, sqlite3.IntegrityError) as e:
+
+                #
+                # XXX
+                # this is a hack, not sure how to accomplish this in a db-agnostic way
+                # need to determine if the exception thrown was thrown because of a deadlock
+                # for MySQL it's this
+                # see http://stackoverflow.com/questions/25026244/how-to-get-the-mysql-type-of-error-with-pymysql
+                # to explain e.args[0]
+                # not sure you can even have a deadlock in sqlite since it's not meant to be multi-threaded
+                # so we can fake it with the RAISE command in our testing and use the string DEADLOCK
+                #
+
                 if (
-                    e.orig.args[0] == 1213
-                    or e.orig.args[0] == 1205
-                    or (isinstance(e.orig.args[0], str) and e.orig.args[0] == "DEADLOCK")
-                    and current_attempt < attempts
-                ):
-                    get_logger().debug(
-                        f"DEADLOCK STATEMENT attempt #{current_attempt + 1} SQL {e.statement} PARAMS {e.params}"
-                    )
-
+                    e.args[0] == 1213 or e.args[0] == 1205 or (isinstance(e.args[0], str) and e.args[0] == "DEADLOCK")
+                ) and count < attempts:
+                    get_logger().warning("deadlock detected -- trying again (attempt #{})".format(count))
                     try:
-                        db.rollback()  # rolls back to the begin_nested()
-                    except Exception as e:
-                        get_logger().error(f"unable to roll back transaction: {e}")
+                        db.rollback()
+                    except Exception as rollback_error:
+                        get_logger().error("rollback failed for transaction in deadlock: {}".format(rollback_error))
+                        raise e
 
-                        et, ei, tb = sys.exc_info()
-                        raise e.with_traceback(tb)
-
-                    # ... and try again
-                    time.sleep(0.1)  # ... after a bit
-                    current_attempt += 1
+                    count += 1
+                    time.sleep(random.uniform(0, 1))
                     continue
+                else:
+                    if not callable(sql_or_func):
+                        i = 0
+                        for _sql, _params in zip(sql_or_func, params):
+                            get_logger().warning(
+                                "DEADLOCK STATEMENT #{} SQL {} PARAMS {}".format(
+                                    i, _sql, ",".join([str(_) for _ in _params])
+                                )
+                            )
+                            i += 1
 
-                # otherwise we propagate the error
-                et, ei, tb = sys.exc_info()
-                raise e.with_traceback(tb)
+                        # TODO log innodb lock status
+                        raise e
 
+    # if target is an executable, then *args is to session.execute function
+    # if target is a callable, then *args is to the callable function (whatever that is)
+    def retry_on_deadlock(self, targets, *args, attempts=2, commit=False, **kwargs):
+        """Executes the given targets, in order. If a deadlock condition is detected, the database session
+        is rolled back and the targets are executed in order, again. This can happen up to :param:attempts times
+        before the failure is raised as an exception.
 
-def retry_function_on_deadlock(function, *args, **kwargs):
-    assert callable(function)
-    return retry_on_deadlock(function, *args, **kwargs)
+        :param targets Can be any of the following
+        * A callable.
+        * A list of callables.
+        * A sqlalchemy.sql.expression.Executable object.
+        * A list of sqlalchemy.sql.expression.Executable objects.
+        :param int attempts The maximum number of times the operations are tried before passing the exception on.
+        :param bool commit If set to True then the ``commit`` function is called on the session object before returning
+        from the function. If a deadlock occurs during the commit then further attempts are made.
 
+        In the case where targets are functions, session can be omitted, in which case :meth:ace.system.database.get_db is used to
+        acquire a Session to use. When this is the case, the acquired Session object is passed as a keyword parameter
+        to the functions.
 
-def retry_sql_on_deadlock(executable, *args, **kwargs):
-    assert isinstance(executable, Executable)
-    return retry_on_deadlock(executable, *args, **kwargs)
+        In the case where targets are executables, session cannot be omitted. The executables are passed to the
+        ``execute`` function of the Session object as if you had called ``session.execute(target)``.
 
+        :return This function returns the last operation in the list of targets."""
 
-def retry_multi_sql_on_deadlock(executables, *args, **kwargs):
-    assert isinstance(executables, list)
-    assert all([isinstance(_, Executable) for _ in executables])
-    return retry_on_deadlock(executables, *args, **kwargs)
+        if not isinstance(targets, list):
+            targets = [targets]
 
+        current_attempt = 0
+        while True:
+            with self.get_db() as db:
+                try:
+                    last_result = None
+                    for target in targets:
+                        if isinstance(target, Executable) or isinstance(target, str):
+                            db.execute(target, *args, **kwargs)
+                        elif callable(target):
+                            last_result = target(*args, **kwargs)
 
-def retry(_func, *args, **kwargs):
-    """Executes the wrapped function with retry_on_deadlock."""
+                    if commit:
+                        db.commit()
 
-    @functools.wraps(_func)
-    def wrapper(*w_args, **w_kwargs):
-        w_kwargs.update(kwargs)
-        return retry_function_on_deadlock(_func, *w_args, **w_kwargs)
+                    return last_result
 
-    return wrapper
+                except (DBAPIError, IntegrityError) as e:
+                    # catch the deadlock error ids 1213 and 1205
+                    # NOTE this is for MySQL only
+                    if (
+                        e.orig.args[0] == 1213
+                        or e.orig.args[0] == 1205
+                        or (isinstance(e.orig.args[0], str) and e.orig.args[0] == "DEADLOCK")
+                        and current_attempt < attempts
+                    ):
+                        get_logger().debug(
+                            f"DEADLOCK STATEMENT attempt #{current_attempt + 1} SQL {e.statement} PARAMS {e.params}"
+                        )
+
+                        try:
+                            db.rollback()  # rolls back to the begin_nested()
+                        except Exception as e:
+                            get_logger().error(f"unable to roll back transaction: {e}")
+
+                            et, ei, tb = sys.exc_info()
+                            raise e.with_traceback(tb)
+
+                        # ... and try again
+                        time.sleep(0.1)  # ... after a bit
+                        current_attempt += 1
+                        continue
+
+                    # otherwise we propagate the error
+                    et, ei, tb = sys.exc_info()
+                    raise e.with_traceback(tb)
+
+    def retry_function_on_deadlock(self, function, *args, **kwargs):
+        assert callable(function)
+        return self.retry_on_deadlock(function, *args, **kwargs)
+
+    def retry_sql_on_deadlock(self, executable, *args, **kwargs):
+        assert isinstance(executable, Executable)
+        return self.retry_on_deadlock(executable, *args, **kwargs)
+
+    def retry_multi_sql_on_deadlock(self, executables, *args, **kwargs):
+        assert isinstance(executables, list)
+        assert all([isinstance(_, Executable) for _ in executables])
+        return self.retry_on_deadlock(executables, *args, **kwargs)

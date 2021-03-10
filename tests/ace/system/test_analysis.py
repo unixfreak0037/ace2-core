@@ -1,6 +1,5 @@
 # vim: sw=4:ts=4:et
 
-import copy
 import datetime
 import json
 import os.path
@@ -18,13 +17,8 @@ from ace.analysis import (
     recurse_tree,
     search_down,
 )
-from ace.system.analysis_module import register_analysis_module_type
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.exceptions import UnknownObservableError
-from ace.system.analysis_tracking import (
-    get_analysis_details,
-    get_root_analysis,
-)
 
 import pytest
 
@@ -102,11 +96,11 @@ def test_apply_diff_merge_detetion_points():
     original_root = RootAnalysis()
     original_observable = original_root.add_observable("test", "test")
 
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
     modified_observable.add_detection_point("test")
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.get_observable(original_observable)
 
     assert not target_observable.has_detection_points()
@@ -117,10 +111,10 @@ def test_apply_diff_merge_detetion_points():
     original_root = RootAnalysis()
     original_observable = original_root.add_observable("test", "test")
 
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.get_observable(original_observable)
 
     original_observable.add_detection_point("test")
@@ -130,22 +124,23 @@ def test_apply_diff_merge_detetion_points():
     assert not target_observable.has_detection_points()
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_update_and_save():
-    root = RootAnalysis()
-    root.update_and_save()
-    tracked_root = get_root_analysis(root)
+async def test_update_and_save(system):
+    root = system.new_root()
+    await root.update_and_save()
+    tracked_root = await system.get_root_analysis(root)
     assert tracked_root == root
     # modify tracked root
     tracked_root.description = "test"
-    tracked_root.update_and_save()
+    await tracked_root.update_and_save()
     # now they are different
-    assert root != get_root_analysis(root)
+    assert root != await system.get_root_analysis(root)
     # make modification on original root
     root.add_tag("tag")
-    root.update_and_save()
+    await root.update_and_save()
     # now we have an updated copy
-    assert root == get_root_analysis(root)
+    assert root == await system.get_root_analysis(root)
     # that has both changes
     assert root.description == "test"
     assert root.has_tag("tag")
@@ -202,11 +197,11 @@ def test_apply_merge_tags():
 def test_apply_diff_merge_tags():
     original_root = RootAnalysis()
     original_observable = original_root.add_observable("test", "test")
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
     modified_observable.add_tag("test")
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.add_observable("test", "test")
 
     assert not target_observable.tags
@@ -217,10 +212,10 @@ def test_apply_diff_merge_tags():
     # exists before but not after
     original_root = RootAnalysis()
     original_observable = original_root.add_observable("test", "test")
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.add_observable("test", "test")
 
     original_observable.add_tag("test")
@@ -278,6 +273,7 @@ def test_root_analysis_serialization():
     amt = AnalysisModuleType("test", "")
     observable = root.add_observable("test", "test")
     analysis = observable.add_analysis(type=amt, details={"test": "test"})
+    root.add_detection_point("test")
 
     new_root = RootAnalysis.from_dict(root.to_dict())
     assert root == new_root
@@ -290,6 +286,7 @@ def test_root_analysis_serialization():
     assert root.analysis_mode == new_root.analysis_mode
     assert root.queue == new_root.queue
     assert root.instructions == new_root.instructions
+    assert root.detections == new_root.detections
 
     # the observable property for the root should always be None
     assert root.observable is None
@@ -325,7 +322,7 @@ def test_analysis_properties():
     assert analysis.type == amt
     assert analysis.observable == observable
     assert analysis.observables == [observable_2]
-    assert analysis.details == {"test": "test"}
+    assert analysis._details == {"test": "test"}
     assert analysis.children == [observable_2]
     assert analysis.observable_types == ["test2"]
 
@@ -397,46 +394,48 @@ def test_add_analysis_no_amt():
         observable.add_analysis(Analysis())
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_analysis_save():
+async def test_analysis_save(system):
     amt = AnalysisModuleType("test", "")
-    root = RootAnalysis()
-    root.save()
+    root = system.new_root()
+    await root.save()
 
     observable = root.add_observable("test", "test")
     analysis = observable.add_analysis(type=amt)
     # the details have not been set so there is nothing to save
-    assert not analysis.save()
-    assert get_analysis_details(analysis.uuid) is None
+    assert not await analysis.save()
+    assert await system.get_analysis_details(analysis.uuid) is None
 
     # set the details
-    analysis.details = TEST_DETAILS
+    analysis.set_details(TEST_DETAILS)
     # now it should save
-    assert analysis.save()
-    assert get_analysis_details(analysis.uuid) == TEST_DETAILS
+    assert await analysis.save()
+    assert await system.get_analysis_details(analysis.uuid) == TEST_DETAILS
 
     # save it again, since it didn't change it should not try to save again
-    assert not analysis.save()
+    assert not await analysis.save()
 
     # modify the details
-    analysis.details = {"hey": "there"}
-    assert analysis.save()
-    assert get_analysis_details(analysis.uuid) == {"hey": "there"}
+    analysis.set_details({"hey": "there"})
+    assert await analysis.save()
+    assert await system.get_analysis_details(analysis.uuid) == {"hey": "there"}
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_analysis_load():
+async def test_analysis_load(system):
     amt = AnalysisModuleType("test", "")
-    root = RootAnalysis(details=TEST_DETAILS)
+    root = system.new_root(details=TEST_DETAILS)
     observable = root.add_observable("test", "test")
     analysis = observable.add_analysis(type=amt, details=TEST_DETAILS)
-    root.save()
+    await root.save()
 
-    root = get_root_analysis(root.uuid)
+    root = await system.get_root_analysis(root.uuid)
     # the details should not be loaded yet
     assert root._details is None
     # until we access it
-    assert root.details == TEST_DETAILS
+    root.set_details(TEST_DETAILS)
     # and then it is loaded
     assert root._details is not None
 
@@ -444,15 +443,16 @@ def test_analysis_load():
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt)
     assert analysis._details is None
-    assert analysis.details == TEST_DETAILS
+    analysis.set_details(TEST_DETAILS)
     assert analysis._details is not None
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_analysis_completed():
-    register_analysis_module_type(amt := AnalysisModuleType("test", "test", ["test"]))
+async def test_analysis_completed(system):
+    await system.register_analysis_module_type(amt := AnalysisModuleType("test", "test", ["test"]))
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     assert not root.analysis_completed(observable, amt)
 
@@ -464,11 +464,12 @@ def test_analysis_completed():
         root.analysis_completed(RootAnalysis().add_observable("test", "blah"), amt)
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_analysis_tracked():
-    register_analysis_module_type(amt := AnalysisModuleType("test", "test", ["test"]))
+async def test_analysis_tracked(system):
+    await system.register_analysis_module_type(amt := AnalysisModuleType("test", "test", ["test"]))
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     assert not root.analysis_tracked(observable, amt)
 
@@ -481,22 +482,23 @@ def test_analysis_tracked():
         root.analysis_tracked(RootAnalysis().add_observable("test", "blah"), amt)
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_analysis_flush():
-    register_analysis_module_type(amt := AnalysisModuleType("test", "test", ["test"]))
-    root = RootAnalysis()
+async def test_analysis_flush(system):
+    await system.register_analysis_module_type(amt := AnalysisModuleType("test", "test", ["test"]))
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     analysis = observable.add_analysis(type=amt, details=TEST_DETAILS)
-    root.save()
+    await root.save()
 
-    root = get_root_analysis(root.uuid)
+    root = await system.get_root_analysis(root.uuid)
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt)
-    analysis.flush()
+    await analysis.flush()
     # should be gone
     assert analysis._details is None
     # but can load it back
-    assert analysis.details == TEST_DETAILS
+    analysis.set_details(TEST_DETAILS)
 
 
 @pytest.mark.unit
@@ -577,18 +579,19 @@ def test_analysis_eq():
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_root_analysis_apply_merge():
+async def test_root_analysis_apply_merge(system):
     amt = AnalysisModuleType("test", "")
-    root = RootAnalysis()
-    root.save()
+    root = system.new_root()
+    await root.save()
 
-    target_root = get_root_analysis(root)
+    target_root = await system.get_root_analysis(root)
     target_root.analysis_mode = "some_mode"
     target_root.queue = "some_queue"
     target_root.description = "some description"
 
-    root = get_root_analysis(root)
+    root = await system.get_root_analysis(root)
     root.apply_merge(target_root)
 
     assert root.analysis_mode == target_root.analysis_mode
@@ -596,21 +599,22 @@ def test_root_analysis_apply_merge():
     assert root.description == target_root.description
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_root_analysis_merge_with_observables():
+async def test_root_analysis_merge_with_observables(system):
     amt = AnalysisModuleType("test", "")
-    root = RootAnalysis()
+    root = system.new_root()
     existing_observable = root.add_observable("test", "test")
     existing_analysis = existing_observable.add_analysis(type=amt)
-    root.save()
+    await root.save()
 
-    target_root = get_root_analysis(root)
+    target_root = await system.get_root_analysis(root)
     # add a new observable to the root
     new_observable = target_root.add_observable("test", "new")
     # and then add a new analysis to that
     new_analysis = new_observable.add_analysis(type=amt)
 
-    root = get_root_analysis(root)
+    root = await system.get_root_analysis(root)
     root.apply_merge(target_root)
 
     # existing observable and analysis should be there
@@ -621,9 +625,10 @@ def test_root_analysis_merge_with_observables():
     assert root.get_observable(new_observable).get_analysis(amt) == new_analysis
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_create_analysis_request():
-    root = RootAnalysis()
+async def test_create_analysis_request(system):
+    root = system.new_root()
     request = root.create_analysis_request()
     assert isinstance(request, AnalysisRequest)
     assert request.root == root
@@ -633,15 +638,13 @@ def test_create_analysis_request():
 
 
 @pytest.mark.unit
-def test_deepcopy_root():
-    import copy
-
+def test_root_copy():
     root = RootAnalysis()
     observable = root.add_observable("test", "test")
     amt = AnalysisModuleType("test", "")
     analysis = observable.add_analysis(type=amt, details={"test": "test"})
 
-    root_copy = copy.deepcopy(root)
+    root_copy = root.copy()
     observable_copy = root_copy.get_observable(observable)
     assert observable_copy == observable
     assert not (observable_copy is observable)
@@ -711,12 +714,12 @@ def test_root_eq():
     assert RootAnalysis() != RootAnalysis()
     root = RootAnalysis()
     # same uuids
-    assert root == copy.deepcopy(root)
+    assert root == root.copy()
     # invalid compare
     assert root != object()
     # same uuid different version
     root = RootAnalysis()
-    modified_root = copy.deepcopy(root)
+    modified_root = root.copy()
     modified_root.version = str(uuid.uuid4())
     assert root != modified_root
     # same uuid same version
@@ -841,7 +844,7 @@ def test_apply_diff_merge_different_roots():
 def test_root_diff_merge():
     target = RootAnalysis()
     before = RootAnalysis()
-    after = copy.deepcopy(before)
+    after = before.copy()
     after.analysis_mode = "test"
     after.queue = "test"
     after.description = "test"
@@ -975,16 +978,17 @@ def test_apply_merge_analysis():
     observable.apply_merge(target_observable)
     assert observable.analysis
     assert observable.get_analysis("test") is not None
-    assert observable.get_analysis("test").details == {"test": "test"}
+    assert observable.get_analysis("test")._details == {"test": "test"}
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_apply_merge_error_analysis():
+async def test_apply_merge_error_analysis(system):
     amt = AnalysisModuleType("test", "")
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("some_type", "some_value")
 
-    target_root = RootAnalysis()
+    target_root = system.new_root()
     target_observable = target_root.add_observable("some_type", "some_value")
     target_observable.add_analysis(Analysis(type=amt, error_message="test", stack_trace="test"))
 
@@ -992,21 +996,22 @@ def test_apply_merge_error_analysis():
     observable.apply_merge(target_observable)
     assert observable.analysis
     assert observable.get_analysis("test") is not None
-    assert observable.get_analysis("test").details is None
+    assert observable.get_analysis("test")._details is None
     assert observable.get_analysis("test").error_message == "test"
     assert observable.get_analysis("test").stack_trace == "test"
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_apply_diff_merge_analysis():
+async def test_apply_diff_merge_analysis(system):
     amt = AnalysisModuleType("test", "")
-    original_root = RootAnalysis()
+    original_root = system.new_root()
     original_observable = original_root.add_observable("test", "test")
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
     modified_observable.add_analysis(type=amt)
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.get_observable(original_observable)
 
     assert not target_observable.analysis
@@ -1015,12 +1020,12 @@ def test_apply_diff_merge_analysis():
     assert target_observable.get_analysis("test") is not None
 
     # exists before but not after
-    original_root = RootAnalysis()
+    original_root = system.new_root()
     original_observable = original_root.add_observable("test", "test")
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.get_observable(original_observable)
 
     original_observable.add_analysis(type=amt)
@@ -1030,13 +1035,14 @@ def test_apply_diff_merge_analysis():
     assert not target_observable.analysis
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_apply_merge_analysis_with_observables():
+async def test_apply_merge_analysis_with_observables(system):
     amt = AnalysisModuleType("test", "")
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("some_type", "some_value")
 
-    target_root = RootAnalysis()
+    target_root = system.new_root()
     target_observable = target_root.add_observable("some_type", "some_value")
     analysis = target_observable.add_analysis(Analysis(type=amt))
     extra_observable = analysis.add_observable("other_type", "other_value")
@@ -1046,17 +1052,18 @@ def test_apply_merge_analysis_with_observables():
     assert root.get_observable(extra_observable) == extra_observable
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_apply_diff_merge_analysis_with_observables():
+async def test_apply_diff_merge_analysis_with_observables(system):
     amt = AnalysisModuleType("test", "")
-    original_root = RootAnalysis()
+    original_root = system.new_root()
     original_observable = original_root.add_observable("test", "test")
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
     analysis = modified_observable.add_analysis(type=amt)
     new_observable = analysis.add_observable("new", "new")
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.get_observable(original_observable)
 
     assert not target_root.get_observable(new_observable)
@@ -1064,12 +1071,12 @@ def test_apply_diff_merge_analysis_with_observables():
     assert target_root.get_observable(new_observable) == new_observable
 
     # exists before but not after
-    original_root = RootAnalysis()
+    original_root = system.new_root()
     original_observable = original_root.add_observable("test", "test")
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.get_observable(original_observable)
 
     analysis = original_observable.add_analysis(type=amt)
@@ -1080,14 +1087,15 @@ def test_apply_diff_merge_analysis_with_observables():
     assert not target_root.get_observable(new_observable)
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_apply_merge_analysis_with_existing_observables():
+async def test_apply_merge_analysis_with_existing_observables(system):
     amt = AnalysisModuleType("test", "")
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("some_type", "some_value")
     existing_extra_observable = root.add_observable("other_type", "other_value")
 
-    target_root = RootAnalysis()
+    target_root = system.new_root()
     target_observable = target_root.add_observable("some_type", "some_value")
     analysis = target_observable.add_analysis(Analysis(type=amt))
     extra_observable = analysis.add_observable("other_type", "other_value")
@@ -1099,18 +1107,19 @@ def test_apply_merge_analysis_with_existing_observables():
     assert len(existing_extra_observable.parents) == 2
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_apply_diff_merge_analysis_with_existing_observables():
+async def test_apply_diff_merge_analysis_with_existing_observables(system):
     amt = AnalysisModuleType("test", "")
-    original_root = RootAnalysis()
+    original_root = system.new_root()
     original_observable = original_root.add_observable("test", "test")
     existing_observable = original_root.add_observable("existing", "existing")
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
     analysis = modified_observable.add_analysis(type=amt)
     new_observable = analysis.add_observable("existing", "existing")
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.get_observable(original_observable)
     existing_observable = target_root.get_observable(existing_observable)
 
@@ -1121,13 +1130,13 @@ def test_apply_diff_merge_analysis_with_existing_observables():
     assert len(existing_observable.parents) == 2
 
     # exists before but not after
-    original_root = RootAnalysis()
+    original_root = system.new_root()
     original_observable = original_root.add_observable("test", "test")
     existing_observable = original_root.add_observable("existing", "existing")
-    modified_root = copy.deepcopy(original_root)
+    modified_root = original_root.copy()
     modified_observable = modified_root.get_observable(original_observable)
 
-    target_root = copy.deepcopy(original_root)
+    target_root = original_root.copy()
     target_observable = target_root.get_observable(original_observable)
     existing_observable = target_root.get_observable(existing_observable)
 

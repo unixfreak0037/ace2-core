@@ -343,6 +343,10 @@ class AnalysisRequestQueryModel(BaseModel):
     extended_version: Optional[list[str]] = []
 
 
+class AlertListModel(BaseModel):
+    root_uuids: list[str]
+
+
 class ErrorModel(BaseModel):
     code: str
     details: str

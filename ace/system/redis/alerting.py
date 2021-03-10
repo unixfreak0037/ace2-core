@@ -7,9 +7,8 @@
 
 from typing import Optional
 
-from ace.system.alerting import AlertTrackingInterface
+from ace.system import ACESystem
 from ace.system.exceptions import UnknownAlertSystemError
-from ace.system.redis import get_redis_connection
 from ace.time import utc_now
 
 KEY_ALERT_SYSTEMS = "alert_systems"
@@ -19,20 +18,17 @@ def get_alert_queue(name: str) -> str:
     return f"alert_system:{name}"
 
 
-class RedisAlertTrackingInterface(AlertTrackingInterface):
-
-    redis_connection = get_redis_connection
-
-    def register_alert_system(self, name: str) -> bool:
-        with self.redis_connection() as rc:
+class RedisAlertTrackingInterface(ACESystem):
+    async def i_register_alert_system(self, name: str) -> bool:
+        with self.get_redis_connection() as rc:
             return rc.hsetnx(KEY_ALERT_SYSTEMS, name, str(utc_now())) == 1
 
-    def unregister_alert_system(self, name: str) -> bool:
-        with self.redis_connection() as rc:
+    async def i_unregister_alert_system(self, name: str) -> bool:
+        with self.get_redis_connection() as rc:
             return rc.hdel(KEY_ALERT_SYSTEMS, name) == 1
 
-    def submit_alert(self, root_uuid: str) -> bool:
-        with self.redis_connection() as rc:
+    async def i_submit_alert(self, root_uuid: str) -> bool:
+        with self.get_redis_connection() as rc:
             result = False
             for name in rc.hkeys(KEY_ALERT_SYSTEMS):
                 result = True
@@ -41,8 +37,8 @@ class RedisAlertTrackingInterface(AlertTrackingInterface):
 
         return result
 
-    def get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
-        with self.redis_connection() as rc:
+    async def i_get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
+        with self.get_redis_connection() as rc:
             if not rc.hexists(KEY_ALERT_SYSTEMS, name):
                 raise UnknownAlertSystemError(name)
 
@@ -69,8 +65,8 @@ class RedisAlertTrackingInterface(AlertTrackingInterface):
                 _, result = result
                 return [result.decode()]
 
-    def get_alert_count(self, name: str) -> int:
-        with self.redis_connection() as rc:
+    async def i_get_alert_count(self, name: str) -> int:
+        with self.get_redis_connection() as rc:
             if not rc.hexists(KEY_ALERT_SYSTEMS, name):
                 raise UnknownAlertSystemError(name)
 

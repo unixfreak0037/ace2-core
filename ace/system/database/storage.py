@@ -10,18 +10,15 @@ import os.path
 from typing import Union, Iterator
 
 from ace.data_model import ContentMetadata, CustomJSONEncoder
-from ace.system import get_logger, get_system
-from ace.system.config import get_config_value
-from ace.system.database import get_db
+from ace.system import get_logger, ACESystem
 from ace.system.database.schema import Storage, StorageRootTracking
-from ace.system.storage import StorageInterface, store_content
 
 
-class DatabaseStorageInterface(StorageInterface):
+class DatabaseStorageInterface(ACESystem):
     """Abstract storage interface that uses a database to track file storage."""
 
-    def get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:
-        with get_db() as db:
+    async def i_get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:
+        with self.get_db() as db:
             storage = db.query(Storage).filter(Storage.sha256 == sha256).one_or_none()
             if storage is None:
                 return None
@@ -37,8 +34,8 @@ class DatabaseStorageInterface(StorageInterface):
                 custom=json.loads(storage.custom),
             )
 
-    def iter_expired_content(self) -> Iterator[ContentMetadata]:
-        with get_db() as db:
+    async def i_iter_expired_content(self) -> Iterator[ContentMetadata]:
+        with self.get_db() as db:
             # XXX use db NOW()
             for storage in (
                 db.query(Storage)
@@ -60,18 +57,14 @@ class DatabaseStorageInterface(StorageInterface):
                     custom=json.loads(storage.custom),
                 )
 
-    def delete_content(self, sha256: str) -> bool:
-        with get_db() as db:
+    async def i_track_content_root(self, sha256: str, uuid: str):
+        with self.get_db() as db:
+            db.merge(StorageRootTracking(sha256=sha256, root_uuid=uuid))
+            db.commit()
+
+    async def i_delete_content(self, sha256: str) -> bool:
+        with self.get_db() as db:
             count = db.execute(Storage.__table__.delete().where(Storage.sha256 == sha256)).rowcount
             db.commit()
 
-        file_path = self.get_file_path(sha256)
-        if os.path.exists(file_path):
-            os.remove(file_path)
-
         return count == 1
-
-    def track_content_root(self, sha256: str, uuid: str):
-        with get_db() as db:
-            db.merge(StorageRootTracking(sha256=sha256, root_uuid=uuid))
-            db.commit()

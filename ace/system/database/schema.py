@@ -172,38 +172,6 @@ class AnalysisResultCache(Base):
     json_data = Column(Text, nullable=False)
 
 
-class Lock(Base):
-
-    __tablename__ = "locks"
-    __table_args__ = {
-        "mysql_engine": "InnoDB",
-        "mysql_charset": "utf8mb4",
-    }
-
-    id = Column(String, primary_key=True)
-
-    owner = Column(String, nullable=True, index=True)
-
-    acquire_date = Column(TimeStamp, nullable=True, index=True)
-
-    expiration_date = Column(TimeStamp, nullable=True, index=True)
-
-    count = Column(Integer, nullable=False, default=1)
-
-
-class LockOwnerWaitTarget(Base):
-
-    __tablename__ = "lock_owner_wait_target"
-    __table_args__ = {
-        "mysql_engine": "InnoDB",
-        "mysql_charset": "utf8mb4",
-    }
-
-    owner = Column(String, primary_key=True)
-
-    lock_id = Column(String, nullable=False)
-
-
 class Config(Base):
 
     __tablename__ = "config"
@@ -253,3 +221,18 @@ class StorageRootTracking(Base):
     root_uuid = Column(
         String, ForeignKey("root_analysis_tracking.uuid", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True
     )
+
+
+class ApiKey(Base):
+
+    __tablename__ = "api_keys"
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+    }
+
+    api_key = Column(String, primary_key=True)
+
+    name = Column(String, index=True, unique=True, nullable=False)
+
+    description = Column(String, index=False, nullable=True)

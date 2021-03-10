@@ -5,17 +5,7 @@ import uuid
 
 import ace
 
-from ace.system import get_system
-from ace.system.database import (
-    DatabaseACESystem,
-    get_db,
-    execute_with_retry,
-    retry_on_deadlock,
-    retry_function_on_deadlock,
-    retry_sql_on_deadlock,
-    retry_multi_sql_on_deadlock,
-    retry,
-)
+from ace.system.database import DatabaseACESystem
 from ace.system.database.schema import Config
 
 import pytest
@@ -50,34 +40,34 @@ import sqlalchemy.exc
         (lambda db, cursor: True, (), True),
     ],
 )
-def test_execute_with_retry(sql, params, commit):
-    if not isinstance(get_system(), DatabaseACESystem):
+def test_execute_with_retry(sql, params, commit, system):
+    if not isinstance(system, DatabaseACESystem):
         return
 
-    connection = get_system().engine.raw_connection()
+    connection = system.engine.raw_connection()
     cursor = connection.cursor()
-    execute_with_retry(connection, cursor, sql, params, commit=commit)
+    system.execute_with_retry(connection, cursor, sql, params, commit=commit)
     connection.close()
 
 
 @pytest.mark.unit
-def test_execute_with_retry_invalid_length():
-    if not isinstance(get_system(), DatabaseACESystem):
+def test_execute_with_retry_invalid_length(system):
+    if not isinstance(system, DatabaseACESystem):
         return
 
-    connection = get_system().engine.raw_connection()
+    connection = system.engine.raw_connection()
     cursor = connection.cursor()
     with pytest.raises(ValueError):
-        execute_with_retry(connection, cursor, ["SELECT ?", "SELECT ?"], [(1, 2)])
+        system.execute_with_retry(connection, cursor, ["SELECT ?", "SELECT ?"], [(1, 2)])
     connection.close()
 
 
 @pytest.mark.unit
-def test_execute_with_retry_deadlock():
-    if not isinstance(get_system(), DatabaseACESystem):
+def test_execute_with_retry_deadlock(system):
+    if not isinstance(system, DatabaseACESystem):
         return
 
-    connection = get_system().engine.raw_connection()
+    connection = system.engine.raw_connection()
     cursor = connection.cursor()
     cursor.execute(
         """CREATE TRIGGER trigger_deadlock BEFORE INSERT ON `config` BEGIN 
@@ -87,7 +77,7 @@ def test_execute_with_retry_deadlock():
 
     cursor = connection.cursor()
     with pytest.raises(sqlite3.IntegrityError):
-        execute_with_retry(
+        system.execute_with_retry(
             connection, cursor, "INSERT INTO `config` ( `key`, `value` ) VALUES ( ?,? )", ("test", "value"), commit=True
         )
 
@@ -95,21 +85,21 @@ def test_execute_with_retry_deadlock():
 
 
 @pytest.mark.unit
-def test_retry_on_deadlock_single_executable():
-    if not isinstance(get_system(), DatabaseACESystem):
+def test_retry_on_deadlock_single_executable(system):
+    if not isinstance(system, DatabaseACESystem):
         return
 
-    retry_on_deadlock(Config.__table__.insert().values(key="test", value="value"), commit=True)
-    with get_db() as db:
+    system.retry_on_deadlock(Config.__table__.insert().values(key="test", value="value"), commit=True)
+    with system.get_db() as db:
         assert db.query(Config).filter(Config.key == "test").one().value == "value"
 
 
 @pytest.mark.unit
-def test_retry_on_deadlock_multi_executable():
-    if not isinstance(get_system(), DatabaseACESystem):
+def test_retry_on_deadlock_multi_executable(system):
+    if not isinstance(system, DatabaseACESystem):
         return
 
-    retry_on_deadlock(
+    system.retry_on_deadlock(
         [
             Config.__table__.insert().values(key="test", value="value"),
             Config.__table__.insert().values(key="test2", value="value2"),
@@ -117,17 +107,17 @@ def test_retry_on_deadlock_multi_executable():
         commit=True,
     )
 
-    with get_db() as db:
+    with system.get_db() as db:
         assert db.query(Config).filter(Config.key == "test").one().value == "value"
         assert db.query(Config).filter(Config.key == "test2").one().value == "value2"
 
 
 @pytest.mark.unit
-def test_retry_on_deadlock_rollback():
-    if not isinstance(get_system(), DatabaseACESystem):
+def test_retry_on_deadlock_rollback(system):
+    if not isinstance(system, DatabaseACESystem):
         return
 
-    connection = get_system().engine.raw_connection()
+    connection = system.engine.raw_connection()
     cursor = connection.cursor()
     cursor.execute(
         """CREATE TRIGGER trigger_deadlock BEFORE INSERT ON `config` BEGIN 
@@ -136,7 +126,7 @@ def test_retry_on_deadlock_rollback():
     connection.commit()
 
     with pytest.raises(sqlalchemy.exc.IntegrityError):
-        retry_on_deadlock(
+        system.retry_on_deadlock(
             [
                 Config.__table__.insert().values(key="test", value="value"),
                 Config.__table__.insert().values(key="test2", value="value2"),
@@ -145,33 +135,33 @@ def test_retry_on_deadlock_rollback():
         )
 
     # neither of these should be set since the entire transaction was rolled back
-    with get_db() as db:
+    with system.get_db() as db:
         assert db.query(Config).filter(Config.key == "test").one_or_none() is None
         assert db.query(Config).filter(Config.key == "test2").one_or_none() is None
 
 
 @pytest.mark.unit
-def test_retry_function_on_deadlock():
+def test_retry_function_on_deadlock(system):
     def test_function():
         pass
 
-    retry_function_on_deadlock(test_function)
+    system.retry_function_on_deadlock(test_function)
 
 
 @pytest.mark.unit
-def test_retry_sql_on_deadlock():
-    if not isinstance(get_system(), DatabaseACESystem):
+def test_retry_sql_on_deadlock(system):
+    if not isinstance(system, DatabaseACESystem):
         return
 
-    retry_sql_on_deadlock(Config.__table__.insert().values(key="test", value="value"), commit=True)
+    system.retry_sql_on_deadlock(Config.__table__.insert().values(key="test", value="value"), commit=True)
 
 
 @pytest.mark.unit
-def test_retry_multi_sql_on_deadlock():
-    if not isinstance(get_system(), DatabaseACESystem):
+def test_retry_multi_sql_on_deadlock(system):
+    if not isinstance(system, DatabaseACESystem):
         return
 
-    retry_multi_sql_on_deadlock(
+    system.retry_multi_sql_on_deadlock(
         [
             Config.__table__.insert().values(key="test", value="value"),
             Config.__table__.insert().values(key="test2", value="value2"),
@@ -180,10 +170,10 @@ def test_retry_multi_sql_on_deadlock():
     )
 
 
-@pytest.mark.unit
-def test_retry_decorator():
-    @retry
-    def my_func():
-        pass
+# @pytest.mark.unit
+# def test_retry_decorator():
+# @retry
+# def my_func():
+# pass
 
-    my_func()
+# my_func()

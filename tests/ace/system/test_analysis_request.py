@@ -4,28 +4,10 @@ from operator import attrgetter
 
 import pytest
 
-from ace.analysis import RootAnalysis, Analysis
-from ace.system.analysis_request import (
-    AnalysisRequest,
-    clear_tracking_by_analysis_module_type,
-    delete_analysis_request,
-    get_analysis_request_by_observable,
-    get_analysis_request_by_request_id,
-    get_analysis_requests_by_root,
-    get_expired_analysis_requests,
-    link_analysis_requests,
-    process_expired_analysis_requests,
-    track_analysis_request,
-)
-from ace.system.analysis_module import (
-    AnalysisModuleType,
-    register_analysis_module_type,
-    delete_analysis_module_type,
-)
-from ace.system.analysis_tracking import get_root_analysis
+from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
+from ace.system.analysis_request import AnalysisRequest
 from ace.system.constants import *
 from ace.system.exceptions import InvalidWorkQueueError, UnknownAnalysisModuleTypeError
-from ace.system.work_queue import add_work_queue, get_next_analysis_request
 
 amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600)
 
@@ -35,16 +17,17 @@ TEST_2 = "test_2"
 TEST_OWNER = "test_owner"
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_analysis_request_serialization():
-    root = RootAnalysis()
+async def test_analysis_request_serialization(system):
+    root = system.new_root()
     observable = root.add_observable("test", "1.2.3.4")
     request = observable.create_analysis_request(amt)
 
-    assert request == AnalysisRequest.from_dict(request.to_dict())
-    assert request == AnalysisRequest.from_json(request.to_json())
+    assert request == AnalysisRequest.from_dict(request.to_dict(), system)
+    assert request == AnalysisRequest.from_json(request.to_json(), system)
 
-    other = AnalysisRequest.from_dict(request.to_dict())
+    other = AnalysisRequest.from_dict(request.to_dict(), system)
     assert request.id == other.id
     assert request.observable == other.observable
     assert request.type == other.type
@@ -53,7 +36,7 @@ def test_analysis_request_serialization():
     assert request.original_root == other.original_root
     assert request.modified_root == other.modified_root
 
-    other = AnalysisRequest.from_json(request.to_json())
+    other = AnalysisRequest.from_json(request.to_json(), system)
     assert request.id == other.id
     assert request.observable == other.observable
     assert request.type == other.type
@@ -63,33 +46,37 @@ def test_analysis_request_serialization():
     assert request.modified_root == other.modified_root
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_is_observable_analysis_request():
-    root = RootAnalysis()
+async def test_is_observable_analysis_request(system):
+    root = system.new_root()
     observable = root.add_observable("test", "1.2.3.4")
     request = observable.create_analysis_request(amt)
     assert request.is_observable_analysis_request
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_is_observable_analysis_result():
-    root = RootAnalysis()
+async def test_is_observable_analysis_result(system):
+    root = system.new_root()
     observable = root.add_observable("test", "1.2.3.4")
     request = observable.create_analysis_request(amt)
     request.initialize_result()
     assert request.is_observable_analysis_result
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_is_root_analysis_request():
-    root = RootAnalysis()
+async def test_is_root_analysis_request(system):
+    root = system.new_root()
     request = root.create_analysis_request()
     assert request.is_root_analysis_request
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_request_observables():
-    root = RootAnalysis()
+async def test_request_observables(system):
+    root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = observable.create_analysis_request(amt)
     # request.observables should return the observable in the request
@@ -99,14 +86,15 @@ def test_request_observables():
     assert observables[0].value == TEST_1
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_result_observables():
-    amt = register_analysis_module_type(AnalysisModuleType("test", ""))
-    root = RootAnalysis()
+async def test_result_observables(system):
+    amt = await system.register_analysis_module_type(AnalysisModuleType("test", ""))
+    root = system.new_root()
     observable = root.add_observable("test", TEST_1)
-    root.save()
+    await root.save()
     request = observable.create_analysis_request(amt)
-    root = get_root_analysis(root)
+    root = await system.get_root_analysis(root)
     observable = root.get_observable(observable)
     request.initialize_result()
     analysis = request.modified_observable.add_analysis(type=amt)
@@ -120,173 +108,183 @@ def test_result_observables():
     assert observables[1].value == TEST_2
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_lock_analysis_request():
-    root = RootAnalysis()
+async def test_lock_analysis_request(system):
+    root = system.new_root()
     request = root.create_analysis_request()
-    track_analysis_request(request)
-    assert request.lock()
-    assert not request.lock()
-    assert request.unlock()
-    assert not request.unlock()
-    assert request.lock()
+    await system.track_analysis_request(request)
+    assert await request.lock()
+    assert not await request.lock()
+    assert await request.unlock()
+    assert not await request.unlock()
+    assert await request.lock()
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_track_analysis_request():
-    root = RootAnalysis()
+async def test_track_analysis_request(system):
+    root = system.new_root()
     request = root.create_analysis_request()
-    track_analysis_request(request)
-    assert get_analysis_request_by_request_id(request.id) == request
-    assert get_analysis_requests_by_root(root.uuid) == [request]
-    assert delete_analysis_request(request.id)
-    assert get_analysis_request_by_request_id(request.id) is None
-    assert not get_analysis_requests_by_root(root.uuid)
+    await system.track_analysis_request(request)
+    assert await system.get_analysis_request_by_request_id(request.id) == request
+    assert await system.get_analysis_requests_by_root(root.uuid) == [request]
+    assert await system.delete_analysis_request(request.id)
+    assert await system.get_analysis_request_by_request_id(request.id) is None
+    assert not await system.get_analysis_requests_by_root(root.uuid)
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_get_analysis_request_by_observable():
-    register_analysis_module_type(amt)
-    root = RootAnalysis()
+async def test_get_analysis_request_by_observable(system):
+    await system.register_analysis_module_type(amt)
+    root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = observable.create_analysis_request(amt)
-    track_analysis_request(request)
-    assert get_analysis_request_by_observable(observable, amt) == request
-    assert delete_analysis_request(request.id)
-    assert get_analysis_request_by_observable(observable, amt) is None
+    await system.track_analysis_request(request)
+    assert await system.get_analysis_request_by_observable(observable, amt) == request
+    assert await system.delete_analysis_request(request.id)
+    assert await system.get_analysis_request_by_observable(observable, amt) is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_track_analysis_request_unknown_amt():
+async def test_track_analysis_request_unknown_amt(system):
     unknown_amt = AnalysisModuleType("other", "")
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = observable.create_analysis_request(unknown_amt)
     with pytest.raises(UnknownAnalysisModuleTypeError):
-        track_analysis_request(request)
+        await system.track_analysis_request(request)
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_get_expired_analysis_request():
+async def test_get_expired_analysis_request(system):
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = observable.create_analysis_request(amt)
-    track_analysis_request(request)
+    await system.track_analysis_request(request)
     request.status = TRACKING_STATUS_ANALYZING
-    track_analysis_request(request)
-    assert get_expired_analysis_requests() == [request]
+    await system.track_analysis_request(request)
+    assert await system.get_expired_analysis_requests() == [request]
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_process_expired_analysis_request():
+async def test_process_expired_analysis_request(system):
     # set the request to time out immediately
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = observable.create_analysis_request(amt)
-    track_analysis_request(request)
+    await system.track_analysis_request(request)
     request.status = TRACKING_STATUS_ANALYZING
-    track_analysis_request(request)
-    assert get_expired_analysis_requests() == [request]
-    add_work_queue(amt.name)
-    process_expired_analysis_requests(amt)
-    request = get_analysis_request_by_request_id(request.id)
+    await system.track_analysis_request(request)
+    assert await system.get_expired_analysis_requests() == [request]
+    await system.add_work_queue(amt.name)
+    await system.process_expired_analysis_requests(amt)
+    request = await system.get_analysis_request_by_request_id(request.id)
     assert request.status == TRACKING_STATUS_QUEUED
-    assert not get_expired_analysis_requests()
+    assert not await system.get_expired_analysis_requests()
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_process_expired_analysis_request_invalid_work_queue():
+async def test_process_expired_analysis_request_invalid_work_queue(system):
     # test what happens when we're processing an expired analyiss request for a module type that has been deleted
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = observable.create_analysis_request(amt)
-    track_analysis_request(request)
+    await system.track_analysis_request(request)
     request.status = TRACKING_STATUS_ANALYZING
-    track_analysis_request(request)
-    assert get_expired_analysis_requests() == [request]
-    delete_analysis_module_type(amt)
-    process_expired_analysis_requests(amt)
-    assert get_analysis_request_by_request_id(request.id) is None
-    assert not get_expired_analysis_requests()
+    await system.track_analysis_request(request)
+    assert await system.get_expired_analysis_requests() == [request]
+    await system.delete_analysis_module_type(amt)
+    await system.process_expired_analysis_requests(amt)
+    assert await system.get_analysis_request_by_request_id(request.id) is None
+    assert not await system.get_expired_analysis_requests()
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_is_cachable():
+async def test_is_cachable(system):
     amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=0, cache_ttl=600)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     assert observable.create_analysis_request(amt).is_cachable
     assert not root.create_analysis_request().is_cachable
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_clear_tracking_by_analysis_module_type():
+async def test_clear_tracking_by_analysis_module_type(system):
     amt = AnalysisModuleType("test", "")
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     request = observable.create_analysis_request(amt)
-    track_analysis_request(request)
+    await system.track_analysis_request(request)
 
-    assert get_analysis_request_by_request_id(request.id)
-    clear_tracking_by_analysis_module_type(amt)
-    assert get_analysis_request_by_request_id(request.id) is None
+    assert await system.get_analysis_request_by_request_id(request.id)
+    await system.clear_tracking_by_analysis_module_type(amt)
+    assert await system.get_analysis_request_by_request_id(request.id) is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_link_analysis_requests():
+async def test_link_analysis_requests(system):
     amt = AnalysisModuleType("test", "")
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     source_request = observable.create_analysis_request(amt)
-    track_analysis_request(source_request)
+    await system.track_analysis_request(source_request)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     dest_request = observable.create_analysis_request(amt)
-    track_analysis_request(dest_request)
+    await system.track_analysis_request(dest_request)
 
-    assert link_analysis_requests(source_request, dest_request)
+    assert await system.link_analysis_requests(source_request, dest_request)
 
     # attempting to link against a locked request fails
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     source_request = observable.create_analysis_request(amt)
-    track_analysis_request(source_request)
-    assert source_request.lock()
+    await system.track_analysis_request(source_request)
+    assert await source_request.lock()
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     dest_request = observable.create_analysis_request(amt)
-    track_analysis_request(dest_request)
+    await system.track_analysis_request(dest_request)
 
-    assert not link_analysis_requests(source_request, dest_request)
+    assert not await system.link_analysis_requests(source_request, dest_request)
 
     # attempting to link against a deleted request fails
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     source_request = observable.create_analysis_request(amt)
-    track_analysis_request(source_request)
-    delete_analysis_request(source_request)
+    await system.track_analysis_request(source_request)
+    await system.delete_analysis_request(source_request)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("test", "test")
     dest_request = observable.create_analysis_request(amt)
-    track_analysis_request(dest_request)
+    await system.track_analysis_request(dest_request)
 
-    assert not link_analysis_requests(source_request, dest_request)
+    assert not await system.link_analysis_requests(source_request, dest_request)

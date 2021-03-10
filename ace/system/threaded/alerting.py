@@ -7,29 +7,29 @@ import threading
 from typing import Union, Any, Optional
 
 from ace.analysis import RootAnalysis
-from ace.system.alerting import AlertTrackingInterface
+from ace.system import ACESystem
 from ace.system.exceptions import UnknownAlertSystemError
 
 
-class ThreadedAlertTrackingInterface(AlertTrackingInterface):
+class ThreadedAlertTrackingInterface(ACESystem):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.alert_systems = {}  # key = system name, value = queue.Queue(of RootAnalysis.uuid)
-        self.sync_lock = threading.RLock()
+        self.alert_sync_lock = threading.RLock()
 
-    def register_alert_system(self, name: str) -> bool:
-        with self.sync_lock:
+    async def i_register_alert_system(self, name: str) -> bool:
+        with self.alert_sync_lock:
             if name in self.alert_systems:
                 return False
 
             self.alert_systems[name] = queue.Queue()
             return True
 
-    def unregister_alert_system(self, name: str) -> bool:
-        with self.sync_lock:
+    async def i_unregister_alert_system(self, name: str) -> bool:
+        with self.alert_sync_lock:
             return self.alert_systems.pop(name, None) is not None
 
-    def submit_alert(self, root_uuid: str) -> bool:
+    async def i_submit_alert(self, root_uuid: str) -> bool:
         assert isinstance(root_uuid, str) and root_uuid
 
         result = False
@@ -39,7 +39,7 @@ class ThreadedAlertTrackingInterface(AlertTrackingInterface):
 
         return result
 
-    def get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
+    async def i_get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
         assert isinstance(name, str) and str
         assert timeout is None or isinstance(timeout, int) and timeout >= 0
         result = []
@@ -56,12 +56,13 @@ class ThreadedAlertTrackingInterface(AlertTrackingInterface):
 
         return result
 
-    def get_alert_count(self, name: str) -> int:
+    async def i_get_alert_count(self, name: str) -> int:
         assert isinstance(name, str) and str
         try:
             return self.alert_systems[name].qsize()
         except KeyError:
             raise UnknownAlertSystemError(name)
 
-    def reset(self):
+    async def reset(self):
+        await super().reset()
         self.alert_systems = {}

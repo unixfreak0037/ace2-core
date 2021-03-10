@@ -6,7 +6,6 @@ import shutil
 import pytest
 
 from ace.analysis import RootAnalysis, AnalysisModuleType, Analysis
-from ace.system.analysis_tracking import get_root_analysis
 from ace.time import utc_now
 
 

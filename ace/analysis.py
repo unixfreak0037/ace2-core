@@ -78,7 +78,7 @@ class DetectionPoint:
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, detection_point: Optional["DetectionPoint"] = None, _cls_map=None) -> "DetectionPoint":
+    def from_dict(value: dict, detection_point: Optional["DetectionPoint"] = None) -> "DetectionPoint":
         assert isinstance(value, dict)
         assert detection_point is None or isinstance(detection_point, DetectionPoint)
         data = DetectionPointModel(**value)
@@ -126,7 +126,7 @@ class DetectableObject(MergableObject):
         assert detectable_object is None or isinstance(detectable_object, DetectableObject)
         data = DetectableObjectModel(**value)
         result = detectable_object or DetectableObject()
-        result.detectables = [DetectionPoint.from_dict(_.dict()) for _ in data.detections]
+        result.detections = [DetectionPoint.from_dict(_.dict()) for _ in data.detections]
         return result
 
     @staticmethod
@@ -332,22 +332,14 @@ class AnalysisModuleType:
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, _cls_map=None) -> "AnalysisModuleType":
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
+    def from_dict(value: dict) -> "AnalysisModuleType":
         data = AnalysisModuleTypeModel(**value)
-        return _cls_map["AnalysisModuleType"](**data.dict())
+        return AnalysisModuleType(**data.dict())
 
     @staticmethod
-    def from_json(value: str, _cls_map=None) -> "AnalysisModuleType":
+    def from_json(value: str) -> "AnalysisModuleType":
         assert isinstance(value, str)
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
-        return _cls_map["AnalysisModuleType"].from_dict(
-            AnalysisModuleTypeModel.parse_raw(value).dict(), _cls_map=_cls_map
-        )
+        return AnalysisModuleType.from_dict(AnalysisModuleTypeModel.parse_raw(value).dict())
 
     # ========================================================================
 
@@ -364,18 +356,11 @@ class AnalysisModuleType:
             and sorted(self.extended_version) == sorted(amt.extended_version)
         )
 
-    @property
-    def required_manual_directive(self) -> Union[str, None]:
-        """Returns the directive that is required on the observable if manual is set to True."""
-        if not self.manual:
-            return None
-
-        return f"manual:{self.name}"
-
-    def accepts(self, observable: Observable) -> bool:
-        from ace.system.analysis_module import get_analysis_module_type
-
+    async def accepts(self, observable: Observable, system: "ACESystem") -> bool:
         assert isinstance(observable, Observable)
+        from ace.system import ACESystem
+
+        assert isinstance(system, ACESystem)
 
         # has this module been requested?
         if observable.is_requested(self):
@@ -412,7 +397,7 @@ class AnalysisModuleType:
 
         # AND (this is correct)
         for dep in self.dependencies:
-            amt = get_analysis_module_type(dep)
+            amt = await system.get_analysis_module_type(dep)
             if amt is None:
                 get_logger().debug(f"{observable} has unknown dependency {dep}")
                 return False
@@ -511,7 +496,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
         # if we passed the details in on the constructor then we set it here
         # which also updates the _details_modified
         if details:
-            self.details = details
+            self.set_details(details)
 
         # the observable this Analysis is for
         self.observable_id = observable.uuid if observable else None
@@ -529,12 +514,10 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
 
     # --------------------------------------------------------------------------------
 
-    def save(self) -> bool:
+    async def save(self) -> bool:
         """Saves the current results of the Analysis."""
-        from ace.system.analysis_tracking import track_analysis_details
-
         if self._details_modified:
-            if track_analysis_details(self.root, self.uuid, self._details):
+            if await self.root.system.track_analysis_details(self.root, self.uuid, self._details):
                 self._details_modified = False
                 return True
             else:
@@ -542,27 +525,33 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
         else:
             return False
 
-    def flush(self):
+    async def flush(self):
         """Calls save() and then clears the details property.  It must be load()ed again."""
-        self.save()
+        await self.save()
         self._details = None
 
-    @property
-    def details(self):
+    async def get_details(self):
         # do we already have the details loaded or set?
         if self._details is not None:
             return self._details
 
         # load the external details and return those results
-        self._load_details()
+        await self._load_details()
         return self._details
 
-    @details.setter
-    def details(self, value):
+    def set_details(self, value):
         self._details = value
         self._details_modified = True
 
-    def _load_details(self):
+    @property
+    def details(self):
+        raise RuntimeError()
+
+    @details.setter
+    def details(self, value):
+        raise RuntimeError()
+
+    async def _load_details(self):
         """Returns the details referenced by this object as a dict or None if the operation failed."""
         # NOTE you should never call this directly
         # this is called whenever .details is requested and it hasn't been loaded yet
@@ -574,9 +563,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
             get_logger().warning("called _load_details() after details was already set")
 
         try:
-            from ace.system.analysis_tracking import get_analysis_details
-
-            self._details = get_analysis_details(self.uuid)
+            self._details = await self.root.system.get_analysis_details(self.uuid)
             self._details_modified = False
 
             if self._details is None:
@@ -613,24 +600,19 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(
-        value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None
-    ) -> "Analysis":
+    def from_dict(value: dict, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
         assert isinstance(value, dict)
         assert isinstance(root, RootAnalysis)
         assert analysis is None or isinstance(analysis, Analysis)
 
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
-        result = analysis or _cls_map["Analysis"](root=root)
+        result = analysis or Analysis(root=root)
         result = TaggableObject.from_dict(value, result)
         result = DetectableObject.from_dict(value, result)
 
         data = AnalysisModel(**value)
 
         if data.type:
-            result.type = _cls_map["AnalysisModuleType"].from_dict(data.type.dict())
+            result.type = AnalysisModuleType.from_dict(data.type.dict())
 
         # if value[Analysis.KEY_TYPE]:
         # result.type = AnalysisModuleType.from_dict(value[Analysis.KEY_TYPE])
@@ -648,7 +630,7 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
         if data.details is not None:
             result._details = data.details
             result._details_loaded = False
-            result._details_modified = True  # XXX ??? I think this is right
+            result._details_modified = True
 
         result.error_message = data.error_message
         result.stack_trace = data.stack_trace
@@ -657,12 +639,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
         return result
 
     @staticmethod
-    def from_json(value: str, root: "RootAnalysis", analysis: Optional["Analysis"] = None, _cls_map=None) -> "Analysis":
+    def from_json(value: str, root: "RootAnalysis", analysis: Optional["Analysis"] = None) -> "Analysis":
         assert isinstance(value, str)
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
-        return _cls_map["Analysis"].from_dict(AnalysisModel.parse_raw(value).dict(), root, analysis, _cls_map=_cls_map)
+        return Analysis.from_dict(AnalysisModel.parse_raw(value).dict(), root, analysis)
 
     # =========================================================================
 
@@ -693,8 +672,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
 
     def has_observable(self, o_or_o_type=None, o_value=None):
         """Returns True if this Analysis has this Observable.  Accepts a single Observable or o_type, o_value."""
-        from ace.system.observables import create_observable
-
         if isinstance(o_or_o_type, Observable):
             return o_or_o_type in self.observables
         else:
@@ -825,8 +802,6 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
 
     def add_observable(self, o_or_o_type: Union[Observable, str], *args, **kwargs) -> "Observable":
         """Adds the Observable to this Analysis.  Returns the Observable object, or the one that already existed."""
-        from ace.system.observables import create_observable
-
         assert isinstance(o_or_o_type, Observable) or isinstance(o_or_o_type, str)
 
         # if we passed a string as the first parameter then it's the type
@@ -844,12 +819,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
 
         return observable
 
-    # XXX this functionality belongs to the API
-    def add_file(self, path: str, **kwargs) -> "Observable":
+    async def add_file(self, path: str, **kwargs) -> "Observable":
         """Utility function that adds a file observable to the root analysis by passing a path to the file."""
-        from ace.system.storage import save_file
-
-        return self.add_observable("file", save_file(path, roots=[self.uuid], **kwargs))
+        return self.add_observable("file", await self.root.system.save_file(path, roots=[self.uuid], **kwargs))
 
     def __str__(self):
         return f"Analysis({self.uuid},{self.type},{self.observable})"
@@ -925,11 +897,6 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         get_logger().debug(f"tracking analysis request {ar} for {self}")
         self.request_tracking[ar.type.name] = ar.id
 
-    # XXX not sure we use this
-    def matches(self, value):
-        """Returns True if the given value matches this value of this observable.  This can be overridden to provide more advanced matching such as CIDR for ipv4."""
-        return self.value == value
-
     #
     # json serialization
     #
@@ -964,19 +931,12 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(
-        value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None
-    ) -> "Observable":
+    def from_dict(value: dict, root: "RootAnalysis", observable: Optional["Observable"] = None) -> "Observable":
         assert isinstance(value, dict)
         assert isinstance(root, RootAnalysis)
         assert observable is None or isinstance(observable, Observable)
 
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
         data = ObservableModel(**value)
-
-        from ace.system.observables import create_observable
 
         observable = observable or create_observable(data.type, data.value, root=root)
         observable = TaggableObject.from_dict(value, observable)
@@ -987,7 +947,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         observable.time = data.time
         observable.value = data.value
         observable.analysis = {
-            key: _cls_map["Analysis"].from_dict(analysis.dict(), root=root) for key, analysis in data.analysis.items()
+            key: Analysis.from_dict(analysis.dict(), root=root) for key, analysis in data.analysis.items()
         }
         observable.directives = data.directives
         observable._redirection = data.redirection
@@ -1002,16 +962,10 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return observable
 
     @staticmethod
-    def from_json(
-        value: str, root: "RootAnalysis", observable: Optional["Observable"] = None, _cls_map=None
-    ) -> "Observable":
+    def from_json(value: str, root: "RootAnalysis", observable: Optional["Observable"] = None) -> "Observable":
         assert isinstance(value, str)
-        if _cls_map is None:
-            _cls_map = default_cls_map()
 
-        return _cls_map["Observable"].from_dict(
-            ObservableModel.parse_raw(value).dict(), root, observable, _cls_map=_cls_map
-        )
+        return Observable.from_dict(ObservableModel.parse_raw(value).dict(), root, observable)
 
     # ========================================================================
 
@@ -1434,7 +1388,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
                 existing_analysis = self.add_analysis(
                     type=analysis.type,
                     root=self.root,
-                    details=analysis.details,
+                    details=analysis._details,
                     error_message=analysis.error_message,
                     stack_trace=analysis.stack_trace,
                 )
@@ -1511,7 +1465,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             if after_analysis:
                 target_analysis = self.add_analysis(
                     type=type,
-                    details=after_analysis.details,
+                    details=after_analysis._details,  # XXX make sure this is right
                     summary=after_analysis.summary,
                     error_message=after_analysis.error_message,
                     stack_trace=after_analysis.stack_trace,
@@ -1524,7 +1478,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         """Creates and returns a new ace.system.analysis_request.AnalysisRequest object from this Observable."""
         from ace.system.analysis_request import AnalysisRequest
 
-        return AnalysisRequest(root=self.root, observable=self, type=amt)
+        return AnalysisRequest(self.root.system, root=self.root, observable=self, type=amt)
 
     def __str__(self):
         if self.time is not None:
@@ -1564,6 +1518,50 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         return self.type < other.type
 
 
+class ObservableFactory:
+    """Base class that generates observables."""
+
+    def create_observable(self, type: str, *args, **kwargs) -> Observable:
+        if type == "file":
+            return FileObservable(*args, **kwargs)
+        else:
+            return Observable(type, *args, **kwargs)
+
+
+global_observable_factory = ObservableFactory()
+
+
+def set_global_observable_factory(factory: ObservableFactory):
+    assert isinstance(factory, ObservableFactory)
+    global global_observable_factory
+    global_observable_factory = factory
+
+
+def create_observable(type: str, *args, **kwargs) -> Observable:
+    return global_observable_factory.create_observable(type, *args, **kwargs)
+
+
+class FileObservable(Observable):
+    def __init__(self, *args, **kwargs):
+        super().__init__("file", *args, **kwargs)
+        self._loaded = False
+        self.meta = None
+        self.path = None
+
+    async def load(self) -> bool:
+        """Downloads the contents of the file to the local file system."""
+        if self._loaded:
+            return True
+
+        # make sure a local storage directory has been created
+        self.root.initialize_storage()
+        # store the contents of the file inside this directory named after the hash
+        self.path = os.path.join(self.root.storage_dir, self.value)
+        self.meta = await self.root.system.storage.load_file(self.value, path=self.path)
+        self._loaded = self.meta is not None
+        return self._loaded
+
+
 class RootAnalysis(Analysis, MergableObject):
     """Root analysis object."""
 
@@ -1588,6 +1586,7 @@ class RootAnalysis(Analysis, MergableObject):
         instructions=None,
         version=None,
         expires=None,
+        system=None,
         *args,
         **kwargs,
     ):
@@ -1644,7 +1643,7 @@ class RootAnalysis(Analysis, MergableObject):
 
         self._details = None
         if details:
-            self.details = details
+            self.set_details(details)
 
         self._storage_dir = None
         if storage_dir:
@@ -1670,6 +1669,10 @@ class RootAnalysis(Analysis, MergableObject):
         self._expires = False
         if expires is not None:
             self.expires = expires
+
+        self.system = None
+        if system is not None:
+            self.system = system
 
     #
     # json serialization
@@ -1717,22 +1720,18 @@ class RootAnalysis(Analysis, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, _cls_map=None) -> "RootAnalysis":
+    def from_dict(value: dict, system: Optional["ACESystem"] = None) -> "RootAnalysis":
         assert isinstance(value, dict)
-
-        if _cls_map is None:
-            _cls_map = default_cls_map()
-
         data = RootAnalysisModel(**value)
 
-        root = _cls_map["RootAnalysis"]()
+        root = RootAnalysis(system=system)
         root.observable_store = {
             # XXX should probably be using create_observable here, eh?
-            id: _cls_map["Observable"].from_dict(observable.dict(), root=root)
+            id: Observable.from_dict(observable.dict(), root=root)
             for id, observable in data.observable_store.items()
         }
 
-        root = _cls_map["Analysis"].from_dict(value, root, analysis=root)
+        root = Analysis.from_dict(value, root, analysis=root)
 
         root._analysis_mode = data.analysis_mode
         root._uuid = data.uuid
@@ -1752,12 +1751,14 @@ class RootAnalysis(Analysis, MergableObject):
         return root
 
     @staticmethod
-    def from_json(value: str, _cls_map=None) -> "RootAnalysis":
+    def from_json(value: str, system: Optional["ACESystem"] = None) -> "RootAnalysis":
         assert isinstance(value, str)
-        if _cls_map is None:
-            _cls_map = default_cls_map()
+        return RootAnalysis.from_dict(RootAnalysisModel.parse_raw(value).dict(), system)
 
-        return _cls_map["RootAnalysis"].from_dict(RootAnalysisModel.parse_raw(value).dict(), _cls_map=_cls_map)
+    def copy(self) -> "RootAnalysis":
+        """Returns a copy of this RootAnalysis object."""
+        # similar to copy.deepcopy but uses the json serialization to do it
+        return RootAnalysis.from_dict(self.to_dict(), system=self.system)
 
     # ========================================================================
 
@@ -1883,10 +1884,8 @@ class RootAnalysis(Analysis, MergableObject):
         assert isinstance(value, bool)
         self._expires = value
 
-    def is_expired(self):
+    async def is_expired(self):
         """Returns True if this root has expired."""
-        from ace.system.analysis_request import get_analysis_requests_by_root
-
         # is it set to expire
         if not self.expires:
             return False
@@ -1896,7 +1895,7 @@ class RootAnalysis(Analysis, MergableObject):
             return False
 
         # are there any outstanding analysis requests?
-        if get_analysis_requests_by_root(self.uuid):
+        if await self.system.get_analysis_requests_by_root(self.uuid):
             return False
 
         return True
@@ -2004,26 +2003,22 @@ class RootAnalysis(Analysis, MergableObject):
         get_logger().debug("recorded observable {} with id {}".format(observable, observable.uuid))
         return observable
 
-    def save(self) -> bool:
+    async def save(self) -> bool:
         """Tracks or updates this root. Returns True if successful, False otherwise."""
-        from ace.system.analysis_tracking import track_root_analysis
-
-        if not track_root_analysis(self):
+        if not await self.system.track_root_analysis(self):
             return False
 
         for analysis in self.all_analysis:
             if analysis is not self:
-                analysis.save()
+                await analysis.save()
 
         # save our own details
-        Analysis.save(self)
+        await Analysis.save(self)
         return True
 
-    def update(self) -> bool:
+    async def update(self) -> bool:
         """Loads and merges any changes made to this root. Returns True if successful, False otherwise."""
-        from ace.system.analysis_tracking import get_root_analysis
-
-        existing_root = get_root_analysis(self)
+        existing_root = await self.system.get_root_analysis(self)
         if not existing_root:
             return False
 
@@ -2034,19 +2029,16 @@ class RootAnalysis(Analysis, MergableObject):
         self.version = existing_root.version
         return True
 
-    def update_and_save(self) -> bool:
+    async def update_and_save(self) -> bool:
         """Calls RootAnalysis.save() in a loop until it is accepted. When the
         call to save() fails, the most recent of the root is acquired and
         merged into this root."""
-
-        from ace.system.analysis_tracking import get_root_analysis
-
         for _ in range(100):  # safer way to do a while True:
-            if self.save():
+            if await self.save():
                 return True
 
             get_logger().debug(f"sync iteration {_}")
-            modified_root = get_root_analysis(self)
+            modified_root = await self.system.get_root_analysis(self)
             if modified_root.version == self.version:
                 raise RuntimeError("RootAnalysis.save() failed but version matches -- check logs for issues")
 
@@ -2061,6 +2053,7 @@ class RootAnalysis(Analysis, MergableObject):
         if self.discard():
             get_logger().warning(f"discard() was not called on {self}")
 
+    # XXX this should be async as well
     def discard(self) -> bool:
         """Discards a local RootAnalysis object. This has the effect of
         deleting the storage directory for this analysis, which deletes any
@@ -2077,9 +2070,9 @@ class RootAnalysis(Analysis, MergableObject):
 
     def __str__(self):
         if self.storage_dir:
-            return f"RootAnalysis({self.uuid}) @ {self.storage_dir}"
+            return f"RootAnalysis({self.uuid}) version ({self.version}) storage ({self.storage_dir})"
         else:
-            return f"RootAnalysis({self.uuid})"
+            return f"RootAnalysis({self.uuid}) version ({self.version})"
 
     def __eq__(self, other):
         """Two RootAnalysis objects are equal if the uuid and version is equal."""
@@ -2196,13 +2189,11 @@ class RootAnalysis(Analysis, MergableObject):
         """Creates and returns a new ace.system.analysis_request.AnalysisRequest object from this RootAnalysis."""
         from ace.system.analysis_request import AnalysisRequest
 
-        return AnalysisRequest(self)
+        return AnalysisRequest(self.system, self)
 
-    def submit(self):
+    async def submit(self):
         """Submits this RootAnalysis for analysis."""
-        from ace.system.analysis_request import submit_analysis_request
-
-        return submit_analysis_request(self.create_analysis_request())
+        return await self.system.submit_analysis_request(self.create_analysis_request())
 
     def all_analysis_completed(self) -> bool:
         """Returns True if all analysis has been completed for this root."""
@@ -2359,12 +2350,3 @@ def recurse_tree(target: Union[Observable, Analysis], callback):
                     _recurse(analysis, callback)
 
     _recurse(target, callback)
-
-
-def default_cls_map() -> dict:
-    return {
-        "Analysis": Analysis,
-        "AnalysisModuleType": AnalysisModuleType,
-        "Observable": Observable,
-        "RootAnalysis": RootAnalysis,
-    }

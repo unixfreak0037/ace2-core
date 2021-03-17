@@ -8,7 +8,6 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
-from ace.api import get_api
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable, Analysis
 
 DEFAULT_ASYNC_LIMIT = 3  # XXX ???
@@ -41,9 +40,6 @@ class AnalysisModule:
 
         if timeout:
             self.timeout = timeout
-
-    # def register(self) -> AnalysisModuleType:
-    # return get_api().register_analysis_module_type(self.type)
 
     def is_async(self) -> bool:
         return inspect.iscoroutinefunction(self.execute_analysis)

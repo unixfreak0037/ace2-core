@@ -1,4 +1,4 @@
-SQLAlchemy
+SQLAlchemy<1.4
 aiofiles
 fastapi[all]
 httpx
@@ -9,3 +9,4 @@ pytz
 redis
 tld
 tzlocal
+pycryptodome

@@ -3,28 +3,41 @@
 
 import io
 
-from contextlib import contextmanager
-from typing import Union, Any, Optional
+from contextlib import asynccontextmanager
+from typing import Union, Any, Optional, AsyncGenerator
 
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable
+from ace.data_model import ContentMetadata, Event, ConfigurationSetting
+from ace.system import ACESystem
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.events import EventHandler
-from ace.system.storage import ContentMetadata
 
 
 class AceAPI:
+    def __init__(self, system: ACESystem, api_key: str = None):
+        assert isinstance(system, ACESystem)
+        self.system = system
+        self.api_key = api_key
 
-    # arguments to whatever is used by the api client constructor
-    client_args = []
-    client_kwargs = {}
-
-    @contextmanager
+    @asynccontextmanager
     async def get_client(self):
         """Returns whatever should be used as the API connection to the remote service."""
         raise NotImplementedError()
 
     # alerting
-    async def track_alert(self, root: RootAnalysis):
+    async def register_alert_system(self, name: str) -> bool:
+        raise NotImplementedError()
+
+    async def unregister_alert_system(self, name: str) -> bool:
+        raise NotImplementedError()
+
+    async def submit_alert(self, root: Union[RootAnalysis, str]) -> bool:
+        raise NotImplementedError()
+
+    async def get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
+        raise NotImplementedError()
+
+    async def get_alert_count(self, name: str) -> int:
         raise NotImplementedError()
 
     # analysis module
@@ -47,6 +60,12 @@ class AceAPI:
 
     # analysis request
     async def track_analysis_request(self, request: AnalysisRequest):
+        raise NotImplementedError()
+
+    async def lock_analysis_request(self, request: AnalysisRequest) -> bool:
+        raise NotImplementedError()
+
+    async def unlock_analysis_request(self, request: AnalysisRequest) -> bool:
         raise NotImplementedError()
 
     async def link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest):
@@ -98,7 +117,13 @@ class AceAPI:
     async def track_root_analysis(self, root: RootAnalysis):
         raise NotImplementedError()
 
+    async def update_root_analysis(self, root: RootAnalysis) -> bool:
+        raise NotImplementedError()
+
     async def delete_root_analysis(self, root: Union[RootAnalysis, str]) -> bool:
+        raise NotImplementedError()
+
+    async def root_analysis_exists(self, root: Union[RootAnalysis, str]) -> bool:
         raise NotImplementedError()
 
     async def get_analysis_details(self, uuid: str) -> Any:
@@ -108,6 +133,9 @@ class AceAPI:
         raise NotImplementedError()
 
     async def delete_analysis_details(self, uuid: str) -> bool:
+        raise NotImplementedError()
+
+    async def analysis_details_exists(self, uuid: str) -> bool:
         raise NotImplementedError()
 
     # caching
@@ -131,10 +159,12 @@ class AceAPI:
         raise NotImplementedError()
 
     # config
-    async def get_config(self, key: str, default: Optional[Any] = None) -> Any:
+    async def get_config(
+        self, key: str, default: Optional[Any] = None, env: Optional[str] = None
+    ) -> ConfigurationSetting:
         raise NotImplementedError()
 
-    async def set_config(self, key: str, value: Any):
+    async def set_config(self, key: str, value: Any, documentation: Optional[str] = None):
         raise NotImplementedError()
 
     # events
@@ -147,11 +177,7 @@ class AceAPI:
     async def get_event_handlers(self, event: str) -> list[EventHandler]:
         raise NotImplementedError()
 
-    async def fire_event(self, event: str, *args, **kwargs):
-        raise NotImplementedError()
-
-    # observables
-    async def create_observable(self, type: str, *args, **kwargs) -> Observable:
+    async def fire_event(self, event: Event):
         raise NotImplementedError()
 
     # processing
@@ -165,7 +191,7 @@ class AceAPI:
     async def get_content_bytes(self, sha256: str) -> Union[bytes, None]:
         raise NotImplementedError()
 
-    async def get_content_stream(self, sha256: str) -> Union[io.IOBase, None]:
+    async def iter_content(self, sha256: str, buffer_size: int) -> Union[AsyncGenerator[bytes, None], None]:
         raise NotImplementedError()
 
     async def get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:

@@ -10,6 +10,9 @@ from ace.system.constants import (
     ERROR_AR_EXPIRED,
     ERROR_AR_LOCKED,
     ERROR_AR_UNKNOWN,
+    ERROR_AUTH_INVALID_PASSWORD,
+    ERROR_AUTH_MISSING_ENCRYPTION_SETTINGS,
+    ERROR_AUTH_DUPLICATE_API_KEY_NAME,
     ERROR_OBS_UNKNOWN,
     ERROR_ROOT_EXISTS,
     ERROR_ROOT_UNKNOWN,
@@ -108,6 +111,25 @@ class UnknownRootAnalysisError(ValueError):
     # super().__init__(f"unknown RootAnalysis {uuid}")
 
 
+class MissingEncryptionSettingsError(RuntimeError):
+    """Raised when an attempt to perform an operation requiring crypto is
+    attempted before encryption settings are available."""
+
+    code = ERROR_AUTH_MISSING_ENCRYPTION_SETTINGS
+
+
+class InvalidPasswordError(Exception):
+    """Thrown when an invalid password is provided."""
+
+    code = ERROR_AUTH_INVALID_PASSWORD
+
+
+class DuplicateApiKeyNameError(Exception):
+    """An attempt was made to create an api key that already exists."""
+
+    code = ERROR_AUTH_DUPLICATE_API_KEY_NAME
+
+
 exception_map = {
     ERROR_AMS_UNKNOWN: UnknownAlertSystemError,
     ERROR_AMT_CIRC: CircularDependencyError,
@@ -118,6 +140,9 @@ exception_map = {
     ERROR_AR_EXPIRED: ExpiredAnalysisRequestError,
     ERROR_AR_LOCKED: AnalysisRequestLockedError,
     ERROR_AR_UNKNOWN: UnknownAnalysisRequestError,
+    ERROR_AUTH_DUPLICATE_API_KEY_NAME: DuplicateApiKeyNameError,
+    ERROR_AUTH_INVALID_PASSWORD: InvalidPasswordError,
+    ERROR_AUTH_MISSING_ENCRYPTION_SETTINGS: MissingEncryptionSettingsError,
     ERROR_OBS_UNKNOWN: UnknownObservableError,
     ERROR_ROOT_EXISTS: RootAnalysisExistsError,
     ERROR_ROOT_UNKNOWN: UnknownRootAnalysisError,

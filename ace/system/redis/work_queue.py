@@ -4,11 +4,9 @@ import json
 
 from typing import Union, Optional
 
-from ace.system import ACESystemInterface
+from ace.system import ACESystem
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.exceptions import UnknownAnalysisModuleTypeError
-from ace.system.redis import CONFIG_REDIS_DB, CONFIG_REDIS_PORT, CONFIG_REDIS_HOST, get_redis_connection
-from ace.system.work_queue import WorkQueueManagerInterface
 from ace.time import utc_now
 
 #
@@ -26,12 +24,9 @@ def get_queue_name(name: str) -> str:
     return f"work_queue:{name}"
 
 
-class RedisWorkQueueManagerInterface(WorkQueueManagerInterface):
-
-    redis_connection = get_redis_connection
-
-    def delete_work_queue(self, name: str) -> bool:
-        with self.redis_connection() as rc:
+class RedisWorkQueueManagerInterface(ACESystem):
+    async def i_delete_work_queue(self, name: str) -> bool:
+        with self.get_redis_connection() as rc:
             # this has to exist for the queue to exist
             result = rc.delete(get_marker_name(name))
             # the actual queue may or may not exist
@@ -39,21 +34,21 @@ class RedisWorkQueueManagerInterface(WorkQueueManagerInterface):
 
         return result == 1
 
-    def add_work_queue(self, name: str) -> bool:
-        with self.redis_connection() as rc:
+    async def i_add_work_queue(self, name: str) -> bool:
+        with self.get_redis_connection() as rc:
             # this has to exist for the queue to exist
             return rc.setnx(get_marker_name(name), str(utc_now())) == 1
             # NOTE we don't add the actual queue because you can't add an empty list
 
-    def put_work(self, amt: str, analysis_request: AnalysisRequest):
-        with self.redis_connection() as rc:
+    async def i_put_work(self, amt: str, analysis_request: AnalysisRequest):
+        with self.get_redis_connection() as rc:
             if not rc.exists(get_marker_name(amt)):
                 raise UnknownAnalysisModuleTypeError()
 
             rc.rpush(get_queue_name(amt), analysis_request.to_json())
 
-    def get_work(self, amt: str, timeout: float) -> Union[AnalysisRequest, None]:
-        with self.redis_connection() as rc:
+    async def i_get_work(self, amt: str, timeout: float) -> Union[AnalysisRequest, None]:
+        with self.get_redis_connection() as rc:
             if not rc.exists(get_marker_name(amt)):
                 raise UnknownAnalysisModuleTypeError()
 
@@ -64,7 +59,7 @@ class RedisWorkQueueManagerInterface(WorkQueueManagerInterface):
                 if result is None:
                     return None
 
-                return AnalysisRequest.from_json(result.decode())
+                return AnalysisRequest.from_json(result.decode(), system=self)
 
             else:
                 # if we have a timeout when we use BLPOP
@@ -74,10 +69,10 @@ class RedisWorkQueueManagerInterface(WorkQueueManagerInterface):
 
                 # this can return a tuple of results (key, item1, item2, ...)
                 _, result = result
-                return AnalysisRequest.from_json(result.decode())
+                return AnalysisRequest.from_json(result.decode(), system=self)
 
-    def get_queue_size(self, amt: str) -> int:
-        with self.redis_connection() as rc:
+    async def i_get_queue_size(self, amt: str) -> int:
+        with self.get_redis_connection() as rc:
             if not rc.exists(get_marker_name(amt)):
                 raise UnknownAnalysisModuleTypeError()
 

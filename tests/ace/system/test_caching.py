@@ -4,18 +4,8 @@ import datetime
 
 import pytest
 
-from ace.analysis import RootAnalysis, Observable
-
-from ace.system.analysis_module import AnalysisModuleType, register_analysis_module_type
-from ace.system.caching import (
-    generate_cache_key,
-    cache_analysis_result,
-    get_cached_analysis_result,
-    get_total_cache_size,
-    delete_expired_cached_analysis_results,
-    delete_cached_analysis_results_by_module_type,
-)
-from ace.system.work_queue import get_next_analysis_request
+from ace.analysis import RootAnalysis, Observable, AnalysisModuleType
+from ace.system.caching import generate_cache_key
 
 amt_1 = AnalysisModuleType(name="test_1", description="test_1", cache_ttl=600)
 
@@ -110,78 +100,83 @@ def test_generate_cache_invalid_parameters(observable, amt):
     assert generate_cache_key(observable, amt) is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_cache_analysis_result():
-    root = RootAnalysis()
+async def test_cache_analysis_result(system):
+    root = system.new_root()
     observable = root.add_observable("type", "value")
     request = observable.create_analysis_request(amt_1)
     request.initialize_result()
     analysis = request.modified_observable.add_analysis(type=amt_1)
 
-    assert cache_analysis_result(request) is not None
-    assert get_cached_analysis_result(observable, amt_1) == request
+    assert await system.cache_analysis_result(request) is not None
+    assert await system.get_cached_analysis_result(observable, amt_1) == request
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_nocache_analysis():
-    root = RootAnalysis()
+async def test_nocache_analysis(system):
+    root = system.new_root()
     observable = root.add_observable("type", "value")
     request = observable.create_analysis_request(amt_no_cache)
     request.initialize_result()
     analysis = request.modified_observable.add_analysis(type=amt_no_cache)
 
-    assert cache_analysis_result(request) is None
-    assert get_cached_analysis_result(observable, amt_no_cache) is None
+    assert await system.cache_analysis_result(request) is None
+    assert await system.get_cached_analysis_result(observable, amt_no_cache) is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_cache_expiration():
-    root = RootAnalysis()
+async def test_cache_expiration(system):
+    root = system.new_root()
     observable = root.add_observable("type", "value")
     request = observable.create_analysis_request(amt_fast_expire_cache)
     request.initialize_result()
     analysis = request.modified_observable.add_analysis(type=amt_fast_expire_cache)
 
-    assert cache_analysis_result(request) is not None
+    assert await system.cache_analysis_result(request) is not None
     # should have expired right away
-    assert get_cached_analysis_result(observable, amt_fast_expire_cache) is None
+    assert await system.get_cached_analysis_result(observable, amt_fast_expire_cache) is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_delete_expired_cached_analysis_results():
-    register_analysis_module_type(amt_fast_expire_cache)
+async def test_delete_expired_cached_analysis_results(system):
+    await system.register_analysis_module_type(amt_fast_expire_cache)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("type", "value")
-    root.submit()
+    await root.submit()
 
-    request = get_next_analysis_request("owner", amt_fast_expire_cache, 0)
+    request = await system.get_next_analysis_request("owner", amt_fast_expire_cache, 0)
     request.initialize_result()
     request.modified_observable.add_analysis(type=amt_fast_expire_cache)
-    request.submit()
+    await request.submit()
 
     # should have one expired cache result
-    assert get_total_cache_size() == 1
-    delete_expired_cached_analysis_results()
+    assert await system.get_cache_size() == 1
+    await system.delete_expired_cached_analysis_results()
     # and none after we clear them all out
-    assert get_total_cache_size() == 0
+    assert await system.get_cache_size() == 0
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_delete_cached_analysis_results_by_module_type():
-    register_analysis_module_type(amt_1)
+async def test_delete_cached_analysis_results_by_module_type(system):
+    await system.register_analysis_module_type(amt_1)
 
-    root = RootAnalysis()
+    root = system.new_root()
     observable = root.add_observable("type", "value")
-    root.submit()
+    await root.submit()
 
-    request = get_next_analysis_request("owner", amt_1, 0)
+    request = await system.get_next_analysis_request("owner", amt_1, 0)
     request.initialize_result()
     request.modified_observable.add_analysis(type=amt_1)
-    request.submit()
+    await request.submit()
 
     # should have one cache result
-    assert get_total_cache_size(amt_1) == 1
-    delete_cached_analysis_results_by_module_type(amt_1)
+    assert await system.get_cache_size(amt_1) == 1
+    await system.delete_cached_analysis_results_by_module_type(amt_1)
     # and none after we clear them all out
-    assert get_total_cache_size(amt_1) == 0
+    assert await system.get_cache_size(amt_1) == 0

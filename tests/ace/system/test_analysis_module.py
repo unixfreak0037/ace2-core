@@ -2,19 +2,11 @@
 
 import pytest
 
-from ace.analysis import RootAnalysis, Observable, Analysis
-from ace.system.analysis_module import (
-    AnalysisModuleType,
-    delete_analysis_module_type,
-    get_analysis_module_type,
-    register_analysis_module_type,
-)
-from ace.system.caching import get_cached_analysis_result
+from ace.analysis import RootAnalysis, Observable, Analysis, AnalysisModuleType
 from ace.system.exceptions import (
     AnalysisModuleTypeVersionError,
     AnalysisModuleTypeExtendedVersionError,
 )
-from ace.system.work_queue import get_queue_size, get_next_analysis_request
 
 amt_1 = AnalysisModuleType(
     name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, extended_version=["key1"]
@@ -46,62 +38,67 @@ def test_version_matches(left, right, expected):
     assert left.extended_version_matches(right) == expected
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_register_new_analysis_module_type():
-    assert register_analysis_module_type(amt_1) == amt_1
-    assert get_analysis_module_type(amt_1.name) == amt_1
-    assert get_queue_size(amt_1) == 0
+async def test_register_new_analysis_module_type(system):
+    assert await system.register_analysis_module_type(amt_1) == amt_1
+    assert await system.get_analysis_module_type(amt_1.name) == amt_1
+    assert await system.get_queue_size(amt_1) == 0
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_register_existing_analysis_module_type():
-    assert register_analysis_module_type(amt_1) == amt_1
-    assert get_analysis_module_type(amt_1.name) == amt_1
-    wq = get_queue_size(amt_1) == 0
+async def test_register_existing_analysis_module_type(system):
+    assert await system.register_analysis_module_type(amt_1) == amt_1
+    assert await system.get_analysis_module_type(amt_1.name) == amt_1
+    wq = await system.get_queue_size(amt_1) == 0
 
     # amt_1 is the same as amt so only the amt record changes
-    assert register_analysis_module_type(amt_1_same) == amt_1_same
-    assert get_analysis_module_type(amt_1_same.name) == amt_1_same
+    assert await system.register_analysis_module_type(amt_1_same) == amt_1_same
+    assert await system.get_analysis_module_type(amt_1_same.name) == amt_1_same
 
     # now the version changes with an upgraded version
-    assert register_analysis_module_type(amt_1_upgraded_version) == amt_1_upgraded_version
-    assert get_analysis_module_type(amt_1_same.name) == amt_1_upgraded_version
+    assert await system.register_analysis_module_type(amt_1_upgraded_version) == amt_1_upgraded_version
+    assert await system.get_analysis_module_type(amt_1_same.name) == amt_1_upgraded_version
     with pytest.raises(AnalysisModuleTypeVersionError):
-        get_next_analysis_request("test", amt_1, 0)  # now this request is invalid because am1 is an older version
+        await system.get_next_analysis_request(
+            "test", amt_1, 0
+        )  # now this request is invalid because am1 is an older version
     # same but only passing the name and version of the module
     with pytest.raises(AnalysisModuleTypeVersionError):
-        get_next_analysis_request(
+        await system.get_next_analysis_request(
             "test", "test", 0, version="1.0.0"
         )  # now this request is invalid because am1 is an older version
-    assert get_next_analysis_request("test", amt_1_upgraded_version, 0) is None  # but this works
+    assert await system.get_next_analysis_request("test", amt_1_upgraded_version, 0) is None  # but this works
 
     # extended version data changed
-    assert register_analysis_module_type(amt_1_upgraded_cache_keys) == amt_1_upgraded_cache_keys
-    assert get_analysis_module_type(amt_1_same.name) == amt_1_upgraded_cache_keys
+    assert await system.register_analysis_module_type(amt_1_upgraded_cache_keys) == amt_1_upgraded_cache_keys
+    assert await system.get_analysis_module_type(amt_1_same.name) == amt_1_upgraded_cache_keys
     with pytest.raises(AnalysisModuleTypeExtendedVersionError):
-        get_next_analysis_request(
+        await system.get_next_analysis_request(
             "test", amt_1, 0
         )  # now this request is invalid because am1 has different extended version
     # same but only passing name, version and extended versions of the data
     with pytest.raises(AnalysisModuleTypeExtendedVersionError):
-        get_next_analysis_request(
+        await system.get_next_analysis_request(
             "test",
             "test",
             0,
             "1.0.0",
             ["key1"],
         )  # now this request is invalid because am1 has different extended version
-    assert get_next_analysis_request("test", amt_1_upgraded_cache_keys, 0) is None  # but this works
+    assert await system.get_next_analysis_request("test", amt_1_upgraded_cache_keys, 0) is None  # but this works
 
 
+@pytest.mark.asyncio
 @pytest.mark.integration
-def test_delete_analysis_module_type():
+async def test_delete_analysis_module_type(system):
     amt = AnalysisModuleType("test", "", cache_ttl=300)
-    register_analysis_module_type(amt)
+    await system.register_analysis_module_type(amt)
 
-    assert get_analysis_module_type(amt.name)
-    delete_analysis_module_type(amt)
-    assert get_analysis_module_type(amt.name) is None
+    assert await system.get_analysis_module_type(amt.name)
+    await system.delete_analysis_module_type(amt)
+    assert await system.get_analysis_module_type(amt.name) is None
 
 
 class TempAnalysisModuleType(AnalysisModuleType):
@@ -109,6 +106,7 @@ class TempAnalysisModuleType(AnalysisModuleType):
         super().__init__(name="test", description="test", *args, **kwargs)
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "amt,observable,expected_result",
     [
@@ -231,5 +229,5 @@ class TempAnalysisModuleType(AnalysisModuleType):
     ],
 )
 @pytest.mark.integration
-def test_accepts(amt: AnalysisModuleType, observable: Observable, expected_result: bool):
-    assert amt.accepts(observable) == expected_result
+async def test_accepts(amt: AnalysisModuleType, observable: Observable, expected_result: bool, system):
+    assert await amt.accepts(observable, system) == expected_result

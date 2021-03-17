@@ -8,18 +8,17 @@ from typing import Union, Optional
 import ace
 
 from ace.analysis import AnalysisModuleType
-from ace.system.database import get_db
+from ace.system import ACESystem
 from ace.system.database.schema import AnalysisResultCache
-from ace.system.caching import CachingInterface
 from ace.system.analysis_request import AnalysisRequest
 from ace.time import utc_now
 
 from sqlalchemy import func
 
 
-class DatabaseCachingInterface(CachingInterface):
-    def get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
-        with get_db() as db:
+class DatabaseCachingInterface(ACESystem):
+    async def i_get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
+        with self.get_db() as db:
             result = db.query(AnalysisResultCache).filter(AnalysisResultCache.cache_key == cache_key).one_or_none()
             if result is None:
                 return None
@@ -27,9 +26,9 @@ class DatabaseCachingInterface(CachingInterface):
             if result.expiration_date is not None and utc_now() > result.expiration_date:
                 return None
 
-            return AnalysisRequest.from_json(result.json_data)
+            return AnalysisRequest.from_json(result.json_data, system=self)
 
-    def cache_analysis_result(self, cache_key: str, request: AnalysisRequest, expiration: Optional[int]) -> str:
+    async def i_cache_analysis_result(self, cache_key: str, request: AnalysisRequest, expiration: Optional[int]) -> str:
         expiration_date = None
         # XXX using system side time
         if expiration is not None:
@@ -42,25 +41,26 @@ class DatabaseCachingInterface(CachingInterface):
             json_data=request.to_json(),
         )
 
-        with get_db() as db:
+        with self.get_db() as db:
             db.merge(cache_result)
             db.commit()
+
         return cache_key
 
-    def delete_expired_cached_analysis_results(self):
-        with get_db() as db:
+    async def i_delete_expired_cached_analysis_results(self):
+        with self.get_db() as db:
             db.execute(AnalysisResultCache.__table__.delete().where(AnalysisResultCache.expiration_date < utc_now()))
             db.commit()
 
-    def delete_cached_analysis_results_by_module_type(self, amt: AnalysisModuleType):
-        with get_db() as db:
+    async def i_delete_cached_analysis_results_by_module_type(self, amt: AnalysisModuleType):
+        with self.get_db() as db:
             db.execute(
                 AnalysisResultCache.__table__.delete().where(AnalysisResultCache.analysis_module_type == amt.name)
             )
             db.commit()
 
-    def get_total_cache_size(self, amt: Optional[AnalysisModuleType] = None) -> int:
-        with get_db() as db:
+    async def i_get_cache_size(self, amt: Optional[AnalysisModuleType] = None) -> int:
+        with self.get_db() as db:
             if amt:
                 return (
                     db.query(func.count(AnalysisResultCache.cache_key))

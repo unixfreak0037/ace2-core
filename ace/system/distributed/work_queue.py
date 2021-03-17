@@ -5,7 +5,6 @@ from ace.data_model import AnalysisRequestModel, AnalysisRequestQueryModel, Erro
 from ace.system.constants import ERROR_AMT_VERSION
 from ace.system.exceptions import ACEError
 from ace.system.distributed import app
-from ace.system.work_queue import get_next_analysis_request
 
 from fastapi import Response
 from fastapi.responses import JSONResponse
@@ -18,9 +17,9 @@ from fastapi.responses import JSONResponse
         400: {"model": ErrorModel},
     },
 )
-def api_get_next_analysis_request(query: AnalysisRequestQueryModel):
+async def api_get_next_analysis_request(query: AnalysisRequestQueryModel):
     try:
-        result = get_next_analysis_request(
+        result = await app.state.system.get_next_analysis_request(
             query.owner,
             query.amt,
             timeout=query.timeout,

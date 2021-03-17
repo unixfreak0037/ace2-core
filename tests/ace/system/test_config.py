@@ -2,19 +2,10 @@
 
 import os
 
-from ace.system.config import (
-    DEFAULT_DOC,
-    delete_config,
-    get_config_documentation,
-    get_config_value,
-    set_config,
-    set_config_documentation,
-    set_config_value,
-)
-
 import pytest
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "value",
@@ -29,52 +20,49 @@ import pytest
         {"hello": "world"},
     ],
 )
-def test_config_set_get(value):
+async def test_config_set_get(value, system):
     # should be missing to start
-    assert get_config_value("/test") is None
+    assert await system.get_config_value("/test") is None
 
-    # set with just value
-    set_config("/test", value)
-    assert get_config_value("/test") == value
+    # set value
+    await system.set_config("/test", value)
+    assert await system.get_config_value("/test") == value
 
     # docs should be missing
-    assert get_config_documentation("/test") == DEFAULT_DOC
+    assert (await system.get_config("/test")).documentation is None
 
-    # set the documentation (but not the value)
-    set_config_documentation("/test", "test docs")
-    assert get_config_value("/test") == value  # value should stay the same
-    assert get_config_documentation("/test") == "test docs"
-
-    # set the value (but not the docs)
-    set_config_value("/test", value)
-    assert get_config_value("/test") == value
-    assert get_config_documentation("/test") == "test docs"  # docs should stay the same
+    # set with documentation
+    await system.set_config("/test", value, "test docs")
+    assert await system.get_config_value("/test") == value  # value should stay the same
+    assert (await system.get_config("/test")).documentation == "test docs"
 
     # delete the config entry
-    assert delete_config("/test")
-    assert get_config_value("/test") is None
-    assert get_config_documentation("/test") is None
+    assert await system.delete_config("/test")
+    assert await system.get_config_value("/test") is None
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_config_default_value():
-    assert get_config_value("/test", None) is None
-    assert get_config_value("/test", "test") == "test"
+async def test_config_default_value(system):
+    assert await system.get_config_value("/test", None) is None
+    assert await system.get_config_value("/test", "test") == "test"
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_config_missing_value():
+async def test_config_missing_value(system):
     with pytest.raises(ValueError):
-        set_config_value("/test", None)
+        await system.set_config("/test", None)
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_config_env_value():
+async def test_config_env_value(system):
     os.environ["ACE_TEST"] = "test"
 
     # without the setting it should return what is in the env var
-    assert get_config_value("/test", env="ACE_TEST") == "test"
+    assert await system.get_config_value("/test", env="ACE_TEST") == "test"
 
     # but when it gets set it should return that
-    set_config("/test", "that")
-    assert get_config_value("/test") == "that"
+    await system.set_config("/test", "that")
+    assert await system.get_config_value("/test") == "that"

@@ -18,9 +18,6 @@ class DetectionPointModel(BaseModel):
     description: str = Field(..., description="brief one line description of what was detected")
     details: Optional[str] = Field(description="optional detailed description of the detection")
 
-    def __hash__(self):
-        return hash(self.description + self.details if self.details is not None else "")
-
 
 class DetectableObjectModel(BaseModel):
     """Base class for objects that can have Detection Points."""

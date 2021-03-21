@@ -8,6 +8,8 @@ import os.path
 
 from typing import Union, Any, Optional, AsyncGenerator
 
+import ace.data_model
+
 from ace.data_model import (
     AlertListModel,
     AnalysisRequestQueryModel,
@@ -27,6 +29,7 @@ from ace.system.exceptions import (
     exception_map,
     AnalysisModuleTypeVersionError,
     AnalysisModuleTypeExtendedVersionError,
+    DuplicateApiKeyNameError,
 )
 
 import aiofiles
@@ -417,3 +420,41 @@ class RemoteAceAPI(AceAPI):
             return None
         else:
             return AnalysisRequest.from_dict(response.json(), self.system)
+
+    #
+    # authentication
+    #
+
+    async def create_api_key(
+        self, name: str, description: Optional[str] = None, is_admin: Optional[bool] = False
+    ) -> str:
+        async with self.get_client() as client:
+            data = {"name": name, "is_admin": is_admin}
+            if description is not None:
+                data["description"] = description
+
+            response = await client.post(
+                "/auth",
+                data=data,
+            )
+
+        _raise_exception_on_error(response)
+
+        if response.status_code == 200:
+            raise DuplicateApiKeyNameError()
+
+        return ace.data_model.ApiKeyResponseModel(**response.json()).api_key
+
+    async def delete_api_key(self, name: str) -> bool:
+        async with self.get_client() as client:
+            response = await client.delete(f"/auth/{name}")
+
+        _raise_exception_on_error(response)
+
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+
+    async def verify_api_key(self, api_key: str, is_admin: Optional[bool] = False) -> bool:
+        raise NotImplementedError()

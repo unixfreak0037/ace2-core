@@ -236,3 +236,5 @@ class ApiKey(Base):
     name = Column(String, index=True, unique=True, nullable=False)
 
     description = Column(String, index=False, nullable=True)
+
+    is_admin = Column(BOOLEAN, index=False, nullable=False, default=False)

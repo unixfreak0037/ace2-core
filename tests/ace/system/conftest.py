@@ -63,20 +63,22 @@ async def system(request):
         app.state.system.encryption_settings.load_aes_key("test")
         await app.state.system.initialize()
         await app.state.system.reset()
-        app.state.system.root_api_key = await app.state.system.create_api_key("test", "root")
+        app.state.system.root_api_key = await app.state.system.create_api_key("test_root", "test_root", is_admin=True)
         app.state.system.start()
 
     if request.param == "database":
         test_system = DatabaseACETestSystem()
+        # initialize encryption settings with a password of "test"
+        test_system.encryption_settings = ace.crypto.initialize_encryption_settings("test")
+        test_system.encryption_settings.load_aes_key("test")
     elif request.param == "redis":
         test_system = RedisACETestSystem()
+        # initialize encryption settings with a password of "test"
+        test_system.encryption_settings = ace.crypto.initialize_encryption_settings("test")
+        test_system.encryption_settings.load_aes_key("test")
     elif request.param == "remote":
         # these two systems share the same database and redis instance
         test_system = RemoteACETestSystem()
-
-    # initialize encryption settings with a password of "test"
-    test_system.encryption_settings = ace.crypto.initialize_encryption_settings("test")
-    test_system.encryption_settings.load_aes_key("test")
 
     await test_system.initialize()
 
@@ -101,5 +103,5 @@ async def system(request):
 async def reset_ace_system():
     await test_system.reset()
     if app.state.system:
-        app.state.system.root_api_key = await app.state.system.create_api_key("test", "root")
+        app.state.system.root_api_key = await app.state.system.create_api_key("test_root", "test_root", is_admin=True)
         test_system.api.api_key = app.state.system.root_api_key

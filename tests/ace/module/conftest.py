@@ -44,7 +44,7 @@ async def system(request):
         app.state.system.encryption_settings.load_aes_key("test")
         await app.state.system.initialize()
         await app.state.system.reset()
-        app.state.system.root_api_key = await app.state.system.create_api_key("test", "root")
+        app.state.system.root_api_key = await app.state.system.create_api_key("test", "root", is_admin=True)
         app.state.system.start()
 
     if request.param == "database":
@@ -82,5 +82,5 @@ async def system(request):
 async def reset_ace_system():
     await test_system.reset()
     if app.state.system:
-        app.state.system.root_api_key = await app.state.system.create_api_key("test", "root")
+        app.state.system.root_api_key = await app.state.system.create_api_key("test", "root", is_admin=True)
         test_system.api.api_key = app.state.system.root_api_key

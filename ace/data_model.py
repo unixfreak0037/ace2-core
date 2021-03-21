@@ -349,6 +349,10 @@ class ErrorModel(BaseModel):
     details: str
 
 
+class ApiKeyResponseModel(BaseModel):
+    api_key: str
+
+
 def custom_json_encoder(obj):
     if hasattr(obj, "to_dict"):
         return obj.to_dict()

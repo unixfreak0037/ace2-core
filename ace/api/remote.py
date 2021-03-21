@@ -26,10 +26,12 @@ from ace.system.constants import ERROR_AMT_VERSION, ERROR_AMT_EXTENDED_VERSION, 
 from ace.system.events import EventHandler
 from ace.system.exceptions import (
     AnalysisModuleTypeDependencyError,
-    exception_map,
-    AnalysisModuleTypeVersionError,
     AnalysisModuleTypeExtendedVersionError,
+    AnalysisModuleTypeVersionError,
     DuplicateApiKeyNameError,
+    InvalidApiKeyError,
+    InvalidAccessError,
+    exception_map,
 )
 
 import aiofiles
@@ -42,6 +44,10 @@ from httpx import AsyncClient
 def _raise_exception_on_error(response):
     if response.status_code == 400:
         _raise_exception_from_error_model(ErrorModel.parse_obj(response.json()))
+    elif response.status_code == 401:
+        raise InvalidApiKeyError()
+    elif response.status_code == 403:
+        raise InvalidAccessError()
 
 
 def _raise_exception_from_error_model(error: ErrorModel):

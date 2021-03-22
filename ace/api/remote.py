@@ -334,7 +334,7 @@ class RemoteAceAPI(AceAPI):
             data["expiration_date"] = meta.expiration_date.isoformat()
 
         if meta.custom:
-            data["custom"] = json.dumps(meta.custom, cls=CustomJSONEncoder)
+            data["custom"] = meta.custom
 
         async with self.get_client() as client:
             response = await client.post("/storage", files=files, data=data)

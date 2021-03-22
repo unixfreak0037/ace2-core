@@ -313,9 +313,8 @@ class ContentMetadata(BaseModel):
     expiration_date: Optional[datetime.datetime] = Field(
         description="""When the content should be discarded. Defaults to None which means never discarded.""",
     )
-    custom: Optional[dict] = Field(
-        default_factory=dict,
-        description="""Optional dict for storing any other required custom properties of the content.""",
+    custom: Optional[str] = Field(
+        description="""Optional str for storing any other required custom properties of the content.""",
     )
 
 

@@ -18,9 +18,6 @@ class DetectionPointModel(BaseModel):
     description: str = Field(..., description="brief one line description of what was detected")
     details: Optional[str] = Field(description="optional detailed description of the detection")
 
-    def __hash__(self):
-        return hash(self.description + self.details if self.details is not None else "")
-
 
 class DetectableObjectModel(BaseModel):
     """Base class for objects that can have Detection Points."""
@@ -35,13 +32,11 @@ class TaggableObjectModel(BaseModel):
 
 
 class AnalysisModuleTypeModel(BaseModel):
-    name: str = Field(
-        ..., description="the name of the analysis module which must be unique to another analysis modules"
-    )
-    description: str = Field(..., description="human readable description of what the analysis module does")
+    name: str = Field(description="the name of the analysis module which must be unique to another analysis modules")
+    description: str = Field(description="human readable description of what the analysis module does")
     observable_types: list[str] = Field(
         default_factory=list,
-        description="""List of observable types this analysis module will analyze. 
+        description="""List of observable types this analysis module will analyze.
     An empty list means all observable types are supported.""",
     )
     directives: list[str] = Field(
@@ -336,11 +331,20 @@ class ConfigurationSetting(BaseModel):
 
 
 class AnalysisRequestQueryModel(BaseModel):
-    owner: str
-    amt: str
-    timeout: int
-    version: Optional[str] = None
-    extended_version: Optional[list[str]] = []
+    owner: str = Field(
+        description="""A unique name that identifies what is making the request. This value is tied to the analysis request for the purposes of tracking."""
+    )
+    amt: str = Field(description="The analysis module type this request is for.")
+    timeout: int = Field(
+        description="The amount of time (in seconds) to wait for a request to become available. If no requests become available during this time then an empty response is returned."
+    )
+    version: str = Field(
+        description="The current version of the analysis module type. This value must match what is registered."
+    )
+    extended_version: Optional[list[str]] = Field(
+        [],
+        description="The optional extended version of the analysis module type. This value must match was is registered if it is used.",
+    )
 
 
 class AlertListModel(BaseModel):
@@ -350,6 +354,10 @@ class AlertListModel(BaseModel):
 class ErrorModel(BaseModel):
     code: str
     details: str
+
+
+class ApiKeyResponseModel(BaseModel):
+    api_key: str
 
 
 def custom_json_encoder(obj):

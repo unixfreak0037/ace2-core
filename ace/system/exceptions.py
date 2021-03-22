@@ -10,6 +10,8 @@ from ace.system.constants import (
     ERROR_AR_EXPIRED,
     ERROR_AR_LOCKED,
     ERROR_AR_UNKNOWN,
+    ERROR_AUTH_INVALID_ACCESS,
+    ERROR_AUTH_INVALID_API_KEY,
     ERROR_AUTH_INVALID_PASSWORD,
     ERROR_AUTH_MISSING_ENCRYPTION_SETTINGS,
     ERROR_AUTH_DUPLICATE_API_KEY_NAME,
@@ -130,6 +132,18 @@ class DuplicateApiKeyNameError(Exception):
     code = ERROR_AUTH_DUPLICATE_API_KEY_NAME
 
 
+class InvalidApiKeyError(Exception):
+    """A request was made with an invalid api key."""
+
+    code = ERROR_AUTH_INVALID_API_KEY
+
+
+class InvalidAccessError(Exception):
+    """An request was made for an operation that requires an admin api key."""
+
+    code = ERROR_AUTH_INVALID_ACCESS
+
+
 exception_map = {
     ERROR_AMS_UNKNOWN: UnknownAlertSystemError,
     ERROR_AMT_CIRC: CircularDependencyError,
@@ -140,7 +154,9 @@ exception_map = {
     ERROR_AR_EXPIRED: ExpiredAnalysisRequestError,
     ERROR_AR_LOCKED: AnalysisRequestLockedError,
     ERROR_AR_UNKNOWN: UnknownAnalysisRequestError,
+    ERROR_AUTH_INVALID_ACCESS: InvalidAccessError,
     ERROR_AUTH_DUPLICATE_API_KEY_NAME: DuplicateApiKeyNameError,
+    ERROR_AUTH_INVALID_API_KEY: InvalidApiKeyError,
     ERROR_AUTH_INVALID_PASSWORD: InvalidPasswordError,
     ERROR_AUTH_MISSING_ENCRYPTION_SETTINGS: MissingEncryptionSettingsError,
     ERROR_OBS_UNKNOWN: UnknownObservableError,

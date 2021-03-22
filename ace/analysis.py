@@ -20,8 +20,8 @@ from typing import Union, Optional, Any
 
 import ace
 
-from ace.system import get_logger
-from ace.system.exceptions import UnknownObservableError
+# from ace.system import get_logger
+# from ace.system.exceptions import UnknownObservableError
 from ace.time import parse_datetime_string, utc_now
 from ace.data_model import (
     AnalysisModel,
@@ -32,6 +32,13 @@ from ace.data_model import (
     RootAnalysisModel,
     TaggableObjectModel,
 )
+
+
+def get_logger():
+    from ace.system import get_logger
+
+    return get_logger()
+
 
 #
 # MERGING
@@ -2210,6 +2217,8 @@ class RootAnalysis(Analysis, MergableObject):
         assert isinstance(amt, AnalysisModuleType)
         observable = self.get_observable(observable)
         if observable is None:
+            from ace.system.exceptions import UnknownObservableError
+
             raise UnknownObservableError(str(observable))
 
         return observable.analysis_completed(amt)
@@ -2221,6 +2230,8 @@ class RootAnalysis(Analysis, MergableObject):
 
         observable = self.get_observable(observable)
         if observable is None:
+            from ace.system.exceptions import UnknownObservableError
+
             raise UnknownObservableError(str(observable))
 
         return observable.get_analysis_request_id(amt) is not None

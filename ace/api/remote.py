@@ -8,6 +8,8 @@ import os.path
 
 from typing import Union, Any, Optional, AsyncGenerator
 
+import ace.data_model
+
 from ace.data_model import (
     AlertListModel,
     AnalysisRequestQueryModel,
@@ -24,9 +26,12 @@ from ace.system.constants import ERROR_AMT_VERSION, ERROR_AMT_EXTENDED_VERSION, 
 from ace.system.events import EventHandler
 from ace.system.exceptions import (
     AnalysisModuleTypeDependencyError,
-    exception_map,
-    AnalysisModuleTypeVersionError,
     AnalysisModuleTypeExtendedVersionError,
+    AnalysisModuleTypeVersionError,
+    DuplicateApiKeyNameError,
+    InvalidApiKeyError,
+    InvalidAccessError,
+    exception_map,
 )
 
 import aiofiles
@@ -39,6 +44,10 @@ from httpx import AsyncClient
 def _raise_exception_on_error(response):
     if response.status_code == 400:
         _raise_exception_from_error_model(ErrorModel.parse_obj(response.json()))
+    elif response.status_code == 401:
+        raise InvalidApiKeyError()
+    elif response.status_code == 403:
+        raise InvalidAccessError()
 
 
 def _raise_exception_from_error_model(error: ErrorModel):
@@ -181,8 +190,17 @@ class RemoteAceAPI(AceAPI):
         raise NotImplementedError()
 
     # analysis tracking
-    async def get_root_analysis(self, root: Union[RootAnalysis, str]) -> Union[RootAnalysis, None]:
-        raise NotImplementedError()
+    async def get_root_analysis(self, uuid: str) -> Union[RootAnalysis, None]:
+        assert isinstance(uuid, str)
+
+        async with self.get_client() as client:
+            response = await client.get(f"/analysis_tracking/root/{uuid}")
+
+        if response.status_code == 404:
+            return None
+
+        _raise_exception_on_error(response)
+        return RootAnalysis.from_dict(response.json())
 
     async def track_root_analysis(self, root: RootAnalysis):
         raise NotImplementedError()
@@ -197,7 +215,16 @@ class RemoteAceAPI(AceAPI):
         raise NotImplementedError()
 
     async def get_analysis_details(self, uuid: str) -> Any:
-        raise NotImplementedError()
+        assert isinstance(uuid, str)
+
+        async with self.get_client() as client:
+            response = await client.get(f"/analysis_tracking/details/{uuid}")
+
+        if response.status_code == 404:
+            return None
+
+        _raise_exception_on_error(response)
+        return response.json()
 
     async def track_analysis_details(self, root: RootAnalysis, uuid: str, value: Any) -> bool:
         raise NotImplementedError()
@@ -417,3 +444,41 @@ class RemoteAceAPI(AceAPI):
             return None
         else:
             return AnalysisRequest.from_dict(response.json(), self.system)
+
+    #
+    # authentication
+    #
+
+    async def create_api_key(
+        self, name: str, description: Optional[str] = None, is_admin: Optional[bool] = False
+    ) -> str:
+        async with self.get_client() as client:
+            data = {"name": name, "is_admin": is_admin}
+            if description is not None:
+                data["description"] = description
+
+            response = await client.post(
+                "/auth",
+                data=data,
+            )
+
+        _raise_exception_on_error(response)
+
+        if response.status_code == 200:
+            raise DuplicateApiKeyNameError()
+
+        return ace.data_model.ApiKeyResponseModel(**response.json()).api_key
+
+    async def delete_api_key(self, name: str) -> bool:
+        async with self.get_client() as client:
+            response = await client.delete(f"/auth/{name}")
+
+        _raise_exception_on_error(response)
+
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+
+    async def verify_api_key(self, api_key: str, is_admin: Optional[bool] = False) -> bool:
+        raise NotImplementedError()

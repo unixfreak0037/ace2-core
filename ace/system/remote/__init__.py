@@ -8,6 +8,7 @@ from ace.system import ACESystem
 from ace.system.remote.alerting import RemoteAlertTrackingInterface
 from ace.system.remote.analysis_module import RemoteAnalysisModuleTrackingInterface
 from ace.system.remote.analysis_tracking import RemoteAnalysisTrackingInterface
+from ace.system.remote.auth import RemoteAuthenticationInterface
 from ace.system.remote.caching import RemoteCachingInterface
 from ace.system.remote.config import RemoteConfigurationInterface
 from ace.system.remote.events import RemoteEventInterface
@@ -19,6 +20,7 @@ from ace.system.remote.work_queue import RemoteWorkQueueManagerInterface
 class RemoteACESystem(
     RemoteAlertTrackingInterface,
     RemoteAnalysisRequestTrackingInterface,
+    RemoteAuthenticationInterface,
     RemoteCachingInterface,
     RemoteConfigurationInterface,
     RemoteEventInterface,

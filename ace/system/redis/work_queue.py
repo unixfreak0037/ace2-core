@@ -15,9 +15,7 @@ from ace.time import utc_now
 # the other contains the list of requests (the actual queue)
 #
 
-
-def get_marker_name(name: str) -> str:
-    return f"work_queue_marker:{name}"
+KEY_WORK_QUEUES = "work_queues"
 
 
 def get_queue_name(name: str) -> str:
@@ -25,31 +23,30 @@ def get_queue_name(name: str) -> str:
 
 
 class RedisWorkQueueManagerInterface(ACESystem):
+    async def i_add_work_queue(self, name: str) -> bool:
+        with self.get_redis_connection() as rc:
+            # this has to exist for the queue to exist
+            return rc.hsetnx(KEY_WORK_QUEUES, name, str(utc_now())) == 1
+
     async def i_delete_work_queue(self, name: str) -> bool:
         with self.get_redis_connection() as rc:
             # this has to exist for the queue to exist
-            result = rc.delete(get_marker_name(name))
+            result = rc.hdel(KEY_WORK_QUEUES, name)
             # the actual queue may or may not exist
             rc.delete(get_queue_name(name))
 
         return result == 1
 
-    async def i_add_work_queue(self, name: str) -> bool:
-        with self.get_redis_connection() as rc:
-            # this has to exist for the queue to exist
-            return rc.setnx(get_marker_name(name), str(utc_now())) == 1
-            # NOTE we don't add the actual queue because you can't add an empty list
-
     async def i_put_work(self, amt: str, analysis_request: AnalysisRequest):
         with self.get_redis_connection() as rc:
-            if not rc.exists(get_marker_name(amt)):
+            if not rc.hexists(KEY_WORK_QUEUES, amt):
                 raise UnknownAnalysisModuleTypeError()
 
             rc.rpush(get_queue_name(amt), analysis_request.to_json())
 
     async def i_get_work(self, amt: str, timeout: float) -> Union[AnalysisRequest, None]:
         with self.get_redis_connection() as rc:
-            if not rc.exists(get_marker_name(amt)):
+            if not rc.hexists(KEY_WORK_QUEUES, amt):
                 raise UnknownAnalysisModuleTypeError()
 
             # if we're not looking to wait then we use LPOP
@@ -73,7 +70,7 @@ class RedisWorkQueueManagerInterface(ACESystem):
 
     async def i_get_queue_size(self, amt: str) -> int:
         with self.get_redis_connection() as rc:
-            if not rc.exists(get_marker_name(amt)):
+            if not rc.hexists(KEY_WORK_QUEUES, amt):
                 raise UnknownAnalysisModuleTypeError()
 
             return rc.llen(get_queue_name(amt))

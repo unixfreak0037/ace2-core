@@ -110,21 +110,21 @@ async def test_store_duplicate(tmpdir, system):
         fp.write("Hello, world!")
 
     # store the file content
-    sha256 = await system.save_file(path, custom={"a": "1"})
+    sha256 = await system.save_file(path, custom="1")
     assert sha256
 
     previous_meta = await system.get_content_meta(sha256)
     assert previous_meta
 
     # then try to store it again
-    assert await system.save_file(path, custom={"a": "2"})
+    assert await system.save_file(path, custom="2")
     current_meta = await system.get_content_meta(sha256)
 
     # the current meta should be newer-ish than the previous meta
     assert current_meta.insert_date >= previous_meta.insert_date
 
     # and the custom dict should have changed
-    assert current_meta.custom["a"] == "2"
+    assert current_meta.custom == "2"
 
 
 @pytest.mark.asyncio

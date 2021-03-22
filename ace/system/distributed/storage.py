@@ -27,14 +27,11 @@ async def api_store_content(
     file: UploadFile = File(..., description="The file content to store."),
     name: str = Form(..., description="The name to give the file (stored as metadata.)"),
     expiration_date: Optional[str] = Form(None, description="An optional time at which the content should expire."),
-    custom: Optional[str] = Form({}, description="Optional custom data to associate to the content."),
+    custom: Optional[str] = Form(None, description="Optional custom data to associate to the content."),
 ):
 
     if expiration_date:
         expiration_date = datetime.fromisoformat(expiration_date)
-
-    if custom:
-        custom = json.loads(custom)
 
     meta = ContentMetadata(name=name, expiration_date=expiration_date, custom=custom)
 

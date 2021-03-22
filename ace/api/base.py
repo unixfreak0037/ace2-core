@@ -111,7 +111,7 @@ class AceAPI:
         raise NotImplementedError()
 
     # analysis tracking
-    async def get_root_analysis(self, root: Union[RootAnalysis, str]) -> Union[RootAnalysis, None]:
+    async def get_root_analysis(self, uuid: str) -> Union[RootAnalysis, None]:
         raise NotImplementedError()
 
     async def track_root_analysis(self, root: RootAnalysis):

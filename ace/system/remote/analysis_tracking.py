@@ -8,4 +8,8 @@ from ace.system import ACESystem
 
 
 class RemoteAnalysisTrackingInterface(ACESystem):
-    pass
+    async def i_get_root_analysis(self, uuid: str) -> Union[RootAnalysis, None]:
+        return await self.get_api().get_root_analysis(uuid)
+
+    async def i_get_analysis_details(self, uuid: str) -> Any:
+        return await self.get_api().get_analysis_details(uuid)

@@ -190,8 +190,17 @@ class RemoteAceAPI(AceAPI):
         raise NotImplementedError()
 
     # analysis tracking
-    async def get_root_analysis(self, root: Union[RootAnalysis, str]) -> Union[RootAnalysis, None]:
-        raise NotImplementedError()
+    async def get_root_analysis(self, uuid: str) -> Union[RootAnalysis, None]:
+        assert isinstance(uuid, str)
+
+        async with self.get_client() as client:
+            response = await client.get(f"/analysis_tracking/root/{uuid}")
+
+        if response.status_code == 404:
+            return None
+
+        _raise_exception_on_error(response)
+        return RootAnalysis.from_dict(response.json())
 
     async def track_root_analysis(self, root: RootAnalysis):
         raise NotImplementedError()
@@ -206,7 +215,16 @@ class RemoteAceAPI(AceAPI):
         raise NotImplementedError()
 
     async def get_analysis_details(self, uuid: str) -> Any:
-        raise NotImplementedError()
+        assert isinstance(uuid, str)
+
+        async with self.get_client() as client:
+            response = await client.get(f"/analysis_tracking/details/{uuid}")
+
+        if response.status_code == 404:
+            return None
+
+        _raise_exception_on_error(response)
+        return response.json()
 
     async def track_analysis_details(self, root: RootAnalysis, uuid: str, value: Any) -> bool:
         raise NotImplementedError()

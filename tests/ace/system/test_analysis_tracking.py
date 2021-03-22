@@ -12,16 +12,25 @@ OBSERVABLE_VALUE = "observable value"
 OBSERVABLE_VALUE_2 = "observable value 2"
 
 
+def _compare_root(a, b):
+    assert a is None or isinstance(a, RootAnalysis)
+    assert b is None or isinstance(b, RootAnalysis)
+    if a is None or b is None:
+        return False
+
+    return a.uuid == b.uuid
+
+
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_track_root_analysis(system):
     root = system.new_root()
     await system.track_root_analysis(root)
     # root should be tracked
-    assert await system.get_root_analysis(root.uuid) == root
+    assert (await system.get_root_analysis(root.uuid)).uuid == root.uuid
     # should be OK to do twice
     await system.track_root_analysis(root)
-    assert await system.get_root_analysis(root.uuid) == root
+    assert _compare_root(await system.get_root_analysis(root.uuid), root)
     # clear it out
     assert await system.delete_root_analysis(root.uuid)
     # make sure it's gone

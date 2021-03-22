@@ -8,6 +8,7 @@ TAG_ALERTS = "alerts"
 TAG_AUTH = "authentication"
 TAG_ANALYSIS_MODULE = "analysis modules"
 TAG_ANALYSIS_REQUEST = "analysis requests"
+TAG_ANALYSIS_TRACKING = "analysis tracking"
 TAG_CONFIG = "configuration"
 TAG_STORAGE = "storage"
 TAG_WORK_QUEUE = "work queue"
@@ -41,6 +42,10 @@ tags_metadata = [
         "name": TAG_WORK_QUEUE,
         "description": "Operations related to work queues.",
     },
+    {
+        "name": TAG_ANALYSIS_TRACKING,
+        "description": "Operations to acquire analysis data.",
+    },
 ]
 
 
@@ -63,6 +68,7 @@ import ace.system.distributed.alerting
 import ace.system.distributed.auth
 import ace.system.distributed.analysis_module
 import ace.system.distributed.analysis_request
+import ace.system.distributed.analysis_tracking
 import ace.system.distributed.config
 import ace.system.distributed.storage
 import ace.system.distributed.work_queue

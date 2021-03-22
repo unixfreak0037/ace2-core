@@ -25,11 +25,15 @@ from fastapi.responses import JSONResponse
     dependencies=[Depends(verify_admin_api_key)],
     description="""Creates a new api key.
 
-Api keys are required to access any api function remotely. Each api key has a unique name and an optional description.
+Api keys are required to access any api function remotely. Each api key has a
+unique name and an optional description.
 
-Some api calls require admin level api keys. An admin api key can be created by setting the is_admin optional parameter to True.
+Some api calls require admin level api keys. An admin api key can be created by
+setting the is_admin optional parameter to True.
 
-Returns the value of the randomly generated api key. This value must be kept secret and cannot be recovered. If an api key is lost, you must delete the api key and re-create it.
+Returns the value of the randomly generated api key. This value must be kept
+secret and cannot be recovered. If an api key is lost, you must delete the api
+key and re-create it.
 """,
 )
 async def api_create_api_key(

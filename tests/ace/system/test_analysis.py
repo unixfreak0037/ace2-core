@@ -19,6 +19,7 @@ from ace.analysis import (
 )
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.exceptions import UnknownObservableError
+from ace.time import utc_now
 
 import pytest
 
@@ -307,6 +308,41 @@ def test_root_analysis_serialization():
     # the observable property for the root should always be None
     assert root.observable is None
     assert len(root.observables) == 1
+
+
+@pytest.mark.unit
+def test_observable_serialization():
+    root = RootAnalysis()
+    o_time = utc_now()
+    target = root.add_observable("test", "other")
+    o1 = root.add_observable(
+        "test",
+        "test",
+        time=o_time,
+        context="text context",
+        directives=["directive1", "directive2"],
+        limited_analysis=["limit1", "limit2"],
+        excluded_analysis=["excluded1", "excluded2"],
+        requested_analysis=["requested1", "requested2"],
+    )
+
+    o1.add_relationship("test", target)
+
+    root = RootAnalysis.from_dict(root.to_model().dict())
+    o2 = root.get_observable(o1)
+
+    # should be two separate instances
+    assert id(o1) != id(o2)
+
+    assert o1.type == o2.type
+    assert o1.value == o2.value
+    assert o1.time == o2.time
+    assert o1.context == o2.context
+    assert o1.directives == o2.directives
+    assert o1.limited_analysis == o2.limited_analysis
+    assert o1.excluded_analysis == o2.excluded_analysis
+    assert o1.requested_analysis == o2.requested_analysis
+    assert o1.relationships == o2.relationships
 
 
 @pytest.mark.unit

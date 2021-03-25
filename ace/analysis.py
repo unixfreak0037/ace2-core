@@ -863,6 +863,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         type: str = None,
         value: str = None,
         time: Union[datetime.datetime, str, None] = None,
+        context: str = None,
         root: Optional["RootAnalysis"] = None,
         directives: Optional[list[str]] = None,
         redirection: Optional[Observable] = None,
@@ -881,6 +882,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         self._type = type
         self.value = value
         self._time = time
+        self.context = context
         self._analysis = {}
         self._directives = directives or []  # of str
         self._redirection = redirection or None  # (str)
@@ -916,6 +918,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             type=self.type,
             value=self.value,
             time=self.time,
+            context=self.context,
             analysis={
                 name: AnalysisModel(**analysis.to_dict(*args, **kwargs)).dict()
                 for name, analysis in self.analysis.items()
@@ -926,7 +929,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             limited_analysis=self.limited_analysis,
             excluded_analysis=self.excluded_analysis,
             requested_analysis=self.requested_analysis,
-            relationships=self.relationships,
+            relationships=self._relationships,
             grouping_target=self.grouping_target,
             request_tracking=self.request_tracking,
         )
@@ -953,6 +956,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         observable.type = data.type
         observable.time = data.time
         observable.value = data.value
+        observable.context = data.context
         observable.analysis = {
             key: Analysis.from_dict(analysis.dict(), root=root) for key, analysis in data.analysis.items()
         }
@@ -962,7 +966,7 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         observable.limited_analysis = data.limited_analysis
         observable.excluded_analysis = data.excluded_analysis
         observable.requested_analysis = data.requested_analysis
-        observable.relationships = data.relationships
+        observable._relationships = data.relationships
         observable.grouping_target = data.grouping_target
         observable.request_tracking = data.request_tracking
 
@@ -1165,9 +1169,9 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
             for type, observables in self._relationships.items()
         }
 
-    @relationships.setter
-    def relationships(self, value: dict[str, list[Observable]]):
-        self._relationships = {type: [_.uuid for _ in observables] for type, observables in value}
+    # @relationships.setter
+    # def relationships(self, value: dict[str, list[Observable]]):
+    # self._relationships = {type: [_.uuid for _ in observables] for type, observables in value.items()}
 
     def has_relationship(self, type: str, observable: Optional["Observable"] = None) -> bool:
         if observable is None:

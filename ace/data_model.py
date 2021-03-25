@@ -149,6 +149,14 @@ class ObservableModel(DetectableObjectModel, TaggableObjectModel, BaseModel):
         event occured."""
     )
 
+    context: Optional[str] = Field(
+        description="""Optional context surrounding the observation. This is
+        used to communicate additional information to the analysts, such as
+        where the observation was made. For example, "Source IP address of the
+        sender of the email." or "From address in the email.",
+    """
+    )
+
     analysis: Optional[dict[str, AnalysisModel]] = Field(
         default_factory=dict,
         description="""The record of all analysis performed on this

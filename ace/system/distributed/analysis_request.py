@@ -24,4 +24,4 @@ async def api_process_analysis_request(request: AnalysisRequestModel):
         await app.state.system.process_analysis_request(AnalysisRequest.from_dict(request.dict(), app.state.system))
         return Response(status_code=200)
     except ACEError as e:
-        return JSONResponse(status_code=400, content=ErrorModel(code=e.code, details=str(e)))
+        return JSONResponse(status_code=400, content=ErrorModel(code=e.code, details=str(e)).dict())

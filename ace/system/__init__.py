@@ -26,7 +26,9 @@ from ace.system.exceptions import (
     AnalysisModuleTypeDependencyError,
     AnalysisModuleTypeExtendedVersionError,
     AnalysisModuleTypeVersionError,
+    AnalysisRequestLockedError,
     CircularDependencyError,
+    ExpiredAnalysisRequestError,
     MissingEncryptionSettingsError,
     UnknownAnalysisModuleTypeError,
 )
@@ -421,6 +423,8 @@ class ACESystem:
 
     @coreapi
     async def link_analysis_requests(self, source_request: AnalysisRequest, dest_request: AnalysisRequest) -> bool:
+        """Links the source to the dest such that when the dest has completed,
+        failed or expired, the source is then processed again."""
         assert isinstance(source_request, AnalysisRequest)
         assert isinstance(dest_request, AnalysisRequest)
         assert source_request != dest_request
@@ -537,16 +541,9 @@ class ACESystem:
         """Processes an analysis request.
         This function implements the core logic of the system."""
 
-        # need to lock this at the beginning so that nothing else modifies it
-        # while we're processing it
-        # we only need to do this for observable analysis requests because they are the only types of
-        # requests that can be modified (by creating linked requests)
-        if ar.is_observable_analysis_request and not await ar.lock():
-            raise AnalysisRequestLockedError(f"failed to lock analysis request {ar}")
-
         get_logger().info(f"processing {ar}")
-
         target_root = None
+
         # did we complete a request?
         if ar.is_observable_analysis_result:
             existing_ar = await self.get_analysis_request(ar.id)
@@ -554,18 +551,25 @@ class ACESystem:
             # is this analysis request gone?
             if not existing_ar:
                 get_logger().info(f"requested unknown analysis request {ar.id}")
-                raise UnknownAnalysisRequestError(ar)
+                raise UnknownAnalysisRequestError(ar.id)
 
             # did the ownership change?
             if existing_ar.owner != ar.owner:
                 get_logger().info(f"requested expired analysis request {ar.id}")
-                raise ExpiredAnalysisRequestError(ar)
+                raise ExpiredAnalysisRequestError(ar.id)
 
             # get the existing root analysis
             target_root = await self.get_root_analysis(ar.root)
             if not target_root:
                 get_logger().info(f"analysis request {ar.id} referenced unknown root {ar.root}")
-                raise UnknownRootAnalysisError(ar)
+                raise UnknownRootAnalysisError(ar.id)
+
+            # need to lock this at the beginning so that nothing else modifies it
+            # while we're processing it
+            # we only need to do this for observable analysis requests because they are the only types of
+            # requests that can be modified (by creating linked requests)
+            if not await ar.lock():
+                raise AnalysisRequestLockedError(f"failed to lock analysis request {ar}")
 
             # should we cache these results?
             if ar.is_cachable and not ar.cache_hit:

@@ -12,8 +12,9 @@ from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis, Observable
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.constants import *
 from ace.system.exceptions import (
-    AnalysisModuleTypeVersionError,
     AnalysisModuleTypeExtendedVersionError,
+    AnalysisModuleTypeVersionError,
+    ExpiredAnalysisRequestError,
     UnknownAnalysisModuleTypeError,
 )
 
@@ -314,3 +315,56 @@ async def test_delete_analysis_module_type_linked_results(system):
     # both the original request and the linked request should be gone
     assert await system.get_analysis_request_by_request_id(original_request.id) is None
     assert await system.get_analysis_request_by_request_id(request.id) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.system
+async def test_observable_analysis_request_expired(system):
+
+    # define an owner
+    owner_uuid = str(uuid.uuid4())
+
+    # register a basic analysis module
+    # these are set to expire immediately
+    amt = AnalysisModuleType("test", "", ["test"], timeout=0)
+    assert await system.register_analysis_module_type(amt)
+
+    # submit an analysis request with a single observable
+    root = system.new_root()
+    observable = root.add_observable("test", "test")
+    await system.process_analysis_request(root.create_analysis_request())
+
+    # have the amt receive the next work item
+    request = await system.get_next_analysis_request(owner_uuid, amt, 0)
+    assert isinstance(request, AnalysisRequest)
+
+    # now this has already expired
+    # define another owner
+    other_owner_uuid = str(uuid.uuid4())
+    other_request = await system.get_next_analysis_request(other_owner_uuid, amt, 0)
+
+    # we should have received the same request but the ownership should be different
+    assert request.id == other_request.id
+    assert request.owner != other_request.owner
+
+    # now the first module analyzes and posts requests *after* it expired
+    analysis_details = {"test": "result"}
+    request.initialize_result()
+    request.modified_observable.add_analysis(type=amt, details=analysis_details)
+    with pytest.raises(ExpiredAnalysisRequestError) as e:
+        await system.process_analysis_request(request)
+
+    # but the second one can
+    analysis_details = {"test": "result"}
+    other_request.initialize_result()
+    other_request.modified_observable.add_analysis(type=amt, details=analysis_details)
+    await system.process_analysis_request(other_request)
+
+    # check the results
+    root = await system.get_root_analysis(root.uuid)
+    assert isinstance(root, RootAnalysis)
+    observable = root.get_observable(observable)
+    assert isinstance(observable, Observable)
+    analysis = observable.get_analysis(amt)
+    assert isinstance(analysis, Analysis)
+    assert await analysis.get_details() == analysis_details

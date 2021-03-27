@@ -7,7 +7,7 @@ from typing import Optional, Union
 
 from ace.system import ACESystem
 from ace.system.database.schema import ApiKey
-from ace.system.exceptions import DuplicateApiKeyNameError
+from ace.exceptions import DuplicateApiKeyNameError
 
 from sqlalchemy import and_
 import sqlalchemy.exc

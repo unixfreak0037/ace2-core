@@ -3,7 +3,7 @@
 from ace.data_model import AnalysisRequestModel, ErrorModel
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.distributed import app, TAG_ANALYSIS_REQUEST
-from ace.system.exceptions import ACEError
+from ace.exceptions import ACEError
 
 from fastapi import Response
 from fastapi.responses import JSONResponse

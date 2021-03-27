@@ -8,7 +8,7 @@ from typing import Union, Any, Optional
 
 from ace.analysis import RootAnalysis
 from ace.system import ACESystem
-from ace.system.exceptions import UnknownAlertSystemError
+from ace.exceptions import UnknownAlertSystemError
 
 
 class ThreadedAlertTrackingInterface(ACESystem):

@@ -6,8 +6,8 @@ import pytest
 
 from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
 from ace.system.analysis_request import AnalysisRequest
-from ace.system.constants import *
-from ace.system.exceptions import InvalidWorkQueueError, UnknownAnalysisModuleTypeError
+from ace.constants import *
+from ace.exceptions import InvalidWorkQueueError, UnknownAnalysisModuleTypeError
 
 amt = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600)
 

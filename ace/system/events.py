@@ -6,7 +6,7 @@ from ace.data_model import Event
 # Events
 #
 # An event has two properties: name and args.
-# name is the identifier of the event (see ace/system/constants.py)
+# name is the identifier of the event (see ace/constants.py)
 # args is anything that can be encoded into JSON
 # ace.data_model.custom_json_encoder is used to encode the JSON
 #

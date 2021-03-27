@@ -10,7 +10,7 @@ import ace
 from ace.analysis import RootAnalysis
 from ace.system import ACESystem
 from ace.system.database.schema import RootAnalysisTracking, AnalysisDetailsTracking
-from ace.system.exceptions import UnknownRootAnalysisError
+from ace.exceptions import UnknownRootAnalysisError
 
 import sqlalchemy.exc
 from sqlalchemy.sql import exists, and_

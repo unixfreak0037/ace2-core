@@ -1,7 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 
 from ace.data_model import ConfigurationSetting, ErrorModel
-from ace.system.exceptions import ACEError
+from ace.exceptions import ACEError
 from ace.system.distributed import app, TAG_CONFIG
 
 from fastapi import Response, HTTPException, Query

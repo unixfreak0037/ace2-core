@@ -6,7 +6,7 @@ from typing import Union, Optional
 
 from ace.system import ACESystem
 from ace.system.analysis_request import AnalysisRequest
-from ace.system.exceptions import UnknownAnalysisModuleTypeError
+from ace.exceptions import UnknownAnalysisModuleTypeError
 from ace.time import utc_now
 
 #

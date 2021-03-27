@@ -4,7 +4,7 @@ from typing import Optional
 
 from ace.data_model import ErrorModel, ApiKeyResponseModel
 from ace.system.distributed import app, verify_admin_api_key, TAG_AUTH
-from ace.system.exceptions import ACEError
+from ace.exceptions import ACEError
 
 from fastapi import Depends, HTTPException, Form, Response, Path
 from fastapi.responses import JSONResponse

@@ -1,7 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 
 from tests.systems import RemoteACETestSystem
-from ace.system.exceptions import InvalidApiKeyError, InvalidAccessError
+from ace.exceptions import InvalidApiKeyError, InvalidAccessError
 
 import pytest
 

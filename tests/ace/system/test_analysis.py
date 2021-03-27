@@ -18,7 +18,7 @@ from ace.analysis import (
     search_down,
 )
 from ace.system.analysis_request import AnalysisRequest
-from ace.system.exceptions import UnknownObservableError
+from ace.exceptions import UnknownObservableError
 from ace.time import utc_now
 
 import pytest

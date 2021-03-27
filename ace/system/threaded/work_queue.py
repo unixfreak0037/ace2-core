@@ -6,7 +6,7 @@ from typing import Union
 from ace.analysis import AnalysisModuleType
 from ace.system import ACESystem
 from ace.system.analysis_request import AnalysisRequest
-from ace.system.exceptions import UnknownAnalysisModuleTypeError
+from ace.exceptions import UnknownAnalysisModuleTypeError
 
 
 class ThreadedWorkQueueManagerInterface(ACESystem):

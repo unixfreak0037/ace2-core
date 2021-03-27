@@ -3,7 +3,7 @@
 import pytest
 
 from ace.analysis import RootAnalysis, Observable, Analysis, AnalysisModuleType
-from ace.system.exceptions import (
+from ace.exceptions import (
     AnalysisModuleTypeVersionError,
     AnalysisModuleTypeExtendedVersionError,
 )

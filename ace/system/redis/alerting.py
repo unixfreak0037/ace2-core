@@ -8,7 +8,7 @@
 from typing import Optional
 
 from ace.system import ACESystem
-from ace.system.exceptions import UnknownAlertSystemError
+from ace.exceptions import UnknownAlertSystemError
 from ace.time import utc_now
 
 KEY_ALERT_SYSTEMS = "alert_systems"

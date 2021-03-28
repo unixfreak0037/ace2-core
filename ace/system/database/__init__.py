@@ -17,8 +17,9 @@ from contextlib import contextmanager
 
 import ace
 
-from ace.system import ACESystem, get_logger
+from ace.system import ACESystem
 
+from ace.logging import get_logger
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm.session import Session

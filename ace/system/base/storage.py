@@ -123,7 +123,7 @@ class StorageBaseInterface:
     async def has_valid_root_reference(self, meta: ContentMetadata) -> bool:
         """Returns True if the given meta has a valid (existing) RootAnalysis reference."""
         for root_uuid in meta.roots:
-            if await get_root_analysis(root_uuid) is not None:
+            if await self.get_root_analysis(root_uuid) is not None:
                 return True
 
         return False

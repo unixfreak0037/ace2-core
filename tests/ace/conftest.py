@@ -9,7 +9,7 @@ import pytest
 import ace.crypto
 import ace.system.distributed
 
-from ace.system import ACESystem, get_logger
+from ace.logging import get_logger
 from ace.system.distributed import app
 
 from tests.systems import (

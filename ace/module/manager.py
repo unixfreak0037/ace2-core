@@ -12,12 +12,13 @@ from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from typing import Optional
 
+from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
 from ace.api.base import AceAPI, AnalysisRequest
 from ace.error_reporting.reporter import format_error_report
-from ace.module.base import AnalysisModule
-from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
-from ace.system import get_logger, ACESystem
 from ace.exceptions import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
+from ace.logging import get_logger
+from ace.module.base import AnalysisModule
+from ace.system import ACESystem
 
 import psutil
 

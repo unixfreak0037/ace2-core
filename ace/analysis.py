@@ -20,7 +20,8 @@ from typing import Union, Optional, Any
 
 import ace
 
-# from ace.system import get_logger
+from ace.logging import get_logger
+
 # from ace.system.exceptions import UnknownObservableError
 from ace.time import parse_datetime_string, utc_now
 from ace.data_model import (
@@ -32,12 +33,6 @@ from ace.data_model import (
     RootAnalysisModel,
     TaggableObjectModel,
 )
-
-
-def get_logger():
-    from ace.system import get_logger
-
-    return get_logger()
 
 
 #

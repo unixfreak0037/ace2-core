@@ -6,7 +6,7 @@ import asyncio
 import ace.analysis
 
 from ace.analysis import RootAnalysis, Observable, AnalysisModuleType, Analysis
-from ace.system import get_logger
+from ace.logging import get_logger
 from ace.constants import EVENT_ANALYSIS_ROOT_COMPLETED
 from ace.system.events import EventHandler, Event
 from ace.module.base import AnalysisModule, AsyncAnalysisModule

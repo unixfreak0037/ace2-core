@@ -15,7 +15,7 @@ def format_error_report(reported_exception: Optional[Exception] = None) -> str:
     if reported_exception is None:
         exc_type, reported_exception, tb = sys.exc_info()
     else:
-        exc_type, reported_exception, tb = (
+        _, reported_exception, tb = (
             type(reported_exception),
             reported_exception,
             reported_exception.__traceback__,

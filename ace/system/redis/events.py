@@ -73,7 +73,7 @@ class RedisEventInterface(EventBaseInterface):
             redis_handlers = {event: self.redis_message_handler for event, _ in self.event_handlers.items()}
 
             # XXX assuming we can safely resubscribe every time
-            result = self._rc_p.subscribe(**redis_handlers)
+            self._rc_p.subscribe(**redis_handlers)
             if self.event_thread is None:
                 self.event_thread = self._rc_p.run_in_thread(sleep_time=0.001)
                 get_logger().debug(f"started redis event thread {self.event_thread}")

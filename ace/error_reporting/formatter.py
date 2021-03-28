@@ -201,7 +201,7 @@ class ExceptionFormatter(object):
         if not tb:
             try:
                 raise Exception()
-            except:
+            except Exception:
                 omit_last = True
                 _, _, tb = sys.exc_info()
                 assert tb is not None

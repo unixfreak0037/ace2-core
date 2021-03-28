@@ -48,7 +48,7 @@ class CachingBaseInterface:
 
     @coreapi
     async def delete_expired_cached_analysis_results(self):
-        get_logger().debug(f"deleting expired cached analysis results")
+        get_logger().debug("deleting expired cached analysis results")
         await self.i_delete_expired_cached_analysis_results()
 
     async def i_delete_expired_cached_analysis_results(self):

@@ -70,7 +70,7 @@ def is_valid_password(password: str, settings: EncryptionSettings) -> bool:
     try:
         get_decryption_key(password, settings)
         return True
-    except:
+    except Exception:
         return False
 
 

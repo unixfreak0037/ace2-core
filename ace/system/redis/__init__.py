@@ -4,14 +4,14 @@ from ace.system import ACESystem
 
 import redis
 
-CONFIG_REDIS_HOST = "/ace/core/redis/host"
-CONFIG_REDIS_PORT = "/ace/core/redis/port"
-CONFIG_REDIS_DB = "/ace/core/redis/db"
-
-
 from ace.system.redis.alerting import RedisAlertTrackingInterface
 from ace.system.redis.events import RedisEventInterface
 from ace.system.redis.work_queue import RedisWorkQueueManagerInterface
+
+
+CONFIG_REDIS_HOST = "/ace/core/redis/host"
+CONFIG_REDIS_PORT = "/ace/core/redis/port"
+CONFIG_REDIS_DB = "/ace/core/redis/db"
 
 
 class RedisACESystem(RedisAlertTrackingInterface, RedisEventInterface, RedisWorkQueueManagerInterface, ACESystem):

@@ -4,7 +4,9 @@ import copy
 import uuid
 from typing import Union, Optional, Any
 
-from ace.analysis import RootAnalysis, Observable, AnalysisModuleType
+import ace.system
+
+from ace.analysis import RootAnalysis, Observable, AnalysisModuleType, recurse_tree
 from ace.data_model import AnalysisRequestModel, RootAnalysisModel
 from ace.constants import (
     TRACKING_STATUS_NEW,
@@ -13,15 +15,6 @@ from ace.constants import (
     EVENT_AR_NEW,
     EVENT_AR_DELETED,
     EVENT_AR_EXPIRED,
-)
-from ace.exceptions import UnknownAnalysisModuleTypeError
-
-# TODO merge these
-
-import copy
-
-from ace.analysis import recurse_tree
-from ace.constants import (
     EVENT_ANALYSIS_ROOT_COMPLETED,
     EVENT_ANALYSIS_ROOT_EXPIRED,
     EVENT_CACHE_HIT,
@@ -35,6 +28,7 @@ from ace.exceptions import (
     UnknownAnalysisRequestError,
     UnknownObservableError,
     UnknownRootAnalysisError,
+    UnknownAnalysisModuleTypeError,
 )
 
 
@@ -43,7 +37,7 @@ class AnalysisRequest:
 
     def __init__(
         self,
-        system: "ACESystem",
+        system: "ace.system.ACESystem",
         root: Union[str, RootAnalysis],
         observable: Optional[Observable] = None,
         type: Optional[AnalysisModuleType] = None,
@@ -135,7 +129,7 @@ class AnalysisRequest:
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, system: "ACESystem") -> "AnalysisRequest":
+    def from_dict(value: dict, system: "ace.system.ACESystem") -> "AnalysisRequest":
         assert isinstance(value, dict)
 
         data = AnalysisRequestModel(**value)
@@ -168,7 +162,7 @@ class AnalysisRequest:
         return ar
 
     @staticmethod
-    def from_json(value: str, system: Optional["ACESystem"] = None) -> "AnalysisRequest":
+    def from_json(value: str, system: Optional["ace.system.ACESystem"] = None) -> "AnalysisRequest":
         assert isinstance(value, str)
         return AnalysisRequest.from_dict(AnalysisRequestModel.parse_raw(value).dict(), system)
 

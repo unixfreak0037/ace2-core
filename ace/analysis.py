@@ -1,7 +1,6 @@
 # vim: sw=4:ts=4:et:cc=120
 
 
-import copy
 import datetime
 import hashlib
 import json
@@ -19,6 +18,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Union, Optional, Any
 
 import ace
+import ace.system
 
 from ace.logging import get_logger
 
@@ -358,7 +358,7 @@ class AnalysisModuleType:
             and sorted(self.extended_version) == sorted(amt.extended_version)
         )
 
-    async def accepts(self, observable: Observable, system: "ACESystem") -> bool:
+    async def accepts(self, observable: Observable, system: "ace.system.ACESystem") -> bool:
         assert isinstance(observable, Observable)
         from ace.system import ACESystem
 
@@ -1726,7 +1726,7 @@ class RootAnalysis(Analysis, MergableObject):
         return self.to_model(*args, **kwargs).json()
 
     @staticmethod
-    def from_dict(value: dict, system: Optional["ACESystem"] = None) -> "RootAnalysis":
+    def from_dict(value: dict, system: Optional["ace.system.ACESystem"] = None) -> "RootAnalysis":
         assert isinstance(value, dict)
         data = RootAnalysisModel(**value)
 
@@ -1757,7 +1757,7 @@ class RootAnalysis(Analysis, MergableObject):
         return root
 
     @staticmethod
-    def from_json(value: str, system: Optional["ACESystem"] = None) -> "RootAnalysis":
+    def from_json(value: str, system: Optional["ace.system.ACESystem"] = None) -> "RootAnalysis":
         assert isinstance(value, str)
         return RootAnalysis.from_dict(RootAnalysisModel.parse_raw(value).dict(), system)
 

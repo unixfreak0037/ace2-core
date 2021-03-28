@@ -33,8 +33,8 @@ class ThreadedAlertTrackingInterface(AlertingBaseInterface):
         assert isinstance(root_uuid, str) and root_uuid
 
         result = False
-        for name, queue in self.alert_systems.items():
-            queue.put(root_uuid)
+        for name, work_queue in self.alert_systems.items():
+            work_queue.put(root_uuid)
             result = True
 
         return result

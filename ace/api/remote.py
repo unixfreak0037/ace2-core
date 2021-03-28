@@ -262,7 +262,7 @@ class RemoteAceAPI(AceAPI):
         assert isinstance(key, str) and key
 
         async with self.get_client() as client:
-            response = await client.get(f"/config", params={"key": key})
+            response = await client.get("/config", params={"key": key})
 
         _raise_exception_on_error(response)
         if response.status_code == 404:
@@ -273,7 +273,7 @@ class RemoteAceAPI(AceAPI):
     async def set_config(self, key: str, value: Any, documentation: Optional[str] = None):
         async with self.get_client() as client:
             response = await client.put(
-                f"/config", json=ConfigurationSetting(name=key, value=value, documentation=documentation).dict()
+                "/config", json=ConfigurationSetting(name=key, value=value, documentation=documentation).dict()
             )
 
         _raise_exception_on_error(response)
@@ -286,7 +286,7 @@ class RemoteAceAPI(AceAPI):
         assert isinstance(key, str) and key
 
         async with self.get_client() as client:
-            response = await client.delete(f"/config", params={"key": key})
+            response = await client.delete("/config", params={"key": key})
 
         _raise_exception_on_error(response)
         if response.status_code == 200:

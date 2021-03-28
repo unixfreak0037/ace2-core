@@ -2,6 +2,8 @@
 
 import hashlib
 
+import ace.analysis
+
 
 def generate_cache_key(observable: "ace.analysis.Observable", amt: "ace.analysis.AnalysisModuleType") -> str:
     """Returns the key that should be used for caching the result of the

@@ -56,7 +56,7 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
         self.storage_root = tempfile.mkdtemp()
 
     def create_database(self):
-        from ace.system.database import Base
+        from ace.system.database.schema import Base
 
         Base.metadata.bind = self.engine
         Base.metadata.create_all()

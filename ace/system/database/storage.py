@@ -42,7 +42,7 @@ class DatabaseStorageInterface(StorageBaseInterface):
                 db.query(Storage)
                 .outerjoin(StorageRootTracking)
                 .filter(
-                    Storage.expiration_date != None,
+                    Storage.expiration_date != None,  # noqa: E711
                     datetime.datetime.now() >= Storage.expiration_date,
                     StorageRootTracking.sha256 == None,
                 )

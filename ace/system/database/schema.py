@@ -2,8 +2,6 @@
 
 from datetime import datetime, timezone
 
-from ace.system.database import Base
-
 from sqlalchemy import (
     BigInteger,
     BOOLEAN,
@@ -27,6 +25,10 @@ from sqlalchemy import (
 import sqlalchemy.types
 from sqlalchemy.orm import relationship
 from sqlalchemy.schema import Table
+from sqlalchemy.ext.declarative import declarative_base
+
+
+Base = declarative_base()
 
 
 # https://mike.depalatis.net/blog/sqlalchemy-timestamps.html

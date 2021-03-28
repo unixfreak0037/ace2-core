@@ -49,7 +49,9 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingBaseInterf
         sel = select(
             [bindparam("s", type_=String).label("source_id"), bindparam("d", type_=String).label("dest_id")],
             AnalysisRequestTracking.__table__,
-        ).where(and_(AnalysisRequestTracking.id == source.id, AnalysisRequestTracking.lock == None))
+        ).where(
+            and_(AnalysisRequestTracking.id == source.id, AnalysisRequestTracking.lock == None)
+        )  # noqa:E711
         update = analysis_request_links.insert().from_select(["source_id", "dest_id"], sel)
         with self.get_db() as db:
             count = db.execute(update, {"s": source.id, "d": dest.id}).rowcount
@@ -72,7 +74,9 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingBaseInterf
         with self.get_db() as db:
             count = db.execute(
                 AnalysisRequestTracking.__table__.update()
-                .where(and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock == None))
+                .where(
+                    and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock == None)
+                )  # noqa:E711
                 .values(lock=text("CURRENT_TIMESTAMP"))
             ).rowcount
             db.commit()
@@ -83,7 +87,9 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingBaseInterf
         with self.get_db() as db:
             count = db.execute(
                 AnalysisRequestTracking.__table__.update()
-                .where(and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock != None))
+                .where(
+                    and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock != None)
+                )  # noqa:E711
                 .values(lock=None)
             ).rowcount
             db.commit()

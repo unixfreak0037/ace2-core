@@ -300,8 +300,8 @@ class AnalysisModuleManager:
             self.module_tasks = []
             for completed_task in done:
                 try:
-                    module = await completed_task
-                except asyncio.CancelledError as e:
+                    await completed_task
+                except asyncio.CancelledError:
                     get_logger().warning(f"task {completed_task.get_name()} was cancelled before it completed")
 
         self.executor.shutdown(wait=False, cancel_futures=True)

@@ -28,7 +28,7 @@ class DatabaseAuthenticationInterface(AuthenticationBaseInterface):
             try:
                 db.add(ApiKey(api_key=_sha256(api_key), name=name, description=description, is_admin=is_admin))
                 db.commit()
-            except sqlalchemy.exc.IntegrityError as error:
+            except sqlalchemy.exc.IntegrityError:
                 raise DuplicateApiKeyNameError()
 
         return api_key
@@ -43,7 +43,7 @@ class DatabaseAuthenticationInterface(AuthenticationBaseInterface):
         with self.get_db() as db:
             condition = ApiKey.api_key == _sha256(api_key)
             if is_admin:
-                condition = and_(condition, ApiKey.is_admin == True)
+                condition = and_(condition, ApiKey.is_admin == True)  # noqa:E712
 
             if db.query(ApiKey).filter(condition).one_or_none():
                 return True

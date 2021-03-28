@@ -46,7 +46,7 @@ async def api_set_config(
     setting: ConfigurationSetting,
 ):
     try:
-        result = await app.state.system.set_config(setting.name, setting.value, documentation=setting.documentation)
+        await app.state.system.set_config(setting.name, setting.value, documentation=setting.documentation)
         return Response(status_code=201)
 
     except ACEError as e:

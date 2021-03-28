@@ -1,8 +1,5 @@
 # vim: sw=4:ts=4:et:cc=120
 
-CONFIG_DB_URL = "/ace/core/sqlalchemy/url"
-CONFIG_DB_KWARGS = "/ace/core/sqlalchemy/kwargs"
-
 import functools
 import os
 import os.path
@@ -26,10 +23,6 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import Executable
 from sqlalchemy.ext.declarative import declarative_base
 
-
-Base = declarative_base()
-
-
 from ace.system.database.analysis_module import DatabaseAnalysisModuleTrackingInterface
 from ace.system.database.analysis_request import DatabaseAnalysisRequestTrackingInterface
 from ace.system.database.analysis_tracking import DatabaseAnalysisTrackingInterface
@@ -37,6 +30,10 @@ from ace.system.database.auth import DatabaseAuthenticationInterface
 from ace.system.database.caching import DatabaseCachingInterface
 from ace.system.database.config import DatabaseConfigurationInterface
 from ace.system.local.storage import LocalStorageInterface
+
+
+CONFIG_DB_URL = "/ace/core/sqlalchemy/url"
+CONFIG_DB_KWARGS = "/ace/core/sqlalchemy/kwargs"
 
 
 class DatabaseACESystem(

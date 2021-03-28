@@ -11,7 +11,7 @@ ENCODING = locale.getpreferredencoding()
 
 
 def to_byte(val):
-    unicode_type = str if PY3 else unicode
+    unicode_type = str if PY3 else unicode  # noqa: F821
     if isinstance(val, unicode_type):
         try:
             return val.encode(ENCODING)

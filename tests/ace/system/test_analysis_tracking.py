@@ -39,6 +39,16 @@ async def test_track_root_analysis(system):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
+async def test_track_root_analysis_missing_uuid(system):
+    root = system.new_root()
+    # root's need uuid to work
+    root._uuid = None
+    with pytest.raises(ValueError):
+        await system.track_root_analysis(root)
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
 async def test_update_root_analysis(system):
     root = system.new_root(desc="test 1")
     await system.track_root_analysis(root)
@@ -64,6 +74,40 @@ async def test_update_root_analysis(system):
     assert not await system.update_root_analysis(old_root)
     # the description should NOT have changed
     assert (await system.get_root_analysis(root.uuid)).description == "test 2"
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_update_root_analysis_missing_uuid(system):
+    root = system.new_root()
+    await system.track_root_analysis(root)
+    root = await system.get_root_analysis(root.uuid)
+    # this cannot happen
+    root._uuid = None
+    with pytest.raises(ValueError):
+        await system.update_root_analysis(root)
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_update_root_analysis_with_tracked_content(system, tmp_path):
+    target_path = str(tmp_path / "test.txt")
+    with open(target_path, "w") as fp:
+        fp.write("test")
+
+    root = system.new_root()
+    await system.track_root_analysis(root)
+    root = await system.get_root_analysis(root.uuid)
+    # add a file observable and then update the root
+    file_observable = await root.add_file(target_path)
+    meta = await system.get_content_meta(file_observable.value)
+    # the sha256 observable should not yet be tracked to the root
+    assert not await system.has_valid_root_reference(meta)
+    # now update the root with the new file observable
+    await system.update_root_analysis(root)
+    # the sha256 observable should be tracked to the root at this point
+    meta = await system.get_content_meta(file_observable.value)
+    assert await system.has_valid_root_reference(meta)
 
 
 @pytest.mark.asyncio

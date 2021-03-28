@@ -84,7 +84,7 @@ def get_decryption_key(password: str, settings: EncryptionSettings) -> bytes:
 
     result = PBKDF2(password, settings.salt, 64, settings.iterations)
     if settings.verification_key != result[32:]:
-        from ace.system.exceptions import InvalidPasswordError
+        from ace.exceptions import InvalidPasswordError
 
         raise InvalidPasswordError()
 

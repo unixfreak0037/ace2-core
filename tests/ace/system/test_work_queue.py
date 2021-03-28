@@ -6,8 +6,8 @@ import pytest
 
 from ace.analysis import RootAnalysis, AnalysisModuleType
 from ace.system.analysis_request import AnalysisRequest
-from ace.system.constants import *
-from ace.system.exceptions import UnknownAnalysisModuleTypeError
+from ace.constants import *
+from ace.exceptions import UnknownAnalysisModuleTypeError
 
 amt_1 = AnalysisModuleType(name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600)
 

@@ -8,7 +8,7 @@ from ace.analysis import RootAnalysis, AnalysisModuleType
 from ace.data_model import Event, ContentMetadata
 from ace.system.analysis_request import AnalysisRequest
 from ace.system.caching import generate_cache_key
-from ace.system.constants import (
+from ace.constants import (
     EVENT_ALERT,
     EVENT_ALERT_SYSTEM_REGISTERED,
     EVENT_ALERT_SYSTEM_UNREGISTERED,

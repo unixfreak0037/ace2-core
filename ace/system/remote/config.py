@@ -3,10 +3,10 @@
 from typing import Optional, Any
 
 from ace.data_model import ConfigurationSetting
-from ace.system import ACESystem
+from ace.system.base import ConfigurationBaseInterface
 
 
-class RemoteConfigurationInterface(ACESystem):
+class RemoteConfigurationInterface(ConfigurationBaseInterface):
     async def i_get_config(self, key: str) -> ConfigurationSetting:
         # XXX this is kind of weird -- see if you can get rid of this
         from ace.system.database import CONFIG_DB_KWARGS, CONFIG_DB_URL

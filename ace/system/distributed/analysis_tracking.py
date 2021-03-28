@@ -2,7 +2,7 @@
 
 from ace.data_model import RootAnalysisModel, ErrorModel
 from ace.system.distributed import app, TAG_ANALYSIS_TRACKING
-from ace.system.exceptions import ACEError
+from ace.exceptions import ACEError
 
 from fastapi import HTTPException, Path
 from fastapi.responses import JSONResponse

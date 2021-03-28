@@ -17,7 +17,7 @@ from ace.error_reporting.reporter import format_error_report
 from ace.module.base import AnalysisModule
 from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
 from ace.system import get_logger, ACESystem
-from ace.system.exceptions import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
+from ace.exceptions import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
 
 import psutil
 

@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from ace.analysis import RootAnalysis, Observable, Analysis, AnalysisModuleType
-from ace.system.exceptions import UnknownRootAnalysisError
+from ace.exceptions import UnknownRootAnalysisError
 
 TEST_DETAILS = {"hello": "world"}
 OBSERVABLE_VALUE = "observable value"

@@ -5,8 +5,8 @@ from typing import Union, Optional
 
 from ace.analysis import AnalysisModuleType
 from ace.system.analysis_request import AnalysisRequest
-from ace.system import ACESystem
+from ace.system.base import CachingBaseInterface
 
 
-class RemoteCachingInterface(ACESystem):
+class RemoteCachingInterface(CachingBaseInterface):
     pass

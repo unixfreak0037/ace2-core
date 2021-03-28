@@ -2221,7 +2221,7 @@ class RootAnalysis(Analysis, MergableObject):
         assert isinstance(amt, AnalysisModuleType)
         observable = self.get_observable(observable)
         if observable is None:
-            from ace.system.exceptions import UnknownObservableError
+            from ace.exceptions import UnknownObservableError
 
             raise UnknownObservableError(str(observable))
 
@@ -2234,7 +2234,7 @@ class RootAnalysis(Analysis, MergableObject):
 
         observable = self.get_observable(observable)
         if observable is None:
-            from ace.system.exceptions import UnknownObservableError
+            from ace.exceptions import UnknownObservableError
 
             raise UnknownObservableError(str(observable))
 

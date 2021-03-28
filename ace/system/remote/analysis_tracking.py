@@ -4,10 +4,10 @@
 from typing import Union, Any
 
 from ace.analysis import RootAnalysis
-from ace.system import ACESystem
+from ace.system.base import AnalysisTrackingBaseInterface
 
 
-class RemoteAnalysisTrackingInterface(ACESystem):
+class RemoteAnalysisTrackingInterface(AnalysisTrackingBaseInterface):
     async def i_get_root_analysis(self, uuid: str) -> Union[RootAnalysis, None]:
         return await self.get_api().get_root_analysis(uuid)
 

@@ -5,9 +5,9 @@ import uuid
 
 from typing import Optional, Union
 
-from ace.system import ACESystem
+from ace.system.base import AuthenticationBaseInterface
 from ace.system.database.schema import ApiKey
-from ace.system.exceptions import DuplicateApiKeyNameError
+from ace.exceptions import DuplicateApiKeyNameError
 
 from sqlalchemy import and_
 import sqlalchemy.exc
@@ -19,7 +19,7 @@ def _sha256(data: str) -> str:
     return m.hexdigest()
 
 
-class DatabaseAuthenticationInterface(ACESystem):
+class DatabaseAuthenticationInterface(AuthenticationBaseInterface):
     async def i_create_api_key(
         self, name: str, description: Optional[str] = None, is_admin: Optional[bool] = False
     ) -> Union[str, None]:

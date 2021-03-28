@@ -10,11 +10,12 @@ import os.path
 from typing import Union, Iterator
 
 from ace.data_model import ContentMetadata, CustomJSONEncoder
-from ace.system import get_logger, ACESystem
+from ace.logging import get_logger
+from ace.system.base import StorageBaseInterface
 from ace.system.database.schema import Storage, StorageRootTracking
 
 
-class DatabaseStorageInterface(ACESystem):
+class DatabaseStorageInterface(StorageBaseInterface):
     """Abstract storage interface that uses a database to track file storage."""
 
     async def i_get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:

@@ -2,10 +2,10 @@
 
 from typing import Optional
 
-from ace.system import ACESystem
+from ace.system.base import AuthenticationBaseInterface
 
 
-class RemoteAuthenticationInterface(ACESystem):
+class RemoteAuthenticationInterface(AuthenticationBaseInterface):
     async def create_api_key(
         self, name: str, description: Optional[str] = None, is_admin: Optional[bool] = False
     ) -> str:

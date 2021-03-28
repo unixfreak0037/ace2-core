@@ -6,10 +6,10 @@ import io
 from typing import Union, AsyncGenerator
 
 from ace.data_model import ContentMetadata
-from ace.system import ACESystem
+from ace.system.base import StorageBaseInterface
 
 
-class RemoteStorageInterface(ACESystem):
+class RemoteStorageInterface(StorageBaseInterface):
     async def store_content(self, content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
         return await self.get_api().store_content(content, meta)
 

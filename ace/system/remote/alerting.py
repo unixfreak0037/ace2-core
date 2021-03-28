@@ -2,10 +2,10 @@
 
 from typing import Optional
 
-from ace.system import ACESystem
+from ace.system.base import AlertingBaseInterface
 
 
-class RemoteAlertTrackingInterface(ACESystem):
+class RemoteAlertTrackingInterface(AlertingBaseInterface):
     async def register_alert_system(self, name: str) -> bool:
         return await self.get_api().register_alert_system(name)
 

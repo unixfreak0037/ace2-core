@@ -3,11 +3,11 @@
 from typing import Optional
 
 from ace.data_model import Event
-from ace.system import ACESystem
+from ace.system.base import EventBaseInterface
 from ace.system.events import EventHandler
 
 
-class RemoteEventInterface(ACESystem):
+class RemoteEventInterface(EventBaseInterface):
     pass
     # async def i_register_event_handler(self, event: str, handler: EventHandler):
     # return await self.get_api().register_event_handler(event, handler)

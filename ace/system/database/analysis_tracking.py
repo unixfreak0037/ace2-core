@@ -8,7 +8,7 @@ from typing import Any, Union
 import ace
 
 from ace.analysis import RootAnalysis
-from ace.system import ACESystem
+from ace.system.base import AnalysisTrackingBaseInterface
 from ace.system.database.schema import RootAnalysisTracking, AnalysisDetailsTracking
 from ace.exceptions import UnknownRootAnalysisError
 
@@ -16,7 +16,7 @@ import sqlalchemy.exc
 from sqlalchemy.sql import exists, and_
 
 
-class DatabaseAnalysisTrackingInterface(ACESystem):
+class DatabaseAnalysisTrackingInterface(AnalysisTrackingBaseInterface):
     async def i_get_root_analysis(self, uuid: str) -> Union[RootAnalysisTracking, None]:
         """Returns the root for the given uuid or None if it does not exist.."""
         with self.get_db() as db:

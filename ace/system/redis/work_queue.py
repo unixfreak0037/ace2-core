@@ -4,7 +4,7 @@ import json
 
 from typing import Union, Optional
 
-from ace.system import ACESystem
+from ace.system.base import WorkQueueBaseInterface
 from ace.system.analysis_request import AnalysisRequest
 from ace.exceptions import UnknownAnalysisModuleTypeError
 from ace.time import utc_now
@@ -22,7 +22,7 @@ def get_queue_name(name: str) -> str:
     return f"work_queue:{name}"
 
 
-class RedisWorkQueueManagerInterface(ACESystem):
+class RedisWorkQueueManagerInterface(WorkQueueBaseInterface):
     async def i_add_work_queue(self, name: str) -> bool:
         with self.get_redis_connection() as rc:
             # this has to exist for the queue to exist

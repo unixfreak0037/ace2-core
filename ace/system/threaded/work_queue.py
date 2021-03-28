@@ -4,12 +4,12 @@ import queue
 from typing import Union
 
 from ace.analysis import AnalysisModuleType
-from ace.system import ACESystem
+from ace.system.base import WorkQueueBaseInterface
 from ace.system.analysis_request import AnalysisRequest
 from ace.exceptions import UnknownAnalysisModuleTypeError
 
 
-class ThreadedWorkQueueManagerInterface(ACESystem):
+class ThreadedWorkQueueManagerInterface(WorkQueueBaseInterface):
 
     work_queues = {}  # key = amt.name, value = queue.Queue
 

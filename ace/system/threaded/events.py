@@ -5,11 +5,11 @@ import threading
 from typing import Optional
 
 from ace.data_model import Event, custom_json_encoder
-from ace.system import ACESystem
+from ace.system.base import EventBaseInterface
 from ace.system.events import EventHandler
 
 
-class ThreadedEventInterafce(ACESystem):
+class ThreadedEventInterafce(EventBaseInterface):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.event_handlers = {}  # key = event, value = [EventHandler]

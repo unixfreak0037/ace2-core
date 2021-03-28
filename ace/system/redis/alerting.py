@@ -7,7 +7,7 @@
 
 from typing import Optional
 
-from ace.system import ACESystem
+from ace.system.base import AlertingBaseInterface
 from ace.exceptions import UnknownAlertSystemError
 from ace.time import utc_now
 
@@ -18,7 +18,7 @@ def get_alert_queue(name: str) -> str:
     return f"alert_system:{name}"
 
 
-class RedisAlertTrackingInterface(ACESystem):
+class RedisAlertTrackingInterface(AlertingBaseInterface):
     async def i_register_alert_system(self, name: str) -> bool:
         with self.get_redis_connection() as rc:
             return rc.hsetnx(KEY_ALERT_SYSTEMS, name, str(utc_now())) == 1

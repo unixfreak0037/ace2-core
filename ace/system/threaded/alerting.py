@@ -7,11 +7,11 @@ import threading
 from typing import Union, Any, Optional
 
 from ace.analysis import RootAnalysis
-from ace.system import ACESystem
+from ace.system.base import AlertingBaseInterface
 from ace.exceptions import UnknownAlertSystemError
 
 
-class ThreadedAlertTrackingInterface(ACESystem):
+class ThreadedAlertTrackingInterface(AlertingBaseInterface):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.alert_systems = {}  # key = system name, value = queue.Queue(of RootAnalysis.uuid)

@@ -10,7 +10,7 @@ import os.path
 from typing import Union, Iterator, AsyncGenerator
 
 from ace.data_model import ContentMetadata, CustomJSONEncoder
-from ace.system import get_logger, ACESystem
+from ace.logging import get_logger
 from ace.system.database.schema import Storage, StorageRootTracking
 from ace.system.database.storage import DatabaseStorageInterface
 

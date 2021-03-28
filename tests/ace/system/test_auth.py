@@ -1,6 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 
-from ace.system.exceptions import MissingEncryptionSettingsError, InvalidPasswordError, DuplicateApiKeyNameError
+from ace.exceptions import MissingEncryptionSettingsError, InvalidPasswordError, DuplicateApiKeyNameError
 
 import pytest
 

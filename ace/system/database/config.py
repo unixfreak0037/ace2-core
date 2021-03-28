@@ -3,7 +3,7 @@
 from typing import Any, Optional
 
 from ace.data_model import ConfigurationSetting
-from ace.system import ACESystem
+from ace.system.base import ConfigurationBaseInterface
 from ace.system.database.schema import Config
 
 #
@@ -13,7 +13,7 @@ from ace.system.database.schema import Config
 #
 
 
-class DatabaseConfigurationInterface(ACESystem):
+class DatabaseConfigurationInterface(ConfigurationBaseInterface):
     def get_config_obj(self, key: str) -> Config:
         with self.get_db() as db:
             return db.query(Config).filter(Config.key == key).one_or_none()

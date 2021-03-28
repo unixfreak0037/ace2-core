@@ -4,7 +4,7 @@ from typing import Optional
 
 from ace.data_model import ErrorModel, AlertListModel
 from ace.system.distributed import app, TAG_ALERTS
-from ace.system.exceptions import ACEError
+from ace.exceptions import ACEError
 
 from fastapi import Response, HTTPException, Query, Path
 from fastapi.responses import JSONResponse

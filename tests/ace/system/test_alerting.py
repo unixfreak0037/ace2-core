@@ -15,9 +15,9 @@ from ace.analysis import RootAnalysis, AnalysisModuleType
 # submit_alert,
 # get_alerts,
 # )
-from ace.system.constants import EVENT_ALERT
+from ace.constants import EVENT_ALERT
 from ace.system.events import Event, EventHandler  # , register_event_handler
-from ace.system.exceptions import UnknownAlertSystemError
+from ace.exceptions import UnknownAlertSystemError
 
 # from ace.system.processing import process_analysis_request
 # from ace.system.work_queue import get_next_analysis_request

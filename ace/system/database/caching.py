@@ -8,7 +8,7 @@ from typing import Union, Optional
 import ace
 
 from ace.analysis import AnalysisModuleType
-from ace.system import ACESystem
+from ace.system.base import CachingBaseInterface
 from ace.system.database.schema import AnalysisResultCache
 from ace.system.analysis_request import AnalysisRequest
 from ace.time import utc_now
@@ -16,7 +16,7 @@ from ace.time import utc_now
 from sqlalchemy import func
 
 
-class DatabaseCachingInterface(ACESystem):
+class DatabaseCachingInterface(CachingBaseInterface):
     async def i_get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
         with self.get_db() as db:
             result = db.query(AnalysisResultCache).filter(AnalysisResultCache.cache_key == cache_key).one_or_none()

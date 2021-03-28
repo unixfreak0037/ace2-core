@@ -20,7 +20,7 @@ from ace.crypto import (
     is_valid_password,
 )
 
-from ace.system.exceptions import InvalidPasswordError
+from ace.exceptions import InvalidPasswordError
 
 import pytest
 

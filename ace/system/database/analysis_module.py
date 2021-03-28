@@ -7,11 +7,11 @@ from typing import Union, List
 import ace
 
 from ace.analysis import AnalysisModuleType
-from ace.system import ACESystem
+from ace.system.base import AnalysisModuleTrackingBaseInterface
 from ace.system.database.schema import AnalysisModuleTracking
 
 
-class DatabaseAnalysisModuleTrackingInterface(ACESystem):
+class DatabaseAnalysisModuleTrackingInterface(AnalysisModuleTrackingBaseInterface):
     async def i_track_analysis_module_type(self, amt: AnalysisModuleType):
         assert isinstance(amt, AnalysisModuleType)
         db_amt = AnalysisModuleTracking(name=amt.name, json_data=amt.to_json())

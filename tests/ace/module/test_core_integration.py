@@ -7,7 +7,7 @@ import ace.analysis
 
 from ace.analysis import RootAnalysis, Observable, AnalysisModuleType, Analysis
 from ace.system import get_logger
-from ace.system.constants import EVENT_ANALYSIS_ROOT_COMPLETED
+from ace.constants import EVENT_ANALYSIS_ROOT_COMPLETED
 from ace.system.events import EventHandler, Event
 from ace.module.base import AnalysisModule, AsyncAnalysisModule
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED

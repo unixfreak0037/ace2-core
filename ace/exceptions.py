@@ -1,6 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 
-from ace.system.constants import (
+from ace.constants import (
     ERROR_AMS_UNKNOWN,
     ERROR_AMT_CIRC,
     ERROR_AMT_DEP,

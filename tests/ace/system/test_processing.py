@@ -1,7 +1,7 @@
 import uuid
 
 from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.constants import TRACKING_STATUS_ANALYZING
 from ace.exceptions import (
     AnalysisModuleTypeDependencyError,

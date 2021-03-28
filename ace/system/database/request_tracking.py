@@ -12,7 +12,7 @@ from ace.analysis import Observable, AnalysisModuleType
 from ace.system.base import AnalysisRequestTrackingBaseInterface
 from ace.system.database.schema import AnalysisRequestTracking, analysis_request_links
 from ace.constants import TRACKING_STATUS_ANALYZING, EVENT_AR_EXPIRED
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.system.caching import generate_cache_key
 from ace.exceptions import UnknownAnalysisModuleTypeError
 

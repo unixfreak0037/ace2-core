@@ -9,7 +9,7 @@ from ace import coreapi
 from ace.analysis import AnalysisModuleType, Observable
 from ace.constants import *
 from ace.logging import get_logger
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.system.caching import generate_cache_key
 
 

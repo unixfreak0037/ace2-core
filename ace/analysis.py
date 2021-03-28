@@ -20,10 +20,6 @@ from typing import Union, Optional, Any
 import ace
 import ace.system
 
-from ace.logging import get_logger
-
-# from ace.system.exceptions import UnknownObservableError
-from ace.time import parse_datetime_string, utc_now
 from ace.data_model import (
     AnalysisModel,
     AnalysisModuleTypeModel,
@@ -33,6 +29,8 @@ from ace.data_model import (
     RootAnalysisModel,
     TaggableObjectModel,
 )
+from ace.logging import get_logger
+from ace.time import parse_datetime_string, utc_now
 
 
 #
@@ -892,9 +890,9 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         # reference to the RootAnalysis object
         self.root = root
 
-    def track_analysis_request(self, ar: "ace.system.analysis_request.AnalysisRequest"):
+    def track_analysis_request(self, ar: "ace.system.requests.AnalysisRequest"):
         """Tracks the request for analyze this Observable for the given type of analysis."""
-        from ace.system.analysis_request import AnalysisRequest
+        from ace.system.requests import AnalysisRequest
 
         assert isinstance(ar, AnalysisRequest)
 
@@ -1480,9 +1478,9 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
 
         return self
 
-    def create_analysis_request(self, amt: AnalysisModuleType) -> "ace.system.analysis_request.AnalysisRequest":
-        """Creates and returns a new ace.system.analysis_request.AnalysisRequest object from this Observable."""
-        from ace.system.analysis_request import AnalysisRequest
+    def create_analysis_request(self, amt: AnalysisModuleType) -> "ace.system.requests.AnalysisRequest":
+        """Creates and returns a new ace.system.requests.AnalysisRequest object from this Observable."""
+        from ace.system.requests import AnalysisRequest
 
         return AnalysisRequest(self.root.system, root=self.root, observable=self, type=amt)
 
@@ -2192,8 +2190,8 @@ class RootAnalysis(Analysis, MergableObject):
                 return True
 
     def create_analysis_request(self):
-        """Creates and returns a new ace.system.analysis_request.AnalysisRequest object from this RootAnalysis."""
-        from ace.system.analysis_request import AnalysisRequest
+        """Creates and returns a new ace.system.requests.AnalysisRequest object from this RootAnalysis."""
+        from ace.system.requests import AnalysisRequest
 
         return AnalysisRequest(self.system, self)
 

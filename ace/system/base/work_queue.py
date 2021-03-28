@@ -8,7 +8,7 @@ from typing import Union, Optional
 from ace import coreapi
 from ace.analysis import AnalysisModuleType
 from ace.constants import *
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.crypto import EncryptionSettings
 from ace.logging import get_logger
 from ace.exceptions import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError

@@ -10,7 +10,7 @@ import ace
 from ace.analysis import AnalysisModuleType
 from ace.system.base import CachingBaseInterface
 from ace.system.database.schema import AnalysisResultCache
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.time import utc_now
 
 from sqlalchemy import func

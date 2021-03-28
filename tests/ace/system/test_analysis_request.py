@@ -5,7 +5,7 @@ from operator import attrgetter
 import pytest
 
 from ace.analysis import RootAnalysis, Analysis, AnalysisModuleType
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.constants import *
 from ace.exceptions import InvalidWorkQueueError, UnknownAnalysisModuleTypeError
 

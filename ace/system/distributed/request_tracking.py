@@ -1,7 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 
 from ace.data_model import AnalysisRequestModel, ErrorModel
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.system.distributed import app, TAG_ANALYSIS_REQUEST
 from ace.exceptions import ACEError
 

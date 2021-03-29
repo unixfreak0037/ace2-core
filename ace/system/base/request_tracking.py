@@ -8,7 +8,7 @@ from typing import Union
 from ace import coreapi
 from ace.logging import get_logger
 from ace.constants import *
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.analysis import Observable, AnalysisModuleType, RootAnalysis
 from ace.exceptions import UnknownAnalysisModuleTypeError, ExpiredAnalysisRequestError
 

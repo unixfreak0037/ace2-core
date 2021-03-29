@@ -65,10 +65,10 @@ app = FastAPI(
 
 # importing these modules is what ends up loading the routes
 import ace.system.distributed.alerting
-import ace.system.distributed.auth
-import ace.system.distributed.analysis_module
-import ace.system.distributed.analysis_request
 import ace.system.distributed.analysis_tracking
+import ace.system.distributed.auth
 import ace.system.distributed.config
+import ace.system.distributed.module_tracking
+import ace.system.distributed.request_tracking
 import ace.system.distributed.storage
 import ace.system.distributed.work_queue

@@ -9,7 +9,7 @@ from typing import Union, Any, Optional, AsyncGenerator
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable
 from ace.data_model import ContentMetadata, Event, ConfigurationSetting
 from ace.system import ACESystem
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.system.events import EventHandler
 
 

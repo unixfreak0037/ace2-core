@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from ace.analysis import RootAnalysis, AnalysisModuleType
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.constants import *
 from ace.exceptions import UnknownAnalysisModuleTypeError
 

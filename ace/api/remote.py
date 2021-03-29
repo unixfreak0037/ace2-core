@@ -21,7 +21,7 @@ from ace.data_model import (
 )
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable
 from ace.api.base import AceAPI
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.constants import ERROR_AMT_VERSION, ERROR_AMT_EXTENDED_VERSION, ERROR_AMT_DEP
 from ace.system.events import EventHandler
 from ace.exceptions import (

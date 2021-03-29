@@ -4,7 +4,7 @@ from typing import Union
 
 from ace.analysis import AnalysisModuleType
 from ace.system.base import AnalysisRequestTrackingBaseInterface
-from ace.system.base.analysis_request import AnalysisRequest
+from ace.system.base.request_tracking import AnalysisRequest
 
 
 class RemoteAnalysisRequestTrackingInterface(AnalysisRequestTrackingBaseInterface):

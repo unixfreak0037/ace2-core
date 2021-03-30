@@ -69,42 +69,22 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
 
 
 class RedisACETestSystem(RedisACESystem, DatabaseACETestSystem, ThreadedACESystem):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._redis_connection = None
-
-    def get_redis_connection(self):
-        """Returns a redis connection to use."""
-        if self._redis_connection is None:
-            self._redis_connection = redislite.StrictRedis("ace.rdb")
-            # self._redis_connection.flushall()
-
-        return self._redis_connection
-
     async def reset(self):
         await super().reset()
 
         # clear everything
-        with self.get_redis_connection() as rc:
-            self._redis_connection.flushall()
+        async with self.get_redis_connection() as rc:
+            rc.flushall()
+
+        if self._rc_p:
+            self._rc_p.unsubscribe()
 
 
 class DistributedACETestSystem(RedisACETestSystem):
     db_url = "sqlite:///ace.db"
 
-    def get_redis_connection(self):
-        """Returns a redis connection to use."""
-        if self._redis_connection is None:
-            self._redis_connection = redislite.StrictRedis("ace.rdb")
 
-        return self._redis_connection
-
-    async def initialize(self):
-        # add the initial super-user api key
-        await super().initialize()
-
-
-class RemoteACETestSystem(RemoteACESystem, RedisACETestSystem):
+class RemoteACETestSystem(RemoteACESystem, ThreadedACESystem):
     db_url = "sqlite:///ace.db"
 
     def __init__(self, *args, **kwargs):

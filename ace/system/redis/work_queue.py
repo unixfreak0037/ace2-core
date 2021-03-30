@@ -24,12 +24,12 @@ def get_queue_name(name: str) -> str:
 
 class RedisWorkQueueManagerInterface(WorkQueueBaseInterface):
     async def i_add_work_queue(self, name: str) -> bool:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             # this has to exist for the queue to exist
             return rc.hsetnx(KEY_WORK_QUEUES, name, str(utc_now())) == 1
 
     async def i_delete_work_queue(self, name: str) -> bool:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             # this has to exist for the queue to exist
             result = rc.hdel(KEY_WORK_QUEUES, name)
             # the actual queue may or may not exist
@@ -38,14 +38,14 @@ class RedisWorkQueueManagerInterface(WorkQueueBaseInterface):
         return result == 1
 
     async def i_put_work(self, amt: str, analysis_request: AnalysisRequest):
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             if not rc.hexists(KEY_WORK_QUEUES, amt):
                 raise UnknownAnalysisModuleTypeError()
 
             rc.rpush(get_queue_name(amt), analysis_request.to_json())
 
     async def i_get_work(self, amt: str, timeout: float) -> Union[AnalysisRequest, None]:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             if not rc.hexists(KEY_WORK_QUEUES, amt):
                 raise UnknownAnalysisModuleTypeError()
 
@@ -69,7 +69,7 @@ class RedisWorkQueueManagerInterface(WorkQueueBaseInterface):
                 return AnalysisRequest.from_json(result.decode(), system=self)
 
     async def i_get_queue_size(self, amt: str) -> int:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             if not rc.hexists(KEY_WORK_QUEUES, amt):
                 raise UnknownAnalysisModuleTypeError()
 

@@ -1,5 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 
+import contextlib
+
 from ace.system import ACESystem
 
 import redis
@@ -17,10 +19,20 @@ CONFIG_REDIS_DB = "/ace/core/redis/db"
 class RedisACESystem(RedisAlertTrackingInterface, RedisEventInterface, RedisWorkQueueManagerInterface, ACESystem):
     """A partial implementation of the ACE core implemented using Redis."""
 
-    def get_redis_connection(self):
+    @contextlib.asynccontextmanager
+    async def get_redis_connection(self):
         """Returns a redis connection to use."""
+        connection = None
+        try:
+            connection = await self._get_redis_connection()
+            yield connection
+        finally:
+            if connection:
+                connection.close()
+
+    async def _get_redis_connection(self):
         return redis.Redis(
-            host=self.config.get_config_value(CONFIG_REDIS_HOST, default="localhost"),
-            port=self.config.get_config_value(CONFIG_REDIS_PORT, default=6379),
-            db=self.config.get_config_value(CONFIG_REDIS_DB, default=0),
+            host=await self.get_config_value(CONFIG_REDIS_HOST, default="localhost"),
+            port=await self.get_config_value(CONFIG_REDIS_PORT, default=6379),
+            db=await self.get_config_value(CONFIG_REDIS_DB, default=0),
         )

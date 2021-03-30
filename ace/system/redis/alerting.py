@@ -20,15 +20,15 @@ def get_alert_queue(name: str) -> str:
 
 class RedisAlertTrackingInterface(AlertingBaseInterface):
     async def i_register_alert_system(self, name: str) -> bool:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             return rc.hsetnx(KEY_ALERT_SYSTEMS, name, str(utc_now())) == 1
 
     async def i_unregister_alert_system(self, name: str) -> bool:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             return rc.hdel(KEY_ALERT_SYSTEMS, name) == 1
 
     async def i_submit_alert(self, root_uuid: str) -> bool:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             result = False
             for name in rc.hkeys(KEY_ALERT_SYSTEMS):
                 result = True
@@ -38,7 +38,7 @@ class RedisAlertTrackingInterface(AlertingBaseInterface):
         return result
 
     async def i_get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             if not rc.hexists(KEY_ALERT_SYSTEMS, name):
                 raise UnknownAlertSystemError(name)
 
@@ -66,7 +66,7 @@ class RedisAlertTrackingInterface(AlertingBaseInterface):
                 return [result.decode()]
 
     async def i_get_alert_count(self, name: str) -> int:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             if not rc.hexists(KEY_ALERT_SYSTEMS, name):
                 raise UnknownAlertSystemError(name)
 

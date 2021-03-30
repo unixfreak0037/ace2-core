@@ -14,6 +14,9 @@ from ace.system.database.schema import Config
 
 
 class DatabaseConfigurationInterface(ConfigurationBaseInterface):
+
+    temp_config = {}  # key = config path, value = ConfigurationSetting
+
     def get_config_obj(self, key: str) -> Config:
         with self.get_db() as db:
             return db.query(Config).filter(Config.key == key).one_or_none()
@@ -22,7 +25,7 @@ class DatabaseConfigurationInterface(ConfigurationBaseInterface):
         # this happens when the system first starts up as it collects the configuration of the database
         with self.get_db() as db:
             if db is None:
-                return None
+                return self.temp_config.get(key, None)
 
         result = self.get_config_obj(key)
         if result is None:
@@ -39,11 +42,18 @@ class DatabaseConfigurationInterface(ConfigurationBaseInterface):
 
         config = Config(key=key, value=encoded_value, documentation=documentation)
         with self.get_db() as db:
-            db.merge(config)
-            db.commit()
+            if db is None:
+                self.temp_config[key] = setting
+            else:
+                db.merge(config)
+                db.commit()
 
     async def i_delete_config(self, key: str) -> bool:
         with self.get_db() as db:
+            if db is None:
+                return self.temp_config.pop(key) is not None
+
             result = db.execute(Config.__table__.delete().where(Config.key == key)).rowcount
             db.commit()
+
         return result == 1

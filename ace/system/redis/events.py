@@ -59,7 +59,7 @@ class RedisEventInterface(EventBaseInterface):
             # we can't do this until we've got something registered
             if self._rc is None:
                 get_logger().debug("connecting to redis")
-                self._rc = self.get_redis_connection()
+                self._rc = await self._get_redis_connection()
                 self._rc_p = self._rc.pubsub(ignore_subscribe_messages=True)
 
             if event not in self.event_handlers:
@@ -111,7 +111,7 @@ class RedisEventInterface(EventBaseInterface):
 
     async def i_fire_event(self, event: Event):
         try:
-            with self.get_redis_connection() as rc:
+            async with self.get_redis_connection() as rc:
                 rc.publish(event.name, event.json(encoder=custom_json_encoder))
         except Exception as e:
             get_logger().error(f"unable to submit event {event} to redis: {e}")

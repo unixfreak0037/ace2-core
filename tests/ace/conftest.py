@@ -20,6 +20,9 @@ from tests.systems import (
     DistributedACETestSystem,
 )
 
+from docker import DockerClient
+from yellowbox.extras.redis import RedisService
+
 
 @pytest.fixture(autouse=True, scope="session")
 def initialize_logging():
@@ -33,16 +36,24 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(scope="session")
+def redis():
+    docker_client = DockerClient.from_env()
+    with RedisService.run(docker_client) as redis:
+        yield redis
+        docker_client.close()
+
+
 @pytest.fixture(
     autouse=True,
     scope="session",
     params=[
         "database",
         "redis",
-        "remote",
+        # "remote",
     ],
 )
-async def system(request):
+async def system(request, redis):
 
     test_system = None
     get_logger().setLevel(logging.DEBUG)
@@ -66,6 +77,9 @@ async def system(request):
         test_system.encryption_settings.load_aes_key("test")
     elif request.param == "redis":
         test_system = RedisACETestSystem()
+        from ace.system.redis import CONFIG_REDIS_HOST, CONFIG_REDIS_PORT
+
+        await test_system.set_config(CONFIG_REDIS_HOST, redis.client_port())
         # initialize encryption settings with a password of "test"
         test_system.encryption_settings = ace.crypto.initialize_encryption_settings("test")
         test_system.encryption_settings.load_aes_key("test")
@@ -78,6 +92,7 @@ async def system(request):
     # copy the auto generated root api key to the client
     if request.param == "remote":
         test_system.api.api_key = app.state.system.root_api_key
+        get_logger().info(f"using api key {test_system.api.api_key}")
 
     test_system.start()
 
@@ -94,7 +109,13 @@ async def system(request):
 
 @pytest.fixture(autouse=True, scope="function")
 async def reset_ace_system(system):
-    await system.reset()
+    if not isinstance(system, RemoteACETestSystem):
+        await system.reset()
+    else:
+        # XXX temp hack until we implement events in the distributed interface
+        system.event_handlers = {}
+
     if app.state.system:
+        await app.state.system.reset()
         app.state.system.root_api_key = await app.state.system.create_api_key("test", "root", is_admin=True)
         system.api.api_key = app.state.system.root_api_key

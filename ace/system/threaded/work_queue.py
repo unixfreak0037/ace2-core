@@ -5,7 +5,7 @@ from typing import Union
 
 from ace.analysis import AnalysisModuleType
 from ace.system.base import WorkQueueBaseInterface
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.exceptions import UnknownAnalysisModuleTypeError
 
 

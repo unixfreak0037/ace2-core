@@ -9,7 +9,7 @@ import uuid
 import threading
 
 from ace.analysis import AnalysisModuleType, RootAnalysis, Analysis, Observable
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.constants import *
 from ace.exceptions import (
     AnalysisModuleTypeExtendedVersionError,

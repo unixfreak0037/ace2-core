@@ -17,7 +17,7 @@ from ace.analysis import (
     recurse_tree,
     search_down,
 )
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.exceptions import UnknownObservableError
 from ace.time import utc_now
 

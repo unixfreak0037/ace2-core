@@ -6,7 +6,7 @@ import pytest
 
 from ace.analysis import RootAnalysis, AnalysisModuleType
 from ace.data_model import Event, ContentMetadata
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.system.caching import generate_cache_key
 from ace.constants import (
     EVENT_ALERT,

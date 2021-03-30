@@ -5,7 +5,7 @@ import json
 from typing import Union, Optional
 
 from ace.system.base import WorkQueueBaseInterface
-from ace.system.analysis_request import AnalysisRequest
+from ace.system.requests import AnalysisRequest
 from ace.exceptions import UnknownAnalysisModuleTypeError
 from ace.time import utc_now
 

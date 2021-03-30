@@ -3,8 +3,9 @@
 import os.path
 import io
 
-from typing import Union, AsyncGenerator
+from typing import Union, AsyncGenerator, Iterator
 
+from ace.analysis import RootAnalysis
 from ace.data_model import ContentMetadata
 from ace.system.base import StorageBaseInterface
 
@@ -29,3 +30,18 @@ class RemoteStorageInterface(StorageBaseInterface):
 
     async def get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:
         return await self.get_api().get_content_meta(sha256)
+
+    async def iter_expired_content(self) -> Iterator[ContentMetadata]:
+        raise NotImplementedError()
+
+    async def delete_content(self, sha256: str) -> bool:
+        raise NotImplementedError()
+
+    async def track_content_root(self, sha256: str, root: Union[RootAnalysis, str]):
+        raise NotImplementedError()
+
+    async def has_valid_root_reference(self, meta: ContentMetadata) -> bool:
+        raise NotImplementedError()
+
+    async def delete_expired_content(self) -> int:
+        raise NotImplementedError()

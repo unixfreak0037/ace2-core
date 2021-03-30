@@ -2197,7 +2197,7 @@ class RootAnalysis(Analysis, MergableObject):
 
     async def submit(self):
         """Submits this RootAnalysis for analysis."""
-        return await self.system.submit_analysis_request(self.create_analysis_request())
+        return await self.system.process_analysis_request(self.create_analysis_request())
 
     def all_analysis_completed(self) -> bool:
         """Returns True if all analysis has been completed for this root."""

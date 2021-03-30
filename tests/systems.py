@@ -12,6 +12,7 @@ import shutil
 
 from ace.api import AceAPI
 from ace.api.remote import RemoteAceAPI
+from ace.logging import get_logger
 from ace.system.database import DatabaseACESystem
 from ace.system.distributed import app
 from ace.system.redis import RedisACESystem
@@ -58,6 +59,7 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     def create_database(self):
         from ace.system.database.schema import Base
 
+        get_logger().info(f"creating database {self.db_url}")
         Base.metadata.bind = self.engine
         Base.metadata.create_all()
 
@@ -81,12 +83,16 @@ class RedisACETestSystem(RedisACESystem, DatabaseACETestSystem, ThreadedACESyste
 
 
 class DistributedACETestSystem(RedisACETestSystem):
-    db_url = "sqlite:///ace.db"
+    db_url = "sqlite:///ace_distributed.db"
+
+    async def reset(self):
+        if os.path.exists("ace_distributed.db"):
+            os.remove("ace_distributed.db")
+
+        await super().reset()
 
 
 class RemoteACETestSystem(RemoteACESystem, ThreadedACESystem):
-    db_url = "sqlite:///ace.db"
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.api = RemoteAceAPI(self)

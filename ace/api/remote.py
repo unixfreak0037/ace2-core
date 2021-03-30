@@ -178,13 +178,8 @@ class RemoteAceAPI(AceAPI):
     async def clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
         raise NotImplementedError()
 
-    async def submit_analysis_request(self, ar: AnalysisRequest):
-        assert isinstance(ar, AnalysisRequest)
-
-        async with self.get_client() as client:
-            response = await client.post("/process_request", json=ar.to_dict())
-
-        _raise_exception_on_error(response)
+    async def queue_analysis_request(self, ar: AnalysisRequest):
+        raise NotImplementedError()
 
     async def process_expired_analysis_requests(self, amt: AnalysisModuleType):
         raise NotImplementedError()

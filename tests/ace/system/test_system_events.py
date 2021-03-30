@@ -557,7 +557,7 @@ async def test_EVENT_WORK_ADD(system):
     root = system.new_root()
     observable = root.add_observable("test", "test")
     request = AnalysisRequest(system, root, observable, amt)
-    await system.submit_analysis_request(request)
+    await system.queue_analysis_request(request)
 
     handler.wait()
     assert handler.event.name == EVENT_WORK_ADD
@@ -576,7 +576,7 @@ async def test_EVENT_WORK_REMOVE(system):
     root = system.new_root()
     observable = root.add_observable("test", "test")
     request = AnalysisRequest(system, root, observable, amt)
-    await system.submit_analysis_request(request)
+    await system.queue_analysis_request(request)
     work = await system.get_work(amt, 0)
 
     handler.wait()

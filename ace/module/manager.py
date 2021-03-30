@@ -373,7 +373,7 @@ class AnalysisModuleManager:
         # it is ok to wait here
         # we continue analysis on a new task
         if request:
-            await self.system.submit_analysis_request(request)
+            await self.system.process_analysis_request(request)
 
         return module
 

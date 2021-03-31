@@ -16,6 +16,7 @@ from ace.exceptions import (
     AnalysisModuleTypeVersionError,
     ExpiredAnalysisRequestError,
     UnknownAnalysisModuleTypeError,
+    UnknownAnalysisRequestError,
 )
 
 import pytest
@@ -274,7 +275,7 @@ async def test_delete_analysis_module_type_while_processing_request(system):
     request.modified_observable.add_analysis(Analysis(type=amt, details={"test": "test"}))
 
     # should fail since the amt has been removed
-    with pytest.raises(UnknownAnalysisModuleTypeError):
+    with pytest.raises(UnknownAnalysisRequestError):
         await request.submit()
 
     # and the request should already be deleted as well

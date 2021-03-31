@@ -57,7 +57,6 @@ class DatabaseACESystem(
 
     async def initialize(self):
         """Initializes database connections by creating the SQLAlchemy engine and session objects."""
-
         # see https://github.com/PyMySQL/PyMySQL/issues/644
         # /usr/local/lib/python3.6/dist-packages/pymysql/cursors.py:170: Warning: (1300, "Invalid utf8mb4 character string: '800363'")
         warnings.filterwarnings(action="ignore", message=".*Invalid utf8mb4 character string.*")
@@ -72,6 +71,8 @@ class DatabaseACESystem(
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
+
+        await super().initialize()
 
     @contextmanager
     def get_db(self) -> Session:

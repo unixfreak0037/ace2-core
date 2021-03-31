@@ -51,7 +51,7 @@ async def test_get_next_analysis_request(system):
     root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = AnalysisRequest(system, root, observable, amt_1)
-    await system.submit_analysis_request(request)
+    await system.queue_analysis_request(request)
 
     next_ar = await system.get_next_analysis_request(TEST_OWNER, amt_1, 0)
     assert next_ar == request
@@ -67,7 +67,7 @@ async def test_get_next_analysis_request_by_name(system):
     root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = AnalysisRequest(system, root, observable, amt_1)
-    await system.submit_analysis_request(request)
+    await system.queue_analysis_request(request)
 
     next_ar = await system.get_next_analysis_request(TEST_OWNER, "test", 0, version="1.0.0")
     assert next_ar == request
@@ -88,7 +88,7 @@ async def test_get_next_analysis_request_expired(system):
     root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = AnalysisRequest(system, root, observable, amt)
-    await system.submit_analysis_request(request)
+    await system.queue_analysis_request(request)
 
     next_ar = await system.get_next_analysis_request(TEST_OWNER, amt, 0)
     assert next_ar == request
@@ -121,7 +121,7 @@ async def test_get_next_analysis_request_deleted(system):
     root = system.new_root()
     observable = root.add_observable("test", TEST_1)
     request = AnalysisRequest(system, root, observable, amt)
-    await system.submit_analysis_request(request)
+    await system.queue_analysis_request(request)
     await system.delete_analysis_request(request)
     assert await system.get_analysis_request_by_request_id(request.id) is None
 

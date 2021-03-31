@@ -1,6 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 
-import threading
+import asyncio
 
 import pytest
 
@@ -176,14 +176,14 @@ async def test_alert_collection_on_event(system):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.event = None
-            self.sync = threading.Event()
+            self.sync = asyncio.Event()
 
-        def handle_event(self, event: Event):
+        async def handle_event(self, event: Event):
             self.event = event
             self.sync.set()
 
-        def wait(self):
-            if not self.sync.wait(3):
+        async def wait(self):
+            if not await self.sync.wait():
                 raise RuntimeError("timed out")
 
     handler = TestEventHandler()
@@ -199,7 +199,7 @@ async def test_alert_collection_on_event(system):
     request.modified_observable.add_analysis(type=amt).add_detection_point("test")
     await system.process_analysis_request(request)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ALERT
     assert handler.event.args == root.uuid
     assert await system.get_alerts("test") == [root.uuid]

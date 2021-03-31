@@ -13,3 +13,24 @@ class RemoteAnalysisTrackingInterface(AnalysisTrackingBaseInterface):
 
     async def i_get_analysis_details(self, uuid: str) -> Any:
         return await self.get_api().get_analysis_details(uuid)
+
+    async def track_root_analysis(self, root: RootAnalysis) -> bool:
+        raise NotImplementedError()
+
+    async def update_root_analysis(self, root: RootAnalysis) -> bool:
+        raise NotImplementedError()
+
+    async def delete_root_analysis(self, root: Union[RootAnalysis, str]) -> bool:
+        raise NotImplementedError()
+
+    async def root_analysis_exists(self, root: Union[RootAnalysis, str]) -> bool:
+        raise NotImplementedError()
+
+    async def track_analysis_details(self, root: RootAnalysis, uuid: str, value: Any) -> bool:
+        raise NotImplementedError()
+
+    async def delete_analysis_details(self, uuid: str) -> bool:
+        raise NotImplementedError()
+
+    async def analysis_details_exists(self, uuid: str) -> bool:
+        raise NotImplementedError()

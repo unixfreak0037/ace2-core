@@ -1,5 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 
+import asyncio
 import threading
 
 from typing import Optional
@@ -9,59 +10,71 @@ from ace.logging import get_logger
 from ace.system.base import EventBaseInterface
 from ace.system.events import EventHandler
 
+REDIS_CHANNEL_EVENTS = "events"
+
 
 class RedisEventInterface(EventBaseInterface):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._rc = None
-        self._rc_p = None
-        self.event_sync_lock = threading.RLock()
+        self.event_reader_connection = None
+        self.event_reader_stopped_event = None
+        self.event_sync_lock = asyncio.Lock()
         self.event_handlers = {}  # key = event.name, value = [EventHandler]
-        self.event_thread = None
 
-    def redis_message_handler(self, message: dict):
-        if message["type"] not in ["message", "pmessage"]:
-            get_logger().debug(f"redis message {message['data']}")
-            return
-
-        # decode into utf8
-        channel = message["channel"].decode()
-        data = message["data"].decode()
-
-        get_logger().debug(f"received channel {message['channel']} data {message['data']}")
-
-        if channel not in self.event_handlers:
-            get_logger().warning(f"event {channel} fired but not registered")
-            return
-
+    async def redis_message_handler(self, message: bytes):
+        data = message.decode()
         event = Event.parse_raw(data)
-        if event.name != channel:
-            get_logger().error(f"redis channel {channel} does not match event name {event.name}")
-            return
+        get_logger().debug(f"received event {event.name}")
 
         # grab a copy of a list of the handlers for this event
-        with self.event_sync_lock:
-            handlers = self.event_handlers[channel][:]
+        handlers = []
+        async with self.event_sync_lock:
+            if event.name in self.event_handlers:
+                handlers = self.event_handlers[event.name][:]
 
         for handler in handlers:
             try:
-                # TODO this should fire on another thread
-                handler.handle_event(event)
+                get_logger().debug(f"handler {handler} event {event.name}")
+                await handler.handle_event(event)
             except Exception as e:
                 try:
-                    handler.handle_exception(event, e)
+                    await handler.handle_exception(event, e)
                 except Exception as oh_noes:
                     get_logger().error(f"unable to handle exception {e}: {oh_noes}")
 
+    async def event_reader(self, channel):
+        while await channel.wait_message():
+            message = await channel.get()
+            if message:
+                await self.redis_message_handler(message)
+
+        get_logger().debug("event reader stopped")
+        self.event_reader_stopped_event.set()
+
+    async def initialize_event_reader(self):
+        """Starts the event reader loop if it isn't already running."""
+        if self.event_reader_connection is None:
+            get_logger().debug("starting event reader loop")
+            self.event_reader_stopped_event = asyncio.Event()
+            self.event_reader_connection = await self._get_redis_connection()
+            (channel,) = await self.event_reader_connection.subscribe(REDIS_CHANNEL_EVENTS)
+            asyncio.get_running_loop().create_task(self.event_reader(channel))
+
+    async def stop_event_reader(self):
+        """Stops the event reader if it's running."""
+        if self.event_reader_connection:
+            self.event_reader_connection.close()
+            await self.event_reader_connection.wait_closed()
+            await self.event_reader_stopped_event.wait()
+
     async def i_register_event_handler(self, event: str, handler: EventHandler):
-        with self.event_sync_lock:
+
+        # make sure the event reader has started
+        await self.initialize_event_reader()
+
+        async with self.event_sync_lock:
             # have we initialize our connection to redis pub/sub yet?
             # we can't do this until we've got something registered
-            if self._rc is None:
-                get_logger().debug("connecting to redis")
-                self._rc = await self._get_redis_connection()
-                self._rc_p = self._rc.pubsub(ignore_subscribe_messages=True)
-
             if event not in self.event_handlers:
                 self.event_handlers[event] = []
 
@@ -72,16 +85,10 @@ class RedisEventInterface(EventBaseInterface):
             self.event_handlers[event].append(handler)
             redis_handlers = {event: self.redis_message_handler for event, _ in self.event_handlers.items()}
 
-            # XXX assuming we can safely resubscribe every time
-            self._rc_p.subscribe(**redis_handlers)
-            if self.event_thread is None:
-                self.event_thread = self._rc_p.run_in_thread(sleep_time=0.001)
-                get_logger().debug(f"started redis event thread {self.event_thread}")
-
     async def i_remove_event_handler(self, handler: EventHandler, events: Optional[list[str]] = []):
         # if we didn't specify which events to remove the handler from then we
         # look at all of them
-        with self.event_sync_lock:
+        async with self.event_sync_lock:
             if not events:
                 events = list(self.event_handlers.keys())
 
@@ -92,18 +99,8 @@ class RedisEventInterface(EventBaseInterface):
                 except ValueError:
                     pass
 
-            # determine which events no longer have any handlers
-            unsubscribe_events = []
-            for event, handlers in self.event_handlers.items():
-                if not handlers:
-                    unsubscribe_events.append(event)
-
-            # unsubscribe from redis for those events
-            if unsubscribe_events:
-                self._rc_p.unsubscribe(*unsubscribe_events)
-
     async def i_get_event_handlers(self, event: str) -> list[EventHandler]:
-        with self.event_sync_lock:
+        async with self.event_sync_lock:
             try:
                 return self.event_handlers[event][:]
             except KeyError:
@@ -112,26 +109,14 @@ class RedisEventInterface(EventBaseInterface):
     async def i_fire_event(self, event: Event):
         try:
             async with self.get_redis_connection() as rc:
-                rc.publish(event.name, event.json(encoder=custom_json_encoder))
+                await rc.publish(REDIS_CHANNEL_EVENTS, event.json(encoder=custom_json_encoder))
         except Exception as e:
             get_logger().error(f"unable to submit event {event} to redis: {e}")
 
-    def stop(self):
-        if self.event_thread:
-            self.event_thread.stop()
-            self.event_thread = None
-
-        super().stop()
+    async def stop(self):
+        await self.stop_event_reader()
+        await super().stop()
 
     async def reset(self):
         await super().reset()
-        # unsubscribe from all events
-        if self._rc_p:
-            self._rc_p.unsubscribe()
-            # self._rc_p = None
-
-        # if self._rc:
-        # self._rc.close()
-        # self._rc = None
-
         self.event_handlers = {}  # key = event.name, value = [EventHandler]

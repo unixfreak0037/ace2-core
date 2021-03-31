@@ -63,8 +63,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
         Base.metadata.bind = self.engine
         Base.metadata.create_all()
 
-    def stop(self):
-        super().stop()
+    async def stop(self):
+        await super().stop()
 
         if os.path.exists("ace.db"):
             os.remove("ace.db")
@@ -76,10 +76,12 @@ class RedisACETestSystem(RedisACESystem, DatabaseACETestSystem, ThreadedACESyste
 
         # clear everything
         async with self.get_redis_connection() as rc:
-            rc.flushall()
+            await rc.flushall()
 
-        if self._rc_p:
-            self._rc_p.unsubscribe()
+    async def stop(self):
+        async with self.get_redis_connection() as rc:
+            rc.close()
+            await rc.wait_closed()
 
 
 class DistributedACETestSystem(RedisACETestSystem):

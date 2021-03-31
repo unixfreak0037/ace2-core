@@ -257,10 +257,10 @@ async def test_crashing_sync_analysis_module(remote_system):
     sync = threading.Event()
 
     class CustomEventHandler(EventHandler):
-        def handle_event(self, event: Event):
+        async def handle_event(self, event: Event):
             sync.set()
 
-        def handle_exception(self, event: str, exception: Exception):
+        async def handle_exception(self, event: str, exception: Exception):
             pass
 
     # TODO when events are distributed modify this to use that

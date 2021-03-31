@@ -29,7 +29,7 @@ class DatabaseConfigurationInterface(ConfigurationBaseInterface):
 
         result = self.get_config_obj(key)
         if result is None:
-            return None
+            return self.temp_config.get(key, None)
 
         # note that we're storing the entire ConfigurationSetting object in the column
         setting = ConfigurationSetting.parse_raw(result.value)

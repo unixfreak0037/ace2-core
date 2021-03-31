@@ -15,7 +15,10 @@ async def remote_system(redis):
     app.state.system = DistributedACETestSystem()
     from ace.system.redis import CONFIG_REDIS_HOST, CONFIG_REDIS_PORT
 
-    await app.state.system.set_config(CONFIG_REDIS_HOST, redis.client_port())
+    # pull the unix path from the redislist connection pool
+    await app.state.system.set_config(
+        CONFIG_REDIS_HOST, "unix://{}".format(redis.connection_pool.connection_kwargs["path"])
+    )
 
     # initialize encryption settings with a password of "test"
     app.state.system.encryption_settings = initialize_encryption_settings("test")
@@ -25,7 +28,7 @@ async def remote_system(redis):
     await app.state.system.reset()
 
     app.state.system.root_api_key = await app.state.system.create_api_key("test_root", "test_root", is_admin=True)
-    app.state.system.start()
+    await app.state.system.start()
 
     test_system = RemoteACETestSystem()
     await test_system.initialize()
@@ -34,12 +37,12 @@ async def remote_system(redis):
     test_system.api.api_key = app.state.system.root_api_key
     get_logger().info(f"using api key {test_system.api.api_key}")
 
-    test_system.start()
+    await test_system.start()
 
     yield test_system
 
-    test_system.stop()
-    app.state.system.stop()
+    await test_system.stop()
+    await app.state.system.stop()
 
 
 @pytest.fixture(autouse=True, scope="function")

@@ -21,32 +21,32 @@ def get_alert_queue(name: str) -> str:
 class RedisAlertTrackingInterface(AlertingBaseInterface):
     async def i_register_alert_system(self, name: str) -> bool:
         async with self.get_redis_connection() as rc:
-            return rc.hsetnx(KEY_ALERT_SYSTEMS, name, str(utc_now())) == 1
+            return await rc.hsetnx(KEY_ALERT_SYSTEMS, name, str(utc_now())) == 1
 
     async def i_unregister_alert_system(self, name: str) -> bool:
         async with self.get_redis_connection() as rc:
-            return rc.hdel(KEY_ALERT_SYSTEMS, name) == 1
+            return await rc.hdel(KEY_ALERT_SYSTEMS, name) == 1
 
     async def i_submit_alert(self, root_uuid: str) -> bool:
         async with self.get_redis_connection() as rc:
             result = False
-            for name in rc.hkeys(KEY_ALERT_SYSTEMS):
+            for name in await rc.hkeys(KEY_ALERT_SYSTEMS):
                 result = True
                 name = name.decode()
-                rc.rpush(get_alert_queue(name), root_uuid)
+                await rc.rpush(get_alert_queue(name), root_uuid)
 
         return result
 
     async def i_get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
         async with self.get_redis_connection() as rc:
-            if not rc.hexists(KEY_ALERT_SYSTEMS, name):
+            if not await rc.hexists(KEY_ALERT_SYSTEMS, name):
                 raise UnknownAlertSystemError(name)
 
             result = []
 
             if timeout is None:
                 while True:
-                    alert_uuid = rc.lpop(get_alert_queue(name))
+                    alert_uuid = await rc.lpop(get_alert_queue(name))
                     if alert_uuid is None:
                         break
 
@@ -57,7 +57,7 @@ class RedisAlertTrackingInterface(AlertingBaseInterface):
             else:
                 # if a timeout is specified then only a single alert is returned
                 # if we have a timeout when we use BLPOP
-                result = rc.blpop(get_alert_queue(name), timeout=timeout)
+                result = await rc.blpop(get_alert_queue(name), timeout=timeout)
                 if result is None:
                     return []
 
@@ -67,7 +67,7 @@ class RedisAlertTrackingInterface(AlertingBaseInterface):
 
     async def i_get_alert_count(self, name: str) -> int:
         async with self.get_redis_connection() as rc:
-            if not rc.hexists(KEY_ALERT_SYSTEMS, name):
+            if not await rc.hexists(KEY_ALERT_SYSTEMS, name):
                 raise UnknownAlertSystemError(name)
 
-            return rc.llen(get_alert_queue(name))
+            return await rc.llen(get_alert_queue(name))

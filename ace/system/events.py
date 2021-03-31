@@ -18,7 +18,7 @@ from ace.data_model import Event
 
 
 class EventHandler:
-    def handle_event(self, event: Event):
+    async def handle_event(self, event: Event):
         """Called when an event is fired.
 
         Args:
@@ -26,7 +26,7 @@ class EventHandler:
         """
         raise NotImplementedError()
 
-    def handle_exception(self, event: str, exception: Exception):
+    async def handle_exception(self, event: str, exception: Exception):
         """Called when the call to handle_event raises an exception.
 
         This is called with the same parameters as handle_event and an additional parameter that is the exception that was raised.

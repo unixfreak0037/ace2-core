@@ -20,8 +20,10 @@ from tests.systems import (
     DistributedACETestSystem,
 )
 
-from docker import DockerClient
-from yellowbox.extras.redis import RedisService
+# from docker import DockerClient
+# from yellowbox.extras.redis import RedisService
+
+from redislite import Redis
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -39,7 +41,8 @@ def event_loop():
 
 @pytest.fixture(scope="session")
 def redis():
-    docker_client = DockerClient.from_env()
-    with RedisService.run(docker_client) as redis:
-        yield redis
-        docker_client.close()
+    try:
+        redis_connection = Redis("ace.rdb")
+        yield redis_connection
+    finally:
+        redis_connection.close()

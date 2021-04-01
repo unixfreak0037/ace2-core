@@ -46,9 +46,13 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingBaseInterf
         # when we process an analysis request we "lock" it by setting the lock field
         # so if we try to link against an analysis request that is "locked" it fails
 
+        # INSERT INTO analysis_request_links ( source_id, dest_id )
+        # SELECT :source.id, :dest.id FROM analysis_tracking_request
+        # WHERE source.id = :source.id AND lock IS NULL
+
         sel = select(
-            [bindparam("s", type_=String).label("source_id"), bindparam("d", type_=String).label("dest_id")],
-            AnalysisRequestTracking.__table__,
+            bindparam("s", type_=String).label("source_id"),
+            bindparam("d", type_=String).label("dest_id"),
         ).where(
             and_(AnalysisRequestTracking.id == source.id, AnalysisRequestTracking.lock == None)
         )  # noqa:E711

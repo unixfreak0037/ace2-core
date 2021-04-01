@@ -3,22 +3,12 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    BigInteger,
     BOOLEAN,
-    Binary,
     Column,
-    DATE,
-    DATETIME,
-    DateTime,
-    Enum,
     ForeignKey,
-    Index,
     Integer,
-    LargeBinary,
     String,
     Text,
-    UniqueConstraint,
-    func,
     text,
 )
 

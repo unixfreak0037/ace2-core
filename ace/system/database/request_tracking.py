@@ -163,6 +163,6 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingBaseInterf
                 request = AnalysisRequest.from_json(db_request.json_data, self)
                 await self.fire_event(EVENT_AR_EXPIRED, request)
                 try:
-                    await self.submit_analysis_request(request)
+                    await self.queue_analysis_request(request)
                 except UnknownAnalysisModuleTypeError:
                     self.delete_analysis_request(request)

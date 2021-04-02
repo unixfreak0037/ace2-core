@@ -1,7 +1,8 @@
 # vim: ts=4:sw=4:et:cc=120
 
-from typing import Optional
+from typing import Optional, Union
 
+from ace.analysis import RootAnalysis
 from ace.system.base import AlertingBaseInterface
 
 
@@ -14,3 +15,6 @@ class RemoteAlertTrackingInterface(AlertingBaseInterface):
 
     async def get_alerts(self, name: str, timeout: Optional[int] = None) -> list[str]:
         return await self.get_api().get_alerts(name, timeout=timeout)
+
+    async def submit_alert(self, root: Union[RootAnalysis, str]) -> bool:
+        raise NotImplementedError()

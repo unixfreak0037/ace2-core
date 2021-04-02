@@ -1,6 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 
-import threading
+import asyncio
 
 import pytest
 
@@ -51,24 +51,24 @@ class TestEventHandler(EventHandler):
 
         self.event = None
         self.exception = None
-        self.sync = threading.Event()
+        self.sync = asyncio.Event()
 
-    def handle_event(self, event: Event):
+    async def handle_event(self, event: Event):
         self.event = event
         self.sync.set()
 
-    def handle_exception(self, event: Event, exception: Exception):
+    async def handle_exception(self, event: Event, exception: Exception):
         self.event = event
         self.exception = exception
         self.sync.set()
 
-    def wait(self):
-        self.sync.wait(3)
+    async def wait(self):
+        await self.sync.wait()
 
     def reset(self):
         self.event = None
         self.exception = None
-        self.sync = threading.Event()
+        self.sync = asyncio.Event()
 
 
 @pytest.mark.asyncio
@@ -79,7 +79,7 @@ async def test_EVENT_ANALYSIS_ROOT_NEW(system):
     root = system.new_root()
     await system.track_root_analysis(root)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_NEW
     assert RootAnalysis.from_dict(handler.event.args, system) == root
 
@@ -106,7 +106,7 @@ async def test_EVENT_ANALYSIS_ROOT_MODIFIED(system):
     # already tracked so should fire as modified
     await system.track_root_analysis(root)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_MODIFIED
     assert RootAnalysis.from_dict(handler.event.args, system) == root
 
@@ -120,7 +120,7 @@ async def test_EVENT_ANALYSIS_ROOT_DELETED(system):
     await system.register_event_handler(EVENT_ANALYSIS_ROOT_DELETED, handler)
     await system.delete_root_analysis(root)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_DELETED
     assert handler.event.args == root.uuid
 
@@ -141,7 +141,7 @@ async def test_EVENT_ANALYSIS_DETAILS_NEW(system):
     await system.track_root_analysis(root)
     await system.track_analysis_details(root, root.uuid, await root.get_details())
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_DETAILS_NEW
     assert RootAnalysis.from_dict(handler.event.args[0], system) == root
     assert handler.event.args[1] == root.uuid
@@ -169,7 +169,7 @@ async def test_EVENT_ANALYSIS_DETAILS_MODIFIED(system):
     await system.register_event_handler(EVENT_ANALYSIS_DETAILS_MODIFIED, handler)
     await system.track_analysis_details(root, root.uuid, await root.get_details())
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_DETAILS_MODIFIED
     assert RootAnalysis.from_dict(handler.event.args[0], system) == root
     assert handler.event.args[1] == root.uuid
@@ -186,7 +186,7 @@ async def test_EVENT_ANALYSIS_DETAILS_DELETED(system):
     await system.register_event_handler(EVENT_ANALYSIS_DETAILS_DELETED, handler)
     await system.delete_analysis_details(root.uuid)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_DETAILS_DELETED
     assert handler.event.args == root.uuid
 
@@ -204,7 +204,7 @@ async def test_ALERT_SYSTEM_REGISTERED(system):
     await system.register_event_handler(EVENT_ALERT_SYSTEM_REGISTERED, handler)
     await system.register_alert_system("test")
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ALERT_SYSTEM_REGISTERED
     assert handler.event.args == "test"
 
@@ -222,7 +222,7 @@ async def test_ALERT_SYSTEM_REGISTERED(system):
     await system.register_event_handler(EVENT_ALERT_SYSTEM_UNREGISTERED, handler)
 
     await system.unregister_alert_system("test")
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ALERT_SYSTEM_UNREGISTERED
     assert handler.event.args == "test"
 
@@ -244,7 +244,7 @@ async def test_EVENT_ALERT(system):
     await system.register_event_handler(EVENT_ALERT, handler)
     await system.submit_alert(root)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ALERT
     assert handler.event.args == root.uuid
 
@@ -253,7 +253,7 @@ async def test_EVENT_ALERT(system):
     await system.register_event_handler(EVENT_ALERT, handler)
     await system.submit_alert(root)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ALERT
     assert handler.event.args == root.uuid
 
@@ -267,7 +267,7 @@ async def test_EVENT_AMT_NEW(system):
     amt = AnalysisModuleType("test", "")
     await system.register_analysis_module_type(amt)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_AMT_NEW
     assert AnalysisModuleType.from_dict(handler.event.args) == amt
 
@@ -308,7 +308,7 @@ async def test_EVENT_AMT_MODIFIED(system):
     # modified this time
     await system.register_analysis_module_type(amt)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_AMT_MODIFIED
     assert AnalysisModuleType.from_dict(handler.event.args) == amt
 
@@ -323,7 +323,7 @@ async def test_EVENT_AMT_DELETED(system):
     await system.register_analysis_module_type(amt)
     await system.delete_analysis_module_type(amt)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_AMT_DELETED
     assert AnalysisModuleType.from_dict(handler.event.args) == amt
 
@@ -344,7 +344,7 @@ async def test_EVENT_AR_NEW(system):
     request = root.create_analysis_request()
     await system.track_analysis_request(request)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_AR_NEW
     assert AnalysisRequest.from_dict(handler.event.args, system) == request
 
@@ -353,7 +353,7 @@ async def test_EVENT_AR_NEW(system):
     await system.track_analysis_request(request)
 
     # you can re-track a request without harm
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_AR_NEW
     assert AnalysisRequest.from_dict(handler.event.args, system) == request
 
@@ -369,7 +369,7 @@ async def test_EVENT_AR_DELETED(system):
     await system.track_analysis_request(request)
     await system.delete_analysis_request(request)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_AR_DELETED
     assert handler.event.args == request.id
 
@@ -397,7 +397,7 @@ async def test_EVENT_AR_EXPIRED(system):
 
     await system.process_expired_analysis_requests(amt)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_AR_EXPIRED
     assert AnalysisRequest.from_dict(handler.event.args, system) == request
 
@@ -417,7 +417,7 @@ async def test_EVENT_CACHE_NEW(system):
 
     assert await system.cache_analysis_result(request) is not None
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_CACHE_NEW
     assert handler.event.args[0] == generate_cache_key(observable, amt)
     assert AnalysisRequest.from_dict(handler.event.args[1], system) == request
@@ -426,7 +426,7 @@ async def test_EVENT_CACHE_NEW(system):
     handler = TestEventHandler()
     await system.register_event_handler(EVENT_CACHE_NEW, handler)
     assert await system.cache_analysis_result(request) is not None
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_CACHE_NEW
     assert handler.event.args[0] == generate_cache_key(observable, amt)
     assert AnalysisRequest.from_dict(handler.event.args[1], system) == request
@@ -439,7 +439,7 @@ async def test_EVENT_CONFIG_SET(system):
     await system.register_event_handler(EVENT_CONFIG_SET, handler)
 
     await system.set_config("test", "value")
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_CONFIG_SET
     assert handler.event.args[0] == "test"
     assert handler.event.args[1] == "value"
@@ -448,7 +448,7 @@ async def test_EVENT_CONFIG_SET(system):
     handler = TestEventHandler()
     await system.register_event_handler(EVENT_CONFIG_SET, handler)
     await system.set_config("test", "value")
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_CONFIG_SET
     assert handler.event.args[0] == "test"
     assert handler.event.args[1] == "value"
@@ -463,7 +463,7 @@ async def test_EVENT_STORAGE_NEW(system):
     meta = ContentMetadata(name="test")
     sha256 = await system.store_content("test", meta)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_STORAGE_NEW
     assert handler.event.args[0] == sha256
     event_meta = ContentMetadata.parse_obj(handler.event.args[1])
@@ -478,7 +478,7 @@ async def test_EVENT_STORAGE_NEW(system):
     meta = ContentMetadata(name="test")
     sha256 = await system.store_content("test", meta)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_STORAGE_NEW
     assert handler.event.args[0] == sha256
     event_meta = ContentMetadata.parse_obj(handler.event.args[1])
@@ -496,7 +496,7 @@ async def test_EVENT_STORAGE_DELETED(system):
     sha256 = await system.store_content("test", meta)
     await system.delete_content(sha256)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_STORAGE_DELETED
     assert handler.event.args == sha256
 
@@ -514,7 +514,7 @@ async def test_EVENT_WORK_QUEUE_NEW(system):
     await system.register_event_handler(EVENT_WORK_QUEUE_NEW, handler)
 
     await system.add_work_queue("test")
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_WORK_QUEUE_NEW
     assert handler.event.args == "test"
 
@@ -534,7 +534,7 @@ async def test_EVENT_WORK_QUEUE_DELETED(system):
 
     await system.add_work_queue("test")
     await system.delete_work_queue("test")
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_WORK_QUEUE_DELETED
     assert handler.event.args == "test"
 
@@ -557,9 +557,9 @@ async def test_EVENT_WORK_ADD(system):
     root = system.new_root()
     observable = root.add_observable("test", "test")
     request = AnalysisRequest(system, root, observable, amt)
-    await system.submit_analysis_request(request)
+    await system.queue_analysis_request(request)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_WORK_ADD
     assert handler.event.args[0] == amt.name
     assert AnalysisRequest.from_dict(handler.event.args[1], system) == request
@@ -576,10 +576,10 @@ async def test_EVENT_WORK_REMOVE(system):
     root = system.new_root()
     observable = root.add_observable("test", "test")
     request = AnalysisRequest(system, root, observable, amt)
-    await system.submit_analysis_request(request)
+    await system.queue_analysis_request(request)
     work = await system.get_work(amt, 0)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_WORK_REMOVE
     assert handler.event.args[0] == amt.name
     assert AnalysisRequest.from_dict(handler.event.args[1], system) == work
@@ -602,7 +602,7 @@ async def test_EVENT_ANALYSIS_ROOT_EXPIRED(system):
     root = system.new_root(expires=True)
     await root.submit()
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_ANALYSIS_ROOT_EXPIRED
     event_root = RootAnalysis.from_dict(handler.event.args, system)
     assert event_root.uuid == root.uuid and event_root.version is not None
@@ -631,7 +631,7 @@ async def test_EVENT_CACHE_HIT(system):
     root_request = root.create_analysis_request()
     await system.process_analysis_request(root_request)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_CACHE_HIT
     event_root = RootAnalysis.from_dict(handler.event.args[0], system)
     assert event_root.uuid == root.uuid and event_root.version is not None
@@ -654,7 +654,7 @@ async def test_EVENT_WORK_ASSIGNED(system):
     await system.process_analysis_request(root_request)
     request = await system.get_next_analysis_request("owner", amt, 0)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == EVENT_WORK_ASSIGNED
     assert AnalysisRequest.from_dict(handler.event.args, system) == request
 
@@ -675,13 +675,13 @@ async def test_EVENT_PROCESSING(system):
     root_request = root.create_analysis_request()
     await system.process_analysis_request(root_request)
 
-    root_handler.wait()
+    await root_handler.wait()
     assert root_handler.event.name == EVENT_PROCESSING_REQUEST_ROOT
     assert AnalysisRequest.from_dict(root_handler.event.args, system) == root_request
 
     request = await system.get_next_analysis_request("owner", amt, 0)
 
-    observable_request_handler.wait()
+    await observable_request_handler.wait()
     assert observable_request_handler.event.name == EVENT_PROCESSING_REQUEST_OBSERVABLE
     assert AnalysisRequest.from_dict(observable_request_handler.event.args, system) == request
 
@@ -692,6 +692,6 @@ async def test_EVENT_PROCESSING(system):
     request.modified_observable.add_analysis(type=amt, details={"test": "test"})
     await system.process_analysis_request(request)
 
-    result_handler.wait()
+    await result_handler.wait()
     assert result_handler.event.name == EVENT_PROCESSING_REQUEST_RESULT
     assert AnalysisRequest.from_dict(result_handler.event.args, system) == request

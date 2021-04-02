@@ -1,7 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 
+import asyncio
 import json
-import threading
 
 from dataclasses import dataclass
 
@@ -19,32 +19,32 @@ class TestEventHandler(EventHandler):
         self.event = None
         self.exception = None
         self.event_args_json = None
-        self.sync = threading.Event()
+        self.sync = asyncio.Event()
         self.count = 0
 
     @property
     def event_args(self):
         return json.loads(self.event_args_json)
 
-    def handle_event(self, event: Event):
+    async def handle_event(self, event: Event):
         self.event = event
         self.count += 1
         self.sync.set()
 
-    def handle_exception(self, event: Event, exception: Exception):
+    async def handle_exception(self, event: Event, exception: Exception):
         self.event = event
         self.exception = exception
         self.sync.set()
 
-    def wait(self):
-        if not self.sync.wait(3):
+    async def wait(self):
+        if not await self.sync.wait():
             raise RuntimeError("wait() timed out")
 
     def reset(self):
         self.count = 0
         self.event = None
         self.exception = None
-        self.sync = threading.Event()
+        self.sync = asyncio.Event()
 
 
 @pytest.mark.unit
@@ -100,7 +100,7 @@ async def test_event_handler(system):
     args = ["test", {"kwarg1": "test"}]
     await system.fire_event("test", args)
 
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == "test"
     assert handler.event.args == args
 
@@ -122,11 +122,11 @@ async def test_event_multiple_handlers(system):
     args = ["test", {"kwarg1": "test"}]
     await system.fire_event("test", args)
 
-    handler_1.wait()
+    await handler_1.wait()
     assert handler_1.event.name == "test"
     assert handler_1.event.args == args
 
-    handler_2.wait()
+    await handler_2.wait()
     assert handler_2.event.name == "test"
     assert handler_2.event.args == args
 
@@ -143,7 +143,7 @@ async def test_event_handlers_add_fire_remove(system):
     await system.fire_event("test", args)
 
     # make sure it fired
-    handler_1.wait()
+    await handler_1.wait()
     assert handler_1.event.name == "test"
     assert handler_1.event.args == args
 
@@ -156,7 +156,7 @@ async def test_event_handlers_add_fire_remove(system):
     await system.fire_event("test_2", args)
 
     # make sure it fired
-    handler_2.wait()
+    await handler_2.wait()
     assert handler_2.event.name == "test_2"
     assert handler_2.event.args == args
 
@@ -175,7 +175,7 @@ async def test_register_duplicate_handler(system):
     # registering it twice is OK but it should emit a warning
     await system.register_event_handler("test", handler)
     await system.fire_event("test")
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == "test"
     assert handler.count == 1
 
@@ -188,18 +188,18 @@ async def test_event_remove_multiple(system):
     await system.register_event_handler("test_2", handler)
     args = ["test", {"kwarg1": "test"}]
     await system.fire_event("test_1", args)
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == "test_1"
     handler.reset()
     await system.fire_event("test_2", args)
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == "test_2"
     handler.reset()
     await system.remove_event_handler(handler, ["test_1"])
     await system.fire_event("test_1", args)
     assert handler.event is None
     await system.fire_event("test_2", args)
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == "test_2"
 
 
@@ -207,14 +207,14 @@ async def test_event_remove_multiple(system):
 @pytest.mark.integration
 async def test_event_handle_exception(system):
     class TestExceptionHandler(TestEventHandler):
-        def handle_event(self, event: Event):
+        async def handle_event(self, event: Event):
             raise RuntimeError()
 
     handler = TestExceptionHandler()
     await system.register_event_handler("test", handler)
     args = ["test", {"kwarg1": "test"}]
     await system.fire_event("test", args)
-    handler.wait()
+    await handler.wait()
     assert handler.event.name == "test"
     assert handler.event.args == args
     assert handler.exception is not None
@@ -230,7 +230,7 @@ async def test_event_distribution(system):
     await system.fire_event("test")
 
     for handler in handlers:
-        handler.wait()
+        await handler.wait()
         assert handler.event.name == "test"
         assert handler.count == 1
 

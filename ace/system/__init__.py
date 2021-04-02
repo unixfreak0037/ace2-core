@@ -42,18 +42,24 @@ class ACESystem(
 
         return RootAnalysis(system=self, *args, **kwargs)
 
-    # XXX reset is really just for unit testing
     async def reset(self):
+        """Resets the system. Useful for unit testing."""
         pass
 
     # should be called before start() is called
     async def initialize(self):
+        """Called once when the system is first created.
+        Be sure to call await super().initialize if you override this method."""
         pass
 
     # called to start the system
-    def start(self):
+    async def start(self):
+        """Called once as the system begins execution.
+        Be sure to call await super().initialize if you override this method."""
         pass
 
     # called to stop the system
-    def stop(self):
+    async def stop(self):
+        """Called once when the system is being shut down.
+        Extend this to"""
         pass

@@ -46,9 +46,9 @@ class ThreadedEventInterafce(EventBaseInterface):
 
         for handler in await self.get_event_handlers(event.name):
             try:
-                handler.handle_event(event)
+                await handler.handle_event(event)
             except Exception as e:
-                handler.handle_exception(event, e)
+                await handler.handle_exception(event, e)
 
     async def reset(self):
         await super().reset()

@@ -10,7 +10,7 @@ from ace.logging import get_logger
 from ace.constants import *
 from ace.system.requests import AnalysisRequest
 from ace.analysis import Observable, AnalysisModuleType, RootAnalysis
-from ace.exceptions import UnknownAnalysisModuleTypeError, ExpiredAnalysisRequestError
+from ace.exceptions import UnknownAnalysisModuleTypeError, ExpiredAnalysisRequestError, UnknownAnalysisRequestError
 
 
 class AnalysisRequestTrackingBaseInterface:
@@ -151,7 +151,7 @@ class AnalysisRequestTrackingBaseInterface:
         raise NotImplementedError()
 
     @coreapi
-    async def submit_analysis_request(self, ar: AnalysisRequest):
+    async def queue_analysis_request(self, ar: AnalysisRequest):
         """Submits the given AnalysisRequest to the appropriate queue for analysis."""
         assert isinstance(ar, AnalysisRequest)
         assert isinstance(ar.root, RootAnalysis)
@@ -334,7 +334,7 @@ class AnalysisRequestTrackingBaseInterface:
                     # track_analysis_request(new_ar)
                     await target_root.update_and_save()
                     await self.fire_event(EVENT_PROCESSING_REQUEST_OBSERVABLE, new_ar)
-                    await self.submit_analysis_request(new_ar)
+                    await self.queue_analysis_request(new_ar)
                     continue
 
         # at this point this AnalysisRequest is no longer needed

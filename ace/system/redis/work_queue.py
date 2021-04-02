@@ -24,35 +24,35 @@ def get_queue_name(name: str) -> str:
 
 class RedisWorkQueueManagerInterface(WorkQueueBaseInterface):
     async def i_add_work_queue(self, name: str) -> bool:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             # this has to exist for the queue to exist
-            return rc.hsetnx(KEY_WORK_QUEUES, name, str(utc_now())) == 1
+            return await rc.hsetnx(KEY_WORK_QUEUES, name, str(utc_now())) == 1
 
     async def i_delete_work_queue(self, name: str) -> bool:
-        with self.get_redis_connection() as rc:
+        async with self.get_redis_connection() as rc:
             # this has to exist for the queue to exist
-            result = rc.hdel(KEY_WORK_QUEUES, name)
+            result = await rc.hdel(KEY_WORK_QUEUES, name)
             # the actual queue may or may not exist
-            rc.delete(get_queue_name(name))
+            await rc.delete(get_queue_name(name))
 
         return result == 1
 
     async def i_put_work(self, amt: str, analysis_request: AnalysisRequest):
-        with self.get_redis_connection() as rc:
-            if not rc.hexists(KEY_WORK_QUEUES, amt):
+        async with self.get_redis_connection() as rc:
+            if not await rc.hexists(KEY_WORK_QUEUES, amt):
                 raise UnknownAnalysisModuleTypeError()
 
-            rc.rpush(get_queue_name(amt), analysis_request.to_json())
+            await rc.rpush(get_queue_name(amt), analysis_request.to_json())
 
     async def i_get_work(self, amt: str, timeout: float) -> Union[AnalysisRequest, None]:
-        with self.get_redis_connection() as rc:
-            if not rc.hexists(KEY_WORK_QUEUES, amt):
+        async with self.get_redis_connection() as rc:
+            if not await rc.hexists(KEY_WORK_QUEUES, amt):
                 raise UnknownAnalysisModuleTypeError()
 
             # if we're not looking to wait then we use LPOP
             # this always returns a single result
             if timeout == 0:
-                result = rc.lpop(get_queue_name(amt))
+                result = await rc.lpop(get_queue_name(amt))
                 if result is None:
                     return None
 
@@ -60,7 +60,7 @@ class RedisWorkQueueManagerInterface(WorkQueueBaseInterface):
 
             else:
                 # if we have a timeout when we use BLPOP
-                result = rc.blpop(get_queue_name(amt), timeout=timeout)
+                result = await rc.blpop(get_queue_name(amt), timeout=timeout)
                 if result is None:
                     return None
 
@@ -69,8 +69,8 @@ class RedisWorkQueueManagerInterface(WorkQueueBaseInterface):
                 return AnalysisRequest.from_json(result.decode(), system=self)
 
     async def i_get_queue_size(self, amt: str) -> int:
-        with self.get_redis_connection() as rc:
-            if not rc.hexists(KEY_WORK_QUEUES, amt):
+        async with self.get_redis_connection() as rc:
+            if not await rc.hexists(KEY_WORK_QUEUES, amt):
                 raise UnknownAnalysisModuleTypeError()
 
-            return rc.llen(get_queue_name(amt))
+            return await rc.llen(get_queue_name(amt))

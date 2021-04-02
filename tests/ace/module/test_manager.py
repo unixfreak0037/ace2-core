@@ -10,14 +10,14 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_add_module(system):
+async def test_add_module(remote_system):
     class CustomAnalysisModule(AnalysisModule):
         pass
 
     class CustomAnalysisModule2(AnalysisModule):
         pass
 
-    manager = AnalysisModuleManager(system)
+    manager = AnalysisModuleManager(remote_system)
     module = CustomAnalysisModule()
     assert manager.add_module(module) is module
     assert module in manager.analysis_modules
@@ -33,30 +33,30 @@ async def test_add_module(system):
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_verify_registration(system):
+async def test_verify_registration(remote_system):
     # registration OK
     amt = AnalysisModuleType("test", "", extended_version=["yara:6f5902ac237024bdd0c176cb93063dc4"])
 
-    assert await system.register_analysis_module_type(amt)
+    assert await remote_system.register_analysis_module_type(amt)
 
-    manager = AnalysisModuleManager(system)
+    manager = AnalysisModuleManager(remote_system)
     manager.add_module(AnalysisModule(amt))
     assert await manager.verify_registration()
     # missing registration
     amt = AnalysisModuleType("missing", "")
-    manager = AnalysisModuleManager(system)
+    manager = AnalysisModuleManager(remote_system)
     manager.add_module(AnalysisModule(amt))
     assert not await manager.verify_registration()
     assert not await manager.run()
     # version mismatch
     amt = AnalysisModuleType("test", "", version="1.0.1")
-    manager = AnalysisModuleManager(system)
+    manager = AnalysisModuleManager(remote_system)
     manager.add_module(AnalysisModule(amt))
     assert not await manager.verify_registration()
     assert not await manager.run()
     # extended version mismatch
     amt = AnalysisModuleType("test", "", extended_version=["yara:71bec09d78fe6abdb94244a4cc89c740"])
-    manager = AnalysisModuleManager(system)
+    manager = AnalysisModuleManager(remote_system)
     manager.add_module(AnalysisModule(amt))
     assert not await manager.verify_registration()
     # extended version mismatch but upgrade ok
@@ -66,14 +66,14 @@ async def test_verify_registration(system):
 
     # starts out with the wrong set of yara rules but upgrade() fixes that
     amt = AnalysisModuleType("test", "", extended_version=["yara:71bec09d78fe6abdb94244a4cc89c740"])
-    manager = AnalysisModuleManager(system)
+    manager = AnalysisModuleManager(remote_system)
     manager.add_module(UpgradableAnalysisModule(amt))
     assert await manager.verify_registration()
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_scaling_task_creation(system):
+async def test_scaling_task_creation(remote_system):
     class CustomManager(AnalysisModuleManager):
         direction = SCALE_DOWN
 
@@ -87,8 +87,8 @@ async def test_scaling_task_creation(system):
             return sum(iter(self.module_task_count.values()))
 
     amt = AnalysisModuleType("test", "")
-    result = await system.register_analysis_module_type(amt)
-    manager = CustomManager(system)
+    result = await remote_system.register_analysis_module_type(amt)
+    manager = CustomManager(remote_system)
     module = AnalysisModule(amt, limit=2)
     manager.add_module(module)
 

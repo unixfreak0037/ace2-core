@@ -13,3 +13,6 @@ class RemoteAuthenticationInterface(AuthenticationBaseInterface):
 
     async def delete_api_key(self, name: str) -> str:
         return await self.get_api().delete_api_key(name)
+
+    async def verify_api_key(self, api_key: str, is_admin: Optional[bool] = False) -> bool:
+        raise NotImplementedError()

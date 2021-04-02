@@ -12,3 +12,12 @@ class RemoteAnalysisModuleTrackingInterface(AnalysisModuleTrackingBaseInterface)
 
     async def i_get_analysis_module_type(self, name: str) -> Union[AnalysisModuleType, None]:
         return await self.get_api().get_analysis_module_type(name)
+
+    async def track_analysis_module_type(self, amt: AnalysisModuleType):
+        raise NotImplementedError()
+
+    async def delete_analysis_module_type(self, amt: Union[AnalysisModuleType, str]) -> bool:
+        raise NotImplementedError()
+
+    async def get_all_analysis_module_types(self) -> list[AnalysisModuleType]:
+        raise NotImplementedError()

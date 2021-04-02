@@ -102,7 +102,7 @@ class AceAPI:
     async def clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
         raise NotImplementedError()
 
-    async def submit_analysis_request(self, ar: AnalysisRequest):
+    async def queue_analysis_request(self, ar: AnalysisRequest):
         raise NotImplementedError()
 
     async def process_expired_analysis_requests(

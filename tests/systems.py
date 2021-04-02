@@ -12,6 +12,7 @@ import shutil
 
 from ace.api import AceAPI
 from ace.api.remote import RemoteAceAPI
+from ace.logging import get_logger
 from ace.system.database import DatabaseACESystem
 from ace.system.distributed import app
 from ace.system.redis import RedisACESystem
@@ -58,55 +59,42 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     def create_database(self):
         from ace.system.database.schema import Base
 
+        get_logger().info(f"creating database {self.db_url}")
         Base.metadata.bind = self.engine
         Base.metadata.create_all()
 
-    def stop(self):
-        super().stop()
+    async def stop(self):
+        await super().stop()
 
         if os.path.exists("ace.db"):
             os.remove("ace.db")
 
 
 class RedisACETestSystem(RedisACESystem, DatabaseACETestSystem, ThreadedACESystem):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._redis_connection = None
-
-    def get_redis_connection(self):
-        """Returns a redis connection to use."""
-        if self._redis_connection is None:
-            self._redis_connection = redislite.StrictRedis("ace.rdb")
-            # self._redis_connection.flushall()
-
-        return self._redis_connection
-
     async def reset(self):
         await super().reset()
 
         # clear everything
-        with self.get_redis_connection() as rc:
-            self._redis_connection.flushall()
+        async with self.get_redis_connection() as rc:
+            await rc.flushall()
+
+    async def stop(self):
+        async with self.get_redis_connection() as rc:
+            rc.close()
+            await rc.wait_closed()
 
 
 class DistributedACETestSystem(RedisACETestSystem):
-    db_url = "sqlite:///ace.db"
+    db_url = "sqlite:///ace_distributed.db"
 
-    def get_redis_connection(self):
-        """Returns a redis connection to use."""
-        if self._redis_connection is None:
-            self._redis_connection = redislite.StrictRedis("ace.rdb")
+    async def reset(self):
+        if os.path.exists("ace_distributed.db"):
+            os.remove("ace_distributed.db")
 
-        return self._redis_connection
-
-    async def initialize(self):
-        # add the initial super-user api key
-        await super().initialize()
+        await super().reset()
 
 
-class RemoteACETestSystem(RemoteACESystem, RedisACETestSystem):
-    db_url = "sqlite:///ace.db"
-
+class RemoteACETestSystem(RemoteACESystem, ThreadedACESystem):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.api = RemoteAceAPI(self)

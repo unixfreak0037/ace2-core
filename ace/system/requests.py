@@ -230,7 +230,7 @@ class AnalysisRequest:
 
     async def submit(self):
         """Submits this analysis request for processing."""
-        await self.system.submit_analysis_request(self)
+        await self.system.process_analysis_request(self)
 
     async def lock(self) -> bool:
         return await self.system.lock_analysis_request(self)

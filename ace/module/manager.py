@@ -6,6 +6,8 @@ import concurrent.futures
 import multiprocessing
 import os
 import signal
+import sys
+import threading
 import uuid
 
 from concurrent.futures.process import BrokenProcessPool
@@ -31,7 +33,7 @@ SCALE_DOWN = -1
 # concurrency routines
 #
 
-# concurrency mode for non-async analysis modules
+# concurrency mode for multi-process analysis modules
 # defaults to threaded
 CONCURRENCY_MODE_THREADED = 1
 CONCURRENCY_MODE_PROCESS = 2
@@ -56,26 +58,77 @@ CONCURRENCY_MODE_PROCESS = 2
 #
 
 sync_module_map = None
+# for each new process (or thread) we create a new async event loop
+event_loop_map = {}  # key = thread_id, value = event loop
+# we need this at the start as we build out the threads/processes
+event_loop_sync = threading.RLock()
+
+
+def _get_executor_event_loop():
+    """Returns the event loop to use for the current executor."""
+    with event_loop_sync:
+        return event_loop_map[threading.current_thread()]
 
 
 def _initialize_executor(module_map):
+    """Initializes the executor by creating a new event loop and loading the
+    analysis modules into memory."""
+    with event_loop_sync:
+        event_loop_map[threading.current_thread()] = asyncio.new_event_loop()
+
+    _get_executor_event_loop().run_until_complete(_initialize_executor_async(module_map))
+
+
+async def _initialize_executor_async(module_map):
     global sync_module_map
-    sync_module_map = {}
-    # TODO probably need to initialize logging here
-    for module_name, params in module_map.items():
-        _type, amt = params
-        # create a new instance of the analysis module
-        sync_module_map[module_name] = _type(type=amt)
-        get_logger().info(f"loaded {amt.name} in subprocess")
-        # load any additional resources
-        sync_module_map[module_name].load()
+    try:
+        sync_module_map = {}
+        # TODO probably need to initialize logging here
+        for module_name, params in module_map.items():
+            _type, amt = params
+            # create a new instance of the analysis module
+            sync_module_map[module_name] = _type(type=amt)
+            # load any additional resources
+            await sync_module_map[module_name].load()
 
-    import logging
+        import logging
 
-    get_logger().setLevel(logging.DEBUG)
+        get_logger().setLevel(logging.DEBUG)
+
+    except Exception as e:
+        sys.stderr.write(e)
 
 
-def _execute_sync_module(module_type: str, request_json: str) -> str:
+def _execute_multi_process_module(module_type: str, request_json: str) -> str:
+    """Processes the request with the analysis module."""
+    amt = AnalysisModuleType.from_json(module_type)
+    module = sync_module_map[amt.name]
+
+    # run_until_complete just keeps going until it returns
+    # there's no way to "cancel" it
+    # the only way out is to kill the process
+    # so we start a thread to monitor the timeout
+    def _module_timeout():
+        get_logger().critical(f"analysis module {module} timed out analyzing request {request_json}")
+        # and then die if we hit it
+        sys.exit(1)
+
+    get_logger().info(f"starting timer for {module.timeout} seconds")
+    t = threading.Timer(module.timeout, _module_timeout)
+    t.start()
+
+    try:
+        result = _get_executor_event_loop().run_until_complete(
+            _execute_multi_process_module_async(module_type, request_json)
+        )
+    finally:
+        # if we did't time out make sure we cancel the timer
+        t.cancel()
+
+    return result
+
+
+async def _execute_multi_process_module_async(module_type: str, request_json: str) -> str:
     # XXX ???
     # use a dummy system here...
     from ace.system.threaded import ThreadedACESystem
@@ -86,23 +139,28 @@ def _execute_sync_module(module_type: str, request_json: str) -> str:
     amt = AnalysisModuleType.from_json(module_type)
     module = sync_module_map[amt.name]
     if not module.type.extended_version_matches(amt):
-        module.upgrade()
+        await module.upgrade()
 
     if not module.type.extended_version_matches(amt):
         raise AnalysisModuleTypeExtendedVersionError(amt, module.type)
 
     analysis = request.modified_observable.add_analysis(Analysis(type=module.type, details={}))
-    module.execute_analysis(request.modified_root, request.modified_observable, analysis)
+    await module.execute_analysis(request.modified_root, request.modified_observable, analysis)
     return request.to_json()
 
 
-def _upgrade_sync_module(amt_json: str) -> str:
+def _upgrade_multi_process_module(amt_json: str) -> str:
+    """Upgrades the module type."""
+    return _get_executor_event_loop().run_until_complete(_upgrade_multi_process_module_async(amt_json))
+
+
+async def _upgrade_multi_process_module_async(amt_json: str) -> str:
     if not sync_module_map:
-        raise RuntimeError("_upgrade_sync_module called before _initialize_executor")
+        raise RuntimeError("_upgrade_multi_process_module called before _initialize_executor")
 
     amt = AnalysisModuleType.from_json(amt_json)
     module = sync_module_map[amt.name]
-    module.upgrade()
+    await module.upgrade()
     return module.type.to_json()
 
 
@@ -177,13 +235,7 @@ class AnalysisModuleManager:
             # is the extended version different?
             if not module.type.extended_version_matches(existing_type):
                 # try to upgrade the module
-                if module.is_async():
-                    await self.upgrade_module(module)
-                else:
-                    # NOTE this is blocking the async loop
-                    # it's OK because this only gets called when the manager starts up
-                    # you can't call self.upgrade_module() on sync modules until you've fully initialize the executor
-                    module.upgrade()
+                await self.upgrade_module(module)
 
                 # is it still different?
                 if not module.type.extended_version_matches(existing_type):
@@ -323,14 +375,14 @@ class AnalysisModuleManager:
 
         # if the module is async then we attempt to upgrade it here
         try:
-            if module.is_async():
-                await module.upgrade()
-            else:
+            if module.is_multi_process:
                 module.type = AnalysisModuleType.from_json(
                     await asyncio.get_event_loop().run_in_executor(
-                        self.executor, _upgrade_sync_module, module.type.to_json()
+                        self.executor, _upgrade_multi_process_module, module.type.to_json()
                     )
                 )
+            else:
+                await module.upgrade()
 
             return True
 
@@ -386,7 +438,32 @@ class AnalysisModuleManager:
         assert isinstance(request, AnalysisRequest)
 
         request.initialize_result()
-        if module.is_async():
+        if module.is_multi_process:
+            try:
+                request_json = request.to_json()
+                request_result_json = await asyncio.get_event_loop().run_in_executor(
+                    self.executor, _execute_multi_process_module, module.type.to_json(), request_json
+                )
+                return AnalysisRequest.from_json(request_result_json, self.system)
+            except BrokenProcessPool as e:
+                # when this happens you have to create and start a new one
+                self.process_exception(
+                    module,
+                    request,
+                    e,
+                    error_message=f"{module.type} process crashed when analyzing type {request.modified_observable.type} value {request.modified_observable.value}",
+                )
+                # we have to start a new executor
+                self.start_executor()
+                return request
+            except Exception as e:
+                return self.process_exception(
+                    module,
+                    request,
+                    e,
+                    f"{module.type} failed analyzing type {request.modified_observable.type} value {request.modified_observable.value}: {e}",
+                )
+        else:
             try:
                 analysis = request.modified_observable.add_analysis(Analysis(type=module.type, details={}))
                 await asyncio.wait_for(
@@ -401,31 +478,6 @@ class AnalysisModuleManager:
                     e,
                     f"{module.type} timed out analyzing type {request.modified_observable.type} value {request.modified_observable.value} after {module.timeout} seconds",
                 )
-            except Exception as e:
-                return self.process_exception(
-                    module,
-                    request,
-                    e,
-                    f"{module.type} failed analyzing type {request.modified_observable.type} value {request.modified_observable.value}: {e}",
-                )
-        else:
-            try:
-                request_json = request.to_json()
-                request_result_json = await asyncio.get_event_loop().run_in_executor(
-                    self.executor, _execute_sync_module, module.type.to_json(), request_json
-                )
-                return AnalysisRequest.from_json(request_result_json, self.system)
-            except BrokenProcessPool as e:
-                # when this happens you have to create and start a new one
-                self.process_exception(
-                    module,
-                    request,
-                    e,
-                    error_message=f"{module.type} process crashed when analyzing type {request.modified_observable.type} value {request.modified_observable.value}",
-                )
-                # we have to start a new executor
-                self.start_executor()
-                return request
             except Exception as e:
                 return self.process_exception(
                     module,

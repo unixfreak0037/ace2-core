@@ -2,7 +2,7 @@
 #
 
 from ace.analysis import AnalysisModuleType
-from ace.module.base import AnalysisModule, AsyncAnalysisModule
+from ace.module.base import AnalysisModule
 from ace.module.manager import AnalysisModuleManager, SCALE_UP, SCALE_DOWN, NO_SCALING
 
 import pytest
@@ -11,10 +11,10 @@ import pytest
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_add_module(system):
-    class CustomAnalysisModule(AsyncAnalysisModule):
+    class CustomAnalysisModule(AnalysisModule):
         pass
 
-    class CustomAnalysisModule2(AsyncAnalysisModule):
+    class CustomAnalysisModule2(AnalysisModule):
         pass
 
     manager = AnalysisModuleManager(system)
@@ -40,27 +40,27 @@ async def test_verify_registration(system):
     assert await system.register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager(system)
-    manager.add_module(AsyncAnalysisModule(amt))
+    manager.add_module(AnalysisModule(amt))
     assert await manager.verify_registration()
     # missing registration
     amt = AnalysisModuleType("missing", "")
     manager = AnalysisModuleManager(system)
-    manager.add_module(AsyncAnalysisModule(amt))
+    manager.add_module(AnalysisModule(amt))
     assert not await manager.verify_registration()
     assert not await manager.run()
     # version mismatch
     amt = AnalysisModuleType("test", "", version="1.0.1")
     manager = AnalysisModuleManager(system)
-    manager.add_module(AsyncAnalysisModule(amt))
+    manager.add_module(AnalysisModule(amt))
     assert not await manager.verify_registration()
     assert not await manager.run()
     # extended version mismatch
     amt = AnalysisModuleType("test", "", extended_version=["yara:71bec09d78fe6abdb94244a4cc89c740"])
     manager = AnalysisModuleManager(system)
-    manager.add_module(AsyncAnalysisModule(amt))
+    manager.add_module(AnalysisModule(amt))
     assert not await manager.verify_registration()
     # extended version mismatch but upgrade ok
-    class UpgradableAnalysisModule(AsyncAnalysisModule):
+    class UpgradableAnalysisModule(AnalysisModule):
         async def upgrade(self):
             self.type.extended_version = ["yara:6f5902ac237024bdd0c176cb93063dc4"]
 

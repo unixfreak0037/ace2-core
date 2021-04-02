@@ -9,7 +9,7 @@ from ace.analysis import RootAnalysis, Observable, AnalysisModuleType, Analysis
 from ace.logging import get_logger
 from ace.constants import EVENT_ANALYSIS_ROOT_COMPLETED
 from ace.system.events import EventHandler, Event
-from ace.module.base import AnalysisModule, AsyncAnalysisModule
+from ace.module.base import AnalysisModule, MultiProcessAnalysisModule
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
 
 import pytest
@@ -20,7 +20,7 @@ import pytest
 async def test_basic_analysis_async(system):
 
     # basic analysis module
-    class TestAsyncAnalysisModule(AsyncAnalysisModule):
+    class TestAsyncAnalysisModule(AnalysisModule):
         # define the type for this analysis module
         type = AnalysisModuleType("test", "")
 
@@ -55,14 +55,16 @@ async def test_basic_analysis_async(system):
     assert analysis.observables[0] == ace.analysis.Observable("test", "hello")
 
 
-class TestSyncAnalysisModule(AnalysisModule):
+class TestMultiProcessAnalysisModule(AnalysisModule):
     __test__ = False
 
     # define the type for this analysis module
     type = AnalysisModuleType("test", "")
 
-    # define it as an sync module
-    def execute_analysis(self, root, observable, analysis):
+    # mark it as multi process
+    is_multi_process: bool = False
+
+    async def execute_analysis(self, root, observable, analysis):
         analysis.set_details({"test": "test"})
         analysis.add_observable("test", "hello")
         return True
@@ -74,7 +76,7 @@ class TestSyncAnalysisModule(AnalysisModule):
 async def test_basic_analysis_sync(concurrency_mode, system):
 
     # create an instance of it
-    module = TestSyncAnalysisModule()
+    module = TestMultiProcessAnalysisModule()
 
     # register the type to the core
     await system.register_analysis_module_type(module.type)
@@ -103,7 +105,7 @@ async def test_basic_analysis_sync(concurrency_mode, system):
 async def test_force_stop_stuck_async_task(system):
     control = asyncio.Event()
 
-    class CustomAnalysisModule(AsyncAnalysisModule):
+    class CustomAnalysisModule(AnalysisModule):
         async def execute_analysis(self, root, observable, analysis):
             nonlocal control
             control.set()
@@ -135,8 +137,8 @@ async def test_force_stop_stuck_async_task(system):
     await cancel_task
 
 
-class StuckAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable, analysis):
+class StuckAnalysisModule(MultiProcessAnalysisModule):
+    async def execute_analysis(self, root, observable, analysis):
         # get stuck
         import time, sys
 
@@ -172,7 +174,7 @@ async def test_force_stop_stuck_sync_task(system):
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_raised_exception_during_async_analysis(system):
-    class CustomAnalysisModule(AsyncAnalysisModule):
+    class CustomAnalysisModule(AnalysisModule):
         async def execute_analysis(self, root, observable, analysis):
             raise RuntimeError("failure")
 
@@ -197,8 +199,8 @@ async def test_raised_exception_during_async_analysis(system):
     assert analysis.stack_trace
 
 
-class FailingAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable, analysis):
+class FailingAnalysisModule(MultiProcessAnalysisModule):
+    async def execute_analysis(self, root, observable, analysis):
         raise RuntimeError("failure")
 
 
@@ -226,8 +228,8 @@ async def test_raised_exception_during_sync_analysis(system):
     assert analysis.stack_trace
 
 
-class CrashingAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable, analysis):
+class CrashingAnalysisModule(MultiProcessAnalysisModule):
+    async def execute_analysis(self, root, observable, analysis):
         import os, signal
 
         if observable.value == "crash":
@@ -236,8 +238,8 @@ class CrashingAnalysisModule(AnalysisModule):
             analysis.set_details({"test": "test"})
 
 
-class SimpleSyncAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable, analysis):
+class SimpleSyncAnalysisModule(MultiProcessAnalysisModule):
+    async def execute_analysis(self, root, observable, analysis):
         analysis.set_details({"test": "test"})
 
 
@@ -250,15 +252,13 @@ class SimpleSyncAnalysisModule(AnalysisModule):
 @pytest.mark.integration
 async def test_crashing_sync_analysis_module(system):
 
-    import threading
-
-    sync = threading.Event()
+    sync = asyncio.Event()
 
     class CustomEventHandler(EventHandler):
-        def handle_event(self, event: Event):
+        async def handle_event(self, event: Event):
             sync.set()
 
-        def handle_exception(self, event: str, exception: Exception):
+        async def handle_exception(self, event: str, exception: Exception):
             pass
 
     await system.register_event_handler(EVENT_ANALYSIS_ROOT_COMPLETED, CustomEventHandler())
@@ -283,7 +283,7 @@ async def test_crashing_sync_analysis_module(system):
     await manager.run_once()
 
     # wait for analysis to complete
-    assert sync.wait(3)
+    assert await sync.wait()
 
     root = await system.get_root_analysis(root)
     observable = root.get_observable(observable)
@@ -309,8 +309,8 @@ async def test_upgraded_version_analysis_module(system):
     # this check comes before analysis module execution (same for both)
     step_1 = asyncio.Event()
 
-    class CustomAnalysisModule(AnalysisModule):
-        def execute_analysis(self, root, observable, analysis):
+    class CustomAnalysisModule(MultiProcessAnalysisModule):
+        async def execute_analysis(self, root, observable, analysis):
             nonlocal step_1
             analysis.set_details({"version": self.type.version})
             if not step_1.is_set():
@@ -365,7 +365,7 @@ async def test_upgraded_extended_version_async_analysis_module(system):
     step_1 = asyncio.Event()
     step_2 = asyncio.Event()
 
-    class CustomAnalysisModule(AsyncAnalysisModule):
+    class CustomAnalysisModule(AnalysisModule):
         async def execute_analysis(self, root, observable, analysis):
             nonlocal step_1
             analysis.set_details({"extended_version": self.type.extended_version})
@@ -418,11 +418,11 @@ async def test_upgraded_extended_version_async_analysis_module(system):
     assert (await observable.get_analysis(amt).get_details())["extended_version"] == ["intel:v2"]
 
 
-class UpgradableAnalysisModule(AnalysisModule):
-    def execute_analysis(self, root, observable, analysis):
+class UpgradableAnalysisModule(MultiProcessAnalysisModule):
+    async def execute_analysis(self, root, observable, analysis):
         analysis.set_details({"extended_version": self.type.extended_version})
 
-    def upgrade(self):
+    async def upgrade(self):
         self.type.extended_version = ["intel:v2"]
 
 
@@ -479,7 +479,7 @@ async def test_upgrade_analysis_module_failure(concurrency_mode, system):
     amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
     await system.register_analysis_module_type(amt)
 
-    class CustomAnalysisModule(AnalysisModule):
+    class CustomAnalysisModule(MultiProcessAnalysisModule):
         async def execute_analysis(self, *args, **kwargs):
             pass
 
@@ -502,7 +502,7 @@ async def test_upgrade_analysis_module_failure(concurrency_mode, system):
 async def test_async_module_timeout(system):
 
     # define a module that times out immediately
-    class TimeoutAsyncAnalysisModule(AsyncAnalysisModule):
+    class TimeoutAsyncAnalysisModule(AnalysisModule):
         # define the type for this analysis module
         type = AnalysisModuleType("test", "")
         timeout = 0

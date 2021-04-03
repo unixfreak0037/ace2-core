@@ -21,6 +21,7 @@ from ace.exceptions import AnalysisModuleTypeVersionError, AnalysisModuleTypeExt
 from ace.logging import get_logger
 from ace.module.base import AnalysisModule
 from ace.system import ACESystem
+from ace.system.remote import RemoteACESystem
 
 import psutil
 
@@ -62,6 +63,8 @@ sync_module_map = None
 event_loop_map = {}  # key = thread_id, value = event loop
 # we need this at the start as we build out the threads/processes
 event_loop_sync = threading.RLock()
+# global reference to the system to use for remote api purposes
+sync_system = None
 
 
 def _get_executor_event_loop():
@@ -70,9 +73,16 @@ def _get_executor_event_loop():
         return event_loop_map[threading.current_thread()]
 
 
-def _initialize_executor(module_map):
-    """Initializes the executor by creating a new event loop and loading the
-    analysis modules into memory."""
+def _initialize_executor(module_map, system_class):
+    """Initializes the executor. Creates a new event loop and loads the
+    analysis modules into memory. Initializes an instance of the system to use."""
+    global sync_system
+
+    if sync_system is None:
+        sync_system = system_class()
+        # this has to be a remote api based system interface
+        assert isinstance(sync_system, RemoteACESystem)
+
     with event_loop_sync:
         event_loop_map[threading.current_thread()] = asyncio.new_event_loop()
 

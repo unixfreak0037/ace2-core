@@ -96,13 +96,13 @@ class DistributedACETestSystem(RedisACETestSystem):
 
 class RemoteACETestSystem(RemoteACESystem, ThreadedACESystem):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.api = RemoteAceAPI(self)
-        self.api.client_args = []
-        self.api.client_kwargs = {
-            "app": app,
-            "base_url": "http://test",
-        }
+        super().__init__("http://test", None, client_args=[], client_kwargs={"app": app}, *args, **kwargs)
+        # self.api = RemoteAceAPI(self)
+        # self.api.client_args = []
+        # self.api.client_kwargs = {
+        # "app": app,
+        # "base_url": "http://test",
+        # }
 
-    def get_api(self):
-        return self.api
+    # def get_api(self):
+    # return self.api

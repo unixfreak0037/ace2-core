@@ -2,6 +2,9 @@
 #
 
 import asyncio
+import os
+import os.path
+import tempfile
 
 import ace.analysis
 
@@ -536,3 +539,58 @@ async def test_async_module_timeout(remote_system):
     analysis = observable.get_analysis(module.type)
     assert analysis
     assert analysis.error_message == "testv1.0.0 timed out analyzing type test value test after 0 seconds"
+
+
+class FileAnalysisModule(AnalysisModule):
+    type = AnalysisModuleType("test", "")
+
+    async def execute_analysis(self, root, observable, analysis):
+        tmpdir = tempfile.mkdtemp()
+        target_path = os.path.join(tmpdir, "test.txt")
+        with open(target_path, "w") as fp:
+            fp.write("test")
+
+        await analysis.add_file(target_path)
+        os.rmdir(tmpdir)
+
+
+class MultiProcessFileAnalysisModule(FileAnalysisModule):
+    is_multi_process = True
+
+
+@pytest.mark.parametrize("module_class", [FileAnalysisModule, MultiProcessFileAnalysisModule])
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_module_add_file(remote_system, tmpdir, module_class):
+    # adding file content is treated specially by the core since it has to upload and download the content
+
+    # create an instance of it
+    module = module_class()
+
+    # register the type to the core
+    await remote_system.register_analysis_module_type(module.type)
+
+    # submit a root for analysis so we create a new job
+    root = remote_system.new_root()
+    observable = root.add_observable("test", "test")
+    await root.submit()
+
+    # create a new manager to run our analysis modules
+    manager = AnalysisModuleManager(remote_system)
+    manager.add_module(module)
+    await manager.run_once()
+
+    # check the results in the core
+    root = await remote_system.get_root_analysis(root)
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(module.type)
+    assert analysis
+    file_observable = analysis.get_observable_by_type("file")
+    assert file_observable
+
+    meta = await remote_system.get_content_meta(file_observable.value)
+    assert meta.name == "test.txt"
+    assert meta.sha256 == file_observable.value
+
+    content = await remote_system.get_content_bytes(file_observable.value)
+    assert content.decode() == "test"

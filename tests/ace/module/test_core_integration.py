@@ -151,7 +151,7 @@ class StuckAnalysisModule(MultiProcessAnalysisModule):
 async def test_force_stop_stuck_sync_task(manager):
     # there's nothing you can do when concurrency is threaded
     if manager.concurrency_mode == CONCURRENCY_MODE_THREADED:
-        pytest.skip("cannot test in concurrency_mode {manager.concurrency_mode}")
+        pytest.skip(f"cannot test in concurrency_mode {manager.concurrency_mode}")
 
     # register the type to the core
     amt = AnalysisModuleType("test", "")
@@ -255,7 +255,7 @@ class SimpleSyncAnalysisModule(MultiProcessAnalysisModule):
 async def test_crashing_sync_analysis_module(manager):
 
     if manager.concurrency_mode == CONCURRENCY_MODE_THREADED:
-        pytest.skip("cannot test in concurrency_mode {manager.concurrency_mode}")
+        pytest.skip(f"cannot test in concurrency_mode {manager.concurrency_mode}")
 
     sync = asyncio.Event()
 
@@ -312,7 +312,7 @@ async def test_crashing_sync_analysis_module(manager):
 async def test_upgraded_version_analysis_module(manager):
     # cannot test this in process concurrency mode because it requires shared events
     if manager.concurrency_mode == CONCURRENCY_MODE_PROCESS:
-        pytest.skip("cannot test in concurrency_mode {manager.concurrency_mode}")
+        pytest.skip(f"cannot test in concurrency_mode {manager.concurrency_mode}")
 
     # NOTE for this one we don't need to test both sync and async because
     # this check comes before analysis module execution (same for both)

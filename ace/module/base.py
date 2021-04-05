@@ -56,6 +56,8 @@ class AnalysisModule:
         if timeout is not None:
             self.timeout = timeout
 
+        # TODO implement a custom default timeout here
+
     async def execute_analysis(self, root: RootAnalysis, observable: Observable, analysis: Analysis):
         raise NotImplementedError()
 

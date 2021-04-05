@@ -10,14 +10,13 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_add_module(remote_system):
+async def test_add_module(manager):
     class CustomAnalysisModule(AnalysisModule):
         pass
 
     class CustomAnalysisModule2(AnalysisModule):
         pass
 
-    manager = AnalysisModuleManager(remote_system)
     module = CustomAnalysisModule()
     assert manager.add_module(module) is module
     assert module in manager.analysis_modules
@@ -33,11 +32,11 @@ async def test_add_module(remote_system):
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_verify_registration(remote_system):
+async def test_verify_registration(manager):
     # registration OK
     amt = AnalysisModuleType("test", "", extended_version=["yara:6f5902ac237024bdd0c176cb93063dc4"])
 
-    assert await remote_system.register_analysis_module_type(amt)
+    assert await manager.system.register_analysis_module_type(amt)
 
     manager = AnalysisModuleManager(remote_system)
     manager.add_module(AnalysisModule(amt))
@@ -73,7 +72,7 @@ async def test_verify_registration(remote_system):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_scaling_task_creation(remote_system):
+async def test_scaling_task_creation(manager):
     class CustomManager(AnalysisModuleManager):
         direction = SCALE_DOWN
 
@@ -87,8 +86,8 @@ async def test_scaling_task_creation(remote_system):
             return sum(iter(self.module_task_count.values()))
 
     amt = AnalysisModuleType("test", "")
-    result = await remote_system.register_analysis_module_type(amt)
-    manager = CustomManager(remote_system)
+    result = await manager.system.register_analysis_module_type(amt)
+    manager = CustomManager(manager.system)
     module = AnalysisModule(amt, limit=2)
     manager.add_module(module)
 

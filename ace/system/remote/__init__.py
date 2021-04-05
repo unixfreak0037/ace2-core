@@ -40,7 +40,14 @@ class RemoteACESystem(
 
         self.url = url
         self.api_key = api_key
+        self.client_args = client_args
+        self.client_kwargs = client_kwargs
         self.api = RemoteAceAPI(self, api_key, url, client_args=client_args, client_kwargs=client_kwargs)
 
     def get_api(self) -> AceAPI:
+        # if the api key changed then create a new api object to use
+        # if self.api_key != self.api.api_key:
+        # breakpoint()
+        # self.api = RemoteAceAPI(self, self.api_key, self.url, client_args=self.client_args, client_kwargs=self.client_kwargs)
+
         return self.api

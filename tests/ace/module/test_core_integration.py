@@ -5,6 +5,7 @@ import asyncio
 import os
 import os.path
 import tempfile
+import shutil
 
 import ace.analysis
 
@@ -15,13 +16,14 @@ from ace.system.distributed import app
 from ace.system.events import EventHandler, Event
 from ace.module.base import AnalysisModule, MultiProcessAnalysisModule
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
+from tests.systems import RemoteACETestSystem
 
 import pytest
 
 
 @pytest.mark.asyncio
 @pytest.mark.system
-async def test_basic_analysis_async(remote_system):
+async def test_basic_analysis_async(manager):
 
     # basic analysis module
     class TestAsyncAnalysisModule(AnalysisModule):
@@ -38,20 +40,18 @@ async def test_basic_analysis_async(remote_system):
     module = TestAsyncAnalysisModule()
 
     # register the type to the core
-    await remote_system.register_analysis_module_type(module.type)
+    await manager.system.register_analysis_module_type(module.type)
 
     # submit a root for analysis so we create a new job
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
-    # create a new manager to run our analysis modules
-    manager = AnalysisModuleManager(remote_system)
     manager.add_module(module)
     await manager.run_once()
 
     # check the results in the core
-    root = await remote_system.get_root_analysis(root)
+    root = await manager.system.get_root_analysis(root)
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(module.type)
     assert analysis
@@ -74,30 +74,27 @@ class TestMultiProcessAnalysisModule(AnalysisModule):
         return True
 
 
-# @pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
-@pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_PROCESS])
 @pytest.mark.asyncio
 @pytest.mark.system
-async def test_basic_analysis_sync(concurrency_mode, remote_system):
+async def test_basic_analysis_sync(manager):
 
     # create an instance of it
     module = TestMultiProcessAnalysisModule()
 
     # register the type to the core
-    await remote_system.register_analysis_module_type(module.type)
+    await manager.system.register_analysis_module_type(module.type)
 
     # submit a root for analysis so we create a new job
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
     # create a new manager to run our analysis modules
-    manager = AnalysisModuleManager(remote_system, concurrency_mode=concurrency_mode)
     manager.add_module(module)
     await manager.run_once()
 
     # check the results in the core
-    root = await remote_system.get_root_analysis(root)
+    root = await manager.system.get_root_analysis(root)
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(module.type)
     assert analysis
@@ -107,7 +104,7 @@ async def test_basic_analysis_sync(concurrency_mode, remote_system):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_force_stop_stuck_async_task(remote_system):
+async def test_force_stop_stuck_async_task(manager):
     control = asyncio.Event()
 
     class CustomAnalysisModule(AnalysisModule):
@@ -121,13 +118,12 @@ async def test_force_stop_stuck_async_task(remote_system):
 
     # register the type to the core
     amt = AnalysisModuleType("test", "")
-    await remote_system.register_analysis_module_type(amt)
+    await manager.system.register_analysis_module_type(amt)
 
-    manager = AnalysisModuleManager(remote_system)
     module = CustomAnalysisModule(amt)
     manager.add_module(module)
 
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
@@ -152,16 +148,19 @@ class StuckAnalysisModule(MultiProcessAnalysisModule):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_force_stop_stuck_sync_task(remote_system):
+async def test_force_stop_stuck_sync_task(manager):
+    # there's nothing you can do when concurrency is threaded
+    if manager.concurrency_mode == CONCURRENCY_MODE_THREADED:
+        pytest.skip("cannot test in concurrency_mode {manager.concurrency_mode}")
+
     # register the type to the core
     amt = AnalysisModuleType("test", "")
-    await remote_system.register_analysis_module_type(amt)
+    await manager.system.register_analysis_module_type(amt)
 
-    manager = AnalysisModuleManager(remote_system, concurrency_mode=CONCURRENCY_MODE_PROCESS)
     module = StuckAnalysisModule(amt)
     manager.add_module(module)
 
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
@@ -178,25 +177,24 @@ async def test_force_stop_stuck_sync_task(remote_system):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_raised_exception_during_async_analysis(remote_system):
+async def test_raised_exception_during_async_analysis(manager):
     class CustomAnalysisModule(AnalysisModule):
         async def execute_analysis(self, root, observable, analysis):
             raise RuntimeError("failure")
 
     amt = AnalysisModuleType("test", "")
-    await remote_system.register_analysis_module_type(amt)
+    await manager.system.register_analysis_module_type(amt)
 
-    manager = AnalysisModuleManager(remote_system)
     module = CustomAnalysisModule(amt)
     manager.add_module(module)
 
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
     await manager.run_once()
 
-    root = await remote_system.get_root_analysis(root)
+    root = await manager.system.get_root_analysis(root)
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt)
 
@@ -211,21 +209,20 @@ class FailingAnalysisModule(MultiProcessAnalysisModule):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_raised_exception_during_sync_analysis(remote_system):
+async def test_raised_exception_during_sync_analysis(manager):
     amt = AnalysisModuleType("test", "")
-    await remote_system.register_analysis_module_type(amt)
+    await manager.system.register_analysis_module_type(amt)
 
-    manager = AnalysisModuleManager(remote_system)
     module = FailingAnalysisModule(amt)
     manager.add_module(module)
 
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
     await manager.run_once()
 
-    root = await remote_system.get_root_analysis(root)
+    root = await manager.system.get_root_analysis(root)
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt)
 
@@ -255,7 +252,10 @@ class SimpleSyncAnalysisModule(MultiProcessAnalysisModule):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_crashing_sync_analysis_module(remote_system):
+async def test_crashing_sync_analysis_module(manager):
+
+    if manager.concurrency_mode == CONCURRENCY_MODE_THREADED:
+        pytest.skip("cannot test in concurrency_mode {manager.concurrency_mode}")
 
     sync = asyncio.Event()
 
@@ -271,18 +271,17 @@ async def test_crashing_sync_analysis_module(remote_system):
 
     amt_crashing = AnalysisModuleType("crash_test", "")
     amt_ok = AnalysisModuleType("ok", "")
-    await remote_system.register_analysis_module_type(amt_crashing)
-    await remote_system.register_analysis_module_type(amt_ok)
+    await manager.system.register_analysis_module_type(amt_crashing)
+    await manager.system.register_analysis_module_type(amt_ok)
 
     # this is only supported in CONCURRENCY_MODE_PROCESS
-    manager = AnalysisModuleManager(remote_system, concurrency_mode=CONCURRENCY_MODE_PROCESS)
     crashing_module = CrashingAnalysisModule(amt_crashing)
     ok_module = SimpleSyncAnalysisModule(amt_ok)
 
     manager.add_module(crashing_module)
     manager.add_module(ok_module)
 
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "crash")
     await root.submit()
 
@@ -291,7 +290,7 @@ async def test_crashing_sync_analysis_module(remote_system):
     # wait for analysis to complete
     assert await sync.wait()
 
-    root = await remote_system.get_root_analysis(root)
+    root = await manager.system.get_root_analysis(root)
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(amt_crashing)
 
@@ -310,7 +309,11 @@ async def test_crashing_sync_analysis_module(remote_system):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_upgraded_version_analysis_module(remote_system):
+async def test_upgraded_version_analysis_module(manager):
+    # cannot test this in process concurrency mode because it requires shared events
+    if manager.concurrency_mode == CONCURRENCY_MODE_PROCESS:
+        pytest.skip("cannot test in concurrency_mode {manager.concurrency_mode}")
+
     # NOTE for this one we don't need to test both sync and async because
     # this check comes before analysis module execution (same for both)
     step_1 = asyncio.Event()
@@ -324,17 +327,16 @@ async def test_upgraded_version_analysis_module(remote_system):
                 return
 
     amt = AnalysisModuleType("test", "", version="1.0.0")
-    await remote_system.register_analysis_module_type(amt)
+    await manager.system.register_analysis_module_type(amt)
 
-    manager = AnalysisModuleManager(remote_system)
     module = CustomAnalysisModule(type=amt)
     manager.add_module(module)
 
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
-    root_2 = remote_system.new_root()
+    root_2 = manager.system.new_root()
     observable_2 = root_2.add_observable("test", "test")
 
     async def _upgrade():
@@ -342,7 +344,7 @@ async def test_upgraded_version_analysis_module(remote_system):
         nonlocal root_2
         await step_1.wait()
         updated_amt = AnalysisModuleType("test", "", version="1.0.1")
-        await remote_system.register_analysis_module_type(updated_amt)
+        await manager.system.register_analysis_module_type(updated_amt)
         await root_2.submit()
 
     upgrade_task = asyncio.create_task(_upgrade())
@@ -350,7 +352,7 @@ async def test_upgraded_version_analysis_module(remote_system):
     await upgrade_task
 
     # in this case the version mismatch just causes the manger to exit
-    root = await remote_system.get_root_analysis(root_2)
+    root = await manager.system.get_root_analysis(root_2)
     observable = root.get_observable(observable)
     # so no analysis should be seen
     assert observable.get_analysis(amt) is None
@@ -358,7 +360,7 @@ async def test_upgraded_version_analysis_module(remote_system):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_upgraded_extended_version_async_analysis_module(remote_system):
+async def test_upgraded_extended_version_async_analysis_module(manager):
     """Tests the ability of an analysis module to update extended version data."""
 
     #
@@ -385,17 +387,16 @@ async def test_upgraded_extended_version_async_analysis_module(remote_system):
             self.type.extended_version = ["intel:v2"]
 
     amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
-    await remote_system.register_analysis_module_type(amt)
+    await manager.system.register_analysis_module_type(amt)
 
-    manager = AnalysisModuleManager(remote_system)
     module = CustomAnalysisModule(type=amt)
     manager.add_module(module)
 
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
-    root_2 = remote_system.new_root()
+    root_2 = manager.system.new_root()
     observable_2 = root_2.add_observable("test", "test")
 
     async def _update_intel():
@@ -404,7 +405,7 @@ async def test_upgraded_extended_version_async_analysis_module(remote_system):
         await step_1.wait()
         # update the extended version data for this module type
         updated_amt = AnalysisModuleType("test", "", extended_version=["intel:v2"])
-        await remote_system.register_analysis_module_type(updated_amt)
+        await manager.system.register_analysis_module_type(updated_amt)
         await root_2.submit()
 
     async def _shutdown():
@@ -419,7 +420,7 @@ async def test_upgraded_extended_version_async_analysis_module(remote_system):
     await upgrade_task
     await shutdown_task
 
-    root = await remote_system.get_root_analysis(root_2)
+    root = await manager.system.get_root_analysis(root_2)
     observable = root.get_observable(observable)
     assert (await observable.get_analysis(amt).get_details())["extended_version"] == ["intel:v2"]
 
@@ -435,11 +436,8 @@ class UpgradableAnalysisModule(MultiProcessAnalysisModule):
 @pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode, remote_system):
+async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode, redis_url, manager):
     """Tests the ability of a sync analysis module to update extended version data."""
-
-    amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
-    await remote_system.register_analysis_module_type(amt)
 
     # we want to bail after the first execution of the module
     class CustomAnalysisModuleManager(AnalysisModuleManager):
@@ -451,39 +449,57 @@ async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode, 
 
             return result
 
-    manager = CustomAnalysisModuleManager(remote_system, concurrency_mode=concurrency_mode)
-    module = UpgradableAnalysisModule(type=amt)
-    manager.add_module(module)
+    custom_manager = CustomAnalysisModuleManager(
+        manager.system, RemoteACETestSystem, (manager.system.api.api_key,), concurrency_mode=concurrency_mode
+    )
 
-    root = remote_system.new_root()
+    root_analysis_completed = asyncio.Event()
+
+    class CustomEventHandler(EventHandler):
+        async def handle_event(self, event: Event):
+            root_analysis_completed.set()
+
+        async def handle_exception(self, event: str, exception: Exception):
+            pass
+
+    # TODO when events are distributed modify this to use that
+    await app.state.system.register_event_handler(EVENT_ANALYSIS_ROOT_COMPLETED, CustomEventHandler())
+
+    amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
+    await custom_manager.system.register_analysis_module_type(amt)
+
+    module = UpgradableAnalysisModule(type=amt)
+    custom_manager.add_module(module)
+
+    root = custom_manager.system.new_root()
     observable = root.add_observable("test", "test")
 
     async def _update_intel():
-        nonlocal manager
+        nonlocal custom_manager
         # wait for the event loop to start
-        await manager.event_loop_starting_event.wait()
+        await custom_manager.event_loop_starting_event.wait()
         # update the extended version data for this module type
         updated_amt = AnalysisModuleType("test", "", extended_version=["intel:v2"])
-        await remote_system.register_analysis_module_type(updated_amt)
+        await custom_manager.system.register_analysis_module_type(updated_amt)
         # and then submit for analysis
         await root.submit()
 
     upgrade_task = asyncio.create_task(_update_intel())
-    await manager.run()
+    await custom_manager.run()
     await upgrade_task
+    await root_analysis_completed.wait()
 
-    root = await remote_system.get_root_analysis(root)
+    root = await custom_manager.system.get_root_analysis(root)
     observable = root.get_observable(observable)
     assert (await observable.get_analysis(amt).get_details())["extended_version"] == ["intel:v2"]
 
 
-@pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_upgrade_analysis_module_failure(concurrency_mode, remote_system):
+async def test_upgrade_analysis_module_failure(manager):
 
     amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
-    await remote_system.register_analysis_module_type(amt)
+    await manager.system.register_analysis_module_type(amt)
 
     class CustomAnalysisModule(MultiProcessAnalysisModule):
         async def execute_analysis(self, *args, **kwargs):
@@ -492,12 +508,11 @@ async def test_upgrade_analysis_module_failure(concurrency_mode, remote_system):
         async def upgrade(self):
             raise RuntimeError()
 
-    manager = AnalysisModuleManager(remote_system, concurrency_mode=concurrency_mode)
     module = CustomAnalysisModule(type=amt)
     manager.add_module(module)
 
     amt = AnalysisModuleType("test", "", extended_version=["intel:v2"])
-    await remote_system.register_analysis_module_type(amt)
+    await manager.system.register_analysis_module_type(amt)
 
     # this should fail since the upgrade fails
     assert not await manager.run()
@@ -505,7 +520,7 @@ async def test_upgrade_analysis_module_failure(concurrency_mode, remote_system):
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_async_module_timeout(remote_system):
+async def test_async_module_timeout(manager):
 
     # define a module that times out immediately
     class TimeoutAsyncAnalysisModule(AnalysisModule):
@@ -521,20 +536,19 @@ async def test_async_module_timeout(remote_system):
     module = TimeoutAsyncAnalysisModule()
 
     # register the type to the core
-    await remote_system.register_analysis_module_type(module.type)
+    await manager.system.register_analysis_module_type(module.type)
 
     # submit a root for analysis so we create a new job
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
     # create a new manager to run our analysis modules
-    manager = AnalysisModuleManager(remote_system)
     manager.add_module(module)
     await manager.run_once()
 
     # check the results in the core
-    root = await remote_system.get_root_analysis(root)
+    root = await manager.system.get_root_analysis(root)
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(module.type)
     assert analysis
@@ -551,7 +565,7 @@ class FileAnalysisModule(AnalysisModule):
             fp.write("test")
 
         await analysis.add_file(target_path)
-        os.rmdir(tmpdir)
+        shutil.rmtree(tmpdir)
 
 
 class MultiProcessFileAnalysisModule(FileAnalysisModule):
@@ -561,36 +575,35 @@ class MultiProcessFileAnalysisModule(FileAnalysisModule):
 @pytest.mark.parametrize("module_class", [FileAnalysisModule, MultiProcessFileAnalysisModule])
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_module_add_file(remote_system, tmpdir, module_class):
+async def test_module_add_file(manager, tmpdir, module_class):
     # adding file content is treated specially by the core since it has to upload and download the content
 
     # create an instance of it
     module = module_class()
 
     # register the type to the core
-    await remote_system.register_analysis_module_type(module.type)
+    await manager.system.register_analysis_module_type(module.type)
 
     # submit a root for analysis so we create a new job
-    root = remote_system.new_root()
+    root = manager.system.new_root()
     observable = root.add_observable("test", "test")
     await root.submit()
 
     # create a new manager to run our analysis modules
-    manager = AnalysisModuleManager(remote_system)
     manager.add_module(module)
     await manager.run_once()
 
     # check the results in the core
-    root = await remote_system.get_root_analysis(root)
+    root = await manager.system.get_root_analysis(root)
     observable = root.get_observable(observable)
     analysis = observable.get_analysis(module.type)
     assert analysis
     file_observable = analysis.get_observable_by_type("file")
     assert file_observable
 
-    meta = await remote_system.get_content_meta(file_observable.value)
+    meta = await manager.system.get_content_meta(file_observable.value)
     assert meta.name == "test.txt"
     assert meta.sha256 == file_observable.value
 
-    content = await remote_system.get_content_bytes(file_observable.value)
+    content = await manager.system.get_content_bytes(file_observable.value)
     assert content.decode() == "test"

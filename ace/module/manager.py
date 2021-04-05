@@ -3,6 +3,7 @@
 
 import asyncio
 import concurrent.futures
+import logging
 import multiprocessing
 import os
 import signal
@@ -36,8 +37,8 @@ SCALE_DOWN = -1
 
 # concurrency mode for multi-process analysis modules
 # defaults to threaded
-CONCURRENCY_MODE_THREADED = 1
-CONCURRENCY_MODE_PROCESS = 2
+CONCURRENCY_MODE_THREADED = "threaded"
+CONCURRENCY_MODE_PROCESS = "process"
 
 #
 # process-based concurrency uses empty processes to do the work
@@ -58,131 +59,163 @@ CONCURRENCY_MODE_PROCESS = 2
 # then all that needs to be serialized is the name of the module and the analysis request
 #
 
-sync_module_map = None
-# for each new process (or thread) we create a new async event loop
-event_loop_map = {}  # key = thread_id, value = event loop
-# we need this at the start as we build out the threads/processes
-event_loop_sync = threading.RLock()
-# global reference to the system to use for remote api purposes
-sync_system = None
 
+class CPUTaskExecutor:
+    # maps a module name to an initialized AnalysisModule object
+    module_map: dict[str, AnalysisModule]
+    # the event loop we use for this executor
+    event_loop: asyncio.AbstractEventLoop
+    # a reference to a RemoteACESystem implementation to use to communicate to the core
+    system: RemoteACESystem
+    # keep track of the concurrency mode we're running in
+    concurrency_mode: str
 
-def _get_executor_event_loop():
-    """Returns the event loop to use for the current executor."""
-    with event_loop_sync:
-        return event_loop_map[threading.current_thread()]
+    def __init__(
+        self,
+        module_type_map: dict[str, tuple[type[AnalysisModule], AnalysisModuleType]],
+        system_class: type[RemoteACESystem],
+        system_args: list,
+        system_kwargs: dict,
+        concurrency_mode: str,
+    ):
+        self.module_map = {}
+        self.event_loop = asyncio.new_event_loop()
+        self.system = system_class(*system_args, **system_kwargs)
+        self.concurrency_mode = concurrency_mode
+        self.event_loop.run_until_complete(self.initialize(module_type_map))
 
+    async def initialize(self, module_type_map: dict[str, tuple[type[AnalysisModule], AnalysisModuleType]]):
 
-def _initialize_executor(module_map, system_class):
-    """Initializes the executor. Creates a new event loop and loads the
-    analysis modules into memory. Initializes an instance of the system to use."""
-    global sync_system
+        await self.system.initialize()
 
-    if sync_system is None:
-        sync_system = system_class()
-        # this has to be a remote api based system interface
-        assert isinstance(sync_system, RemoteACESystem)
-
-    with event_loop_sync:
-        event_loop_map[threading.current_thread()] = asyncio.new_event_loop()
-
-    _get_executor_event_loop().run_until_complete(_initialize_executor_async(module_map))
-
-
-async def _initialize_executor_async(module_map):
-    global sync_module_map
-    try:
-        sync_module_map = {}
-        # TODO probably need to initialize logging here
-        for module_name, params in module_map.items():
-            _type, amt = params
-            # create a new instance of the analysis module
-            sync_module_map[module_name] = _type(type=amt)
-            # load any additional resources
-            await sync_module_map[module_name].load()
-
-        import logging
-
+        # TODO initialize logging
+        logging.basicConfig(level=logging.DEBUG)
         get_logger().setLevel(logging.DEBUG)
 
-    except Exception as e:
-        sys.stderr.write(e)
+        for module_name, params in module_type_map.items():
+            _type, amt = params
+            # create a new instance of the analysis module
+            self.module_map[module_name] = _type(type=amt)
+            # load any additional resources
+            await self.module_map[module_name].load()
 
+    def execute_analysis(self, module_type: str, request_json: str) -> str:
+        """Processes the request with the analysis module."""
+        amt = AnalysisModuleType.from_json(module_type)
+        module = self.module_map[amt.name]
 
-def _execute_multi_process_module(module_type: str, request_json: str) -> str:
-    """Processes the request with the analysis module."""
-    amt = AnalysisModuleType.from_json(module_type)
-    module = sync_module_map[amt.name]
+        # run_until_complete just keeps going until it returns
+        # there's no way to "cancel" it if something gets stuck
+        # the only way out is to kill the process
+        # so we start a thread to monitor the timeout
+        def _module_timeout():
+            get_logger().critical(f"analysis module {module} timed out analyzing request {request_json}")
+            if self.concurrency_mode == CONCURRENCY_MODE_PROCESS:
+                # and then die if we hit it
+                # NOTE that if we're only running threads then there's really no way out other than to log it
+                sys.exit(1)
 
-    # run_until_complete just keeps going until it returns
-    # there's no way to "cancel" it
-    # the only way out is to kill the process
-    # so we start a thread to monitor the timeout
-    def _module_timeout():
-        get_logger().critical(f"analysis module {module} timed out analyzing request {request_json}")
-        # and then die if we hit it
-        sys.exit(1)
+        get_logger().debug(f"starting timer for {module.timeout} seconds")
+        t = threading.Timer(module.timeout, _module_timeout)
+        t.start()
 
-    get_logger().info(f"starting timer for {module.timeout} seconds")
-    t = threading.Timer(module.timeout, _module_timeout)
-    t.start()
+        try:
+            result = self.event_loop.run_until_complete(self.execute_analysis_async(module_type, request_json))
+        finally:
+            # if we didn't time out make sure we cancel the timer
+            t.cancel()
 
-    try:
-        result = _get_executor_event_loop().run_until_complete(
-            _execute_multi_process_module_async(module_type, request_json)
-        )
-    finally:
-        # if we did't time out make sure we cancel the timer
-        t.cancel()
+        return result
 
-    return result
+    async def execute_analysis_async(self, module_type: str, request_json: str) -> str:
+        request = AnalysisRequest.from_json(request_json, self.system)
+        amt = AnalysisModuleType.from_json(module_type)
+        module = self.module_map[amt.name]
+        if not module.type.extended_version_matches(amt):
+            await module.upgrade()
 
+        if not module.type.extended_version_matches(amt):
+            raise AnalysisModuleTypeExtendedVersionError(amt, module.type)
 
-async def _execute_multi_process_module_async(module_type: str, request_json: str) -> str:
-    # XXX ???
-    # use a dummy system here...
-    from ace.system.threaded import ThreadedACESystem
+        analysis = request.modified_observable.add_analysis(Analysis(type=module.type, details={}))
+        await module.execute_analysis(request.modified_root, request.modified_observable, analysis)
+        return request.to_json()
 
-    system = ThreadedACESystem()
+    def upgrade_module(self, amt_json: str) -> str:
+        """Upgrades the analysis module of the given type."""
+        return self.event_loop.run_until_complete(self.upgrade_module_async(amt_json))
 
-    request = AnalysisRequest.from_json(request_json, system)
-    amt = AnalysisModuleType.from_json(module_type)
-    module = sync_module_map[amt.name]
-    if not module.type.extended_version_matches(amt):
+    async def upgrade_module_async(self, amt_json: str) -> str:
+        if not self.module_map:
+            raise RuntimeError("_upgrade_multi_process_module called before _initialize_executor")
+
+        amt = AnalysisModuleType.from_json(amt_json)
+        module = self.module_map[amt.name]
         await module.upgrade()
-
-    if not module.type.extended_version_matches(amt):
-        raise AnalysisModuleTypeExtendedVersionError(amt, module.type)
-
-    analysis = request.modified_observable.add_analysis(Analysis(type=module.type, details={}))
-    await module.execute_analysis(request.modified_root, request.modified_observable, analysis)
-    return request.to_json()
+        return module.type.to_json()
 
 
-def _upgrade_multi_process_module(amt_json: str) -> str:
-    """Upgrades the module type."""
-    return _get_executor_event_loop().run_until_complete(_upgrade_multi_process_module_async(amt_json))
+# maintains the global mapping of CPUTaskExecutor objects
+task_executor_map_key = lambda: "{}:{}".format(os.getpid(), threading.current_thread())
+task_executor_map: dict[str, CPUTaskExecutor] = {}
+
+# wrapper functions that select the correct CPUTaskExecutor object based on the
+# current process id and then executes the corresponding function
+def _cpu_task_executor_init(
+    module_map: dict,
+    system_class: type[RemoteACESystem],
+    system_args: list,
+    system_kwargs: dict,
+    concurrency_mode: str,
+):
+    task_executor_map[task_executor_map_key()] = CPUTaskExecutor(
+        module_map, system_class, system_args, system_kwargs, concurrency_mode
+    )
 
 
-async def _upgrade_multi_process_module_async(amt_json: str) -> str:
-    if not sync_module_map:
-        raise RuntimeError("_upgrade_multi_process_module called before _initialize_executor")
+def _cpu_task_executor_execute_analysis(module_type: str, request_json: str) -> str:
+    return task_executor_map[task_executor_map_key()].execute_analysis(module_type, request_json)
 
-    amt = AnalysisModuleType.from_json(amt_json)
-    module = sync_module_map[amt.name]
-    await module.upgrade()
-    return module.type.to_json()
+
+def _cpu_task_executor_upgrade_module(amt_json: str) -> str:
+    return task_executor_map[task_executor_map_key()].upgrade_module(amt_json)
 
 
 class AnalysisModuleManager:
     """Executes and manages ace.module.AnalysisModule objects."""
 
-    def __init__(self, system: ACESystem, concurrency_mode=CONCURRENCY_MODE_THREADED, wait_time=0):
+    system: RemoteACESystem
+    system_cls: type[RemoteACESystem] = RemoteACESystem
+    system_cls_args = []
+    system_cls_kwargs = {}
+
+    def __init__(
+        self,
+        system: RemoteACESystem,
+        system_cls: Optional[type[RemoteACESystem]] = None,
+        system_cls_args: Optional[list] = None,
+        system_cls_kwargs: Optional[dict] = None,
+        concurrency_mode=CONCURRENCY_MODE_PROCESS,
+        wait_time=0,
+    ):
         assert isinstance(system, ACESystem)
-        assert isinstance(concurrency_mode, int)
+        assert system_cls is None or issubclass(system_cls, ACESystem)
+        assert system_cls_args is None or isinstance(system_cls_args, tuple)
+        assert system_cls_kwargs is None or isinstance(system_cls_kwargs, dict)
+        assert isinstance(concurrency_mode, str)
         assert isinstance(wait_time, int) and wait_time >= 0
 
+        if system_cls is not None:
+            self.system_cls = system_cls
+
+        if system_cls_args is not None:
+            self.system_cls_args = system_cls_args
+
+        if system_cls_kwargs is not None:
+            self.system_cls_kwargs = system_cls_kwargs
+
         # reference to the remote system
+        # this gets initialized in the async call to initialize
         self.system = system
 
         # the analysis modules this manager is running
@@ -308,14 +341,17 @@ class AnalysisModuleManager:
     def start_executor(self):
         module_map = {_.type.name: [type(_), _.type] for _ in self.analysis_modules}
 
-        # executor for non-async modules
+        # executor for cpu bound modules
+        initargs = (module_map, self.system_cls, self.system_cls_args, self.system_cls_kwargs, self.concurrency_mode)
         if self.concurrency_mode == CONCURRENCY_MODE_THREADED:
             self.executor = concurrent.futures.ThreadPoolExecutor(
-                max_workers=multiprocessing.cpu_count(), initializer=_initialize_executor, initargs=(module_map,)
+                max_workers=multiprocessing.cpu_count(),
+                initializer=_cpu_task_executor_init,
+                initargs=initargs,
             )
         else:
             self.executor = concurrent.futures.ProcessPoolExecutor(
-                initializer=_initialize_executor, initargs=(module_map,)
+                initializer=_cpu_task_executor_init, initargs=initargs
             )
 
     def kill_executor(self):
@@ -333,6 +369,10 @@ class AnalysisModuleManager:
 
     async def run(self) -> bool:
         """Run the analysis routine. Does not return until all tasks have completed."""
+        # initialize must have been called already
+        if self.system is None:
+            raise RuntimeError("system not set -- AnalysisModuleManager.initialize() not called?")
+
         # download current registration and compare
         if not await self.verify_registration():
             return False
@@ -388,7 +428,7 @@ class AnalysisModuleManager:
             if module.is_multi_process:
                 module.type = AnalysisModuleType.from_json(
                     await asyncio.get_event_loop().run_in_executor(
-                        self.executor, _upgrade_multi_process_module, module.type.to_json()
+                        self.executor, _cpu_task_executor_upgrade_module, module.type.to_json()
                     )
                 )
             else:
@@ -452,7 +492,7 @@ class AnalysisModuleManager:
             try:
                 request_json = request.to_json()
                 request_result_json = await asyncio.get_event_loop().run_in_executor(
-                    self.executor, _execute_multi_process_module, module.type.to_json(), request_json
+                    self.executor, _cpu_task_executor_execute_analysis, module.type.to_json(), request_json
                 )
                 return AnalysisRequest.from_json(request_result_json, self.system)
             except BrokenProcessPool as e:

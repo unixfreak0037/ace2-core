@@ -38,26 +38,26 @@ async def test_verify_registration(manager):
 
     assert await manager.system.register_analysis_module_type(amt)
 
-    manager = AnalysisModuleManager(remote_system)
-    manager.add_module(AnalysisModule(amt))
-    assert await manager.verify_registration()
+    custom_manager = AnalysisModuleManager(manager.system)
+    custom_manager.add_module(AnalysisModule(amt))
+    assert await custom_manager.verify_registration()
     # missing registration
     amt = AnalysisModuleType("missing", "")
-    manager = AnalysisModuleManager(remote_system)
-    manager.add_module(AnalysisModule(amt))
-    assert not await manager.verify_registration()
-    assert not await manager.run()
+    custom_manager = AnalysisModuleManager(manager.system)
+    custom_manager.add_module(AnalysisModule(amt))
+    assert not await custom_manager.verify_registration()
+    assert not await custom_manager.run()
     # version mismatch
     amt = AnalysisModuleType("test", "", version="1.0.1")
-    manager = AnalysisModuleManager(remote_system)
-    manager.add_module(AnalysisModule(amt))
-    assert not await manager.verify_registration()
-    assert not await manager.run()
+    custom_manager = AnalysisModuleManager(manager.system)
+    custom_manager.add_module(AnalysisModule(amt))
+    assert not await custom_manager.verify_registration()
+    assert not await custom_manager.run()
     # extended version mismatch
     amt = AnalysisModuleType("test", "", extended_version=["yara:71bec09d78fe6abdb94244a4cc89c740"])
-    manager = AnalysisModuleManager(remote_system)
-    manager.add_module(AnalysisModule(amt))
-    assert not await manager.verify_registration()
+    custom_manager = AnalysisModuleManager(manager.system)
+    custom_manager.add_module(AnalysisModule(amt))
+    assert not await custom_manager.verify_registration()
     # extended version mismatch but upgrade ok
     class UpgradableAnalysisModule(AnalysisModule):
         async def upgrade(self):
@@ -65,9 +65,9 @@ async def test_verify_registration(manager):
 
     # starts out with the wrong set of yara rules but upgrade() fixes that
     amt = AnalysisModuleType("test", "", extended_version=["yara:71bec09d78fe6abdb94244a4cc89c740"])
-    manager = AnalysisModuleManager(remote_system)
-    manager.add_module(UpgradableAnalysisModule(amt))
-    assert await manager.verify_registration()
+    custom_manager = AnalysisModuleManager(manager.system)
+    custom_manager.add_module(UpgradableAnalysisModule(amt))
+    assert await custom_manager.verify_registration()
 
 
 @pytest.mark.asyncio
@@ -86,37 +86,37 @@ async def test_scaling_task_creation(manager):
             return sum(iter(self.module_task_count.values()))
 
     amt = AnalysisModuleType("test", "")
-    result = await manager.system.register_analysis_module_type(amt)
-    manager = CustomManager(manager.system)
+    custom_manager = CustomManager(manager.system)
+    result = await custom_manager.system.register_analysis_module_type(amt)
     module = AnalysisModule(amt, limit=2)
-    manager.add_module(module)
+    custom_manager.add_module(module)
 
     # no tasks to start
-    assert manager.total_task_count() == 0
+    assert custom_manager.total_task_count() == 0
 
     # starts with one task
-    manager.initialize_module_tasks()
-    assert manager.total_task_count() == 1
+    custom_manager.initialize_module_tasks()
+    assert custom_manager.total_task_count() == 1
 
     # scale up to 2 tasks
-    manager.direction = SCALE_UP
-    result = await manager.module_loop(module, "test")
-    assert manager.total_task_count() == 2
+    custom_manager.direction = SCALE_UP
+    result = await custom_manager.module_loop(module, "test")
+    assert custom_manager.total_task_count() == 2
 
     # should not scale past limit
-    result = await manager.module_loop(module, "test")
-    assert manager.total_task_count() == 2
+    result = await custom_manager.module_loop(module, "test")
+    assert custom_manager.total_task_count() == 2
 
     # scale down to one task
-    manager.direction = SCALE_DOWN
-    result = await manager.module_loop(module, "test")
-    assert manager.total_task_count() == 1
+    custom_manager.direction = SCALE_DOWN
+    result = await custom_manager.module_loop(module, "test")
+    assert custom_manager.total_task_count() == 1
 
     # scale down does not drop below one task
-    result = await manager.module_loop(module, "test")
-    assert manager.total_task_count() == 1
+    result = await custom_manager.module_loop(module, "test")
+    assert custom_manager.total_task_count() == 1
 
     # after shutdown it drops to zero tasks
-    manager.shutdown = True
-    await manager.module_loop(module, "test")
-    assert manager.total_task_count() == 0
+    custom_manager.shutdown = True
+    await custom_manager.module_loop(module, "test")
+    assert custom_manager.total_task_count() == 0

@@ -4,25 +4,21 @@
 import multiprocessing
 
 from ace.analysis import AnalysisModuleType
-from ace.module.base import AnalysisModule, DEFAULT_ASYNC_LIMIT
+from ace.module.base import AnalysisModule, MultiProcessAnalysisModule, DEFAULT_ASYNC_LIMIT
 
 import pytest
 
 
 @pytest.mark.unit
 def test_analysis_module_constructor():
-    class AsyncAnalysisModule(AnalysisModule):
-        async def execute_analysis(self, root, observable, analysis):
-            pass
-
     # default sync module
-    module = AnalysisModule()
+    module = MultiProcessAnalysisModule()
     assert isinstance(module.type, AnalysisModuleType)
     assert module.limit == multiprocessing.cpu_count()
     assert module.timeout is None
 
     # default async module
-    module = AsyncAnalysisModule()
+    module = AnalysisModule()
     assert isinstance(module.type, AnalysisModuleType)
     assert module.limit == DEFAULT_ASYNC_LIMIT
     assert module.timeout is None

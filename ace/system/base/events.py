@@ -44,7 +44,6 @@ class EventBaseInterface:
     async def fire_event(self, event: str, event_args: Optional[Any] = None):
         """Fires the event with the given JSON argument."""
         assert isinstance(event, str) and event
-
         get_logger().debug(f"fired event {event}")
         return await self.i_fire_event(Event(name=event, args=event_args))
 

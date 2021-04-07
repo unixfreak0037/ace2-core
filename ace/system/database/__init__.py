@@ -1,5 +1,6 @@
 # vim: sw=4:ts=4:et:cc=120
 
+import asyncio
 import functools
 import os
 import os.path
@@ -8,18 +9,19 @@ import sys
 import threading
 import time
 import warnings
-import sqlite3
 
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
+from typing import Union
 
 import ace
 
 from ace.system import ACESystem
 
 from ace.logging import get_logger
-from sqlalchemy import create_engine, event
+from sqlalchemy import event
 from sqlalchemy.exc import DBAPIError, IntegrityError
-from sqlalchemy.orm.session import Session
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm.session import Session, sessionmaker
 from sqlalchemy.sql.expression import Executable
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -63,32 +65,36 @@ class DatabaseACESystem(
 
         self.db_url = await self.get_config_value(CONFIG_DB_URL, env="ACE_DB_URL", default=self.db_url)
         self.db_kwargs = await self.get_config_value(CONFIG_DB_KWARGS, default=self.db_kwargs)
-        self.engine = create_engine(self.db_url, **self.db_kwargs)
+        self.engine = create_async_engine(self.db_url, **self.db_kwargs)
 
-        @event.listens_for(self.engine, "connect")
+        @event.listens_for(self.engine.sync_engine, "engine_connect")
         def connect(dbapi_connection, connection_record):
-            # XXX check for sqlite
-            cursor = dbapi_connection.cursor()
+            # TODO check for sqlite
+            cursor = dbapi_connection.connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
 
+        self.async_session = sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession)
         await super().initialize()
 
-    @contextmanager
-    def get_db(self) -> Session:
-        """Returns the global scoped_session object."""
-        try:
-            session = None
-            if self.engine is None:
-                yield None
-            else:
-                session = Session(bind=self.engine)
+    @asynccontextmanager
+    async def get_db(self) -> AsyncSession:
+        """Returns the a database session."""
+        session = None
+        if self.engine is None:
+            yield None
+        else:
+            async with self.async_session() as session:
                 yield session
-        finally:
-            if session:
-                session.close()
 
-    def execute_with_retry(self, db, cursor, sql_or_func, params=(), attempts=3, commit=False):
+    async def execute_with_retry(
+        self,
+        db: AsyncSession,
+        sql_or_func: Union[str, list, callable],
+        params: Union[list[dict], dict] = None,
+        attempts: int = 3,
+        commit: bool = False,
+    ):
         """Executes the given SQL or function (and params) against the given cursor with
         re-attempts up to N times (defaults to 2) on deadlock detection.
 
@@ -129,11 +135,12 @@ class DatabaseACESystem(
         Returns the rowcount for a single statement, or a list of rowcount for multiple statements,
         or the result of the function call."""
 
+        assert isinstance(db, AsyncSession)
         assert callable(sql_or_func) or isinstance(sql_or_func, str) or isinstance(sql_or_func, list)
         assert (
             params is None
-            or isinstance(params, tuple)
-            or (isinstance(params, list) and all([isinstance(_, tuple) for _ in params]))
+            or isinstance(params, dict)
+            or (isinstance(params, list) and all([isinstance(_, dict) for _ in params]))
         )
 
         # if we are executing sql then make sure we have a list of SQL statements and a matching list
@@ -142,10 +149,10 @@ class DatabaseACESystem(
             if isinstance(sql_or_func, str):
                 sql_or_func = [sql_or_func]
 
-            if isinstance(params, tuple):
+            if isinstance(params, dict):
                 params = [params]
             elif params is None:
-                params = [() for _ in sql_or_func]
+                params = [{} for _ in sql_or_func]
 
             if len(sql_or_func) != len(params):
                 raise ValueError(
@@ -160,23 +167,21 @@ class DatabaseACESystem(
             try:
                 results = []
                 if callable(sql_or_func):
-                    results.append(sql_or_func(db, cursor, *params))
+                    results.append(sql_or_func(db, *params))
                 else:
                     for (_sql, _params) in zip(sql_or_func, params):
-                        # if ace.CONFIG['global'].getboolean('log_sql'):
-                        # get_logger().debug(f"executing with retry (attempt #{count}) sql {_sql} with paramters {_params}")
-                        cursor.execute(_sql, _params)
-                        results.append(cursor.rowcount)
+                        result = await db.execute(_sql, _params)
+                        results.append(result.rowcount)
 
                 if commit:
-                    db.commit()
+                    await db.commit()
 
                 if len(results) == 1:
                     return results[0]
 
                 return results
 
-            except (DBAPIError, sqlite3.IntegrityError) as e:
+            except (DBAPIError, IntegrityError) as e:
 
                 #
                 # XXX
@@ -194,13 +199,13 @@ class DatabaseACESystem(
                 ) and count < attempts:
                     get_logger().warning("deadlock detected -- trying again (attempt #{})".format(count))
                     try:
-                        db.rollback()
+                        await db.rollback()
                     except Exception as rollback_error:
                         get_logger().error("rollback failed for transaction in deadlock: {}".format(rollback_error))
                         raise e
 
                     count += 1
-                    time.sleep(random.uniform(0, 1))
+                    await asyncio.sleep(random.uniform(0, 1))
                     continue
                 else:
                     if not callable(sql_or_func):
@@ -218,7 +223,7 @@ class DatabaseACESystem(
 
     # if target is an executable, then *args is to session.execute function
     # if target is a callable, then *args is to the callable function (whatever that is)
-    def retry_on_deadlock(self, targets, *args, attempts=2, commit=False, **kwargs):
+    async def retry_on_deadlock(self, targets, *args, attempts=2, commit=False, **kwargs):
         """Executes the given targets, in order. If a deadlock condition is detected, the database session
         is rolled back and the targets are executed in order, again. This can happen up to :param:attempts times
         before the failure is raised as an exception.
@@ -246,17 +251,17 @@ class DatabaseACESystem(
 
         current_attempt = 0
         while True:
-            with self.get_db() as db:
+            async with self.get_db() as db:
                 try:
                     last_result = None
                     for target in targets:
                         if isinstance(target, Executable) or isinstance(target, str):
-                            db.execute(target, *args, **kwargs)
+                            await db.execute(target, *args, **kwargs)
                         elif callable(target):
                             last_result = target(*args, **kwargs)
 
                     if commit:
-                        db.commit()
+                        await db.commit()
 
                     return last_result
 
@@ -274,7 +279,7 @@ class DatabaseACESystem(
                         )
 
                         try:
-                            db.rollback()  # rolls back to the begin_nested()
+                            await db.rollback()  # rolls back to the begin_nested()
                         except Exception as e:
                             get_logger().error(f"unable to roll back transaction: {e}")
 
@@ -282,7 +287,7 @@ class DatabaseACESystem(
                             raise e.with_traceback(tb)
 
                         # ... and try again
-                        time.sleep(0.1)  # ... after a bit
+                        await asyncio.sleep(0.1)  # ... after a bit
                         current_attempt += 1
                         continue
 
@@ -290,15 +295,15 @@ class DatabaseACESystem(
                     et, ei, tb = sys.exc_info()
                     raise e.with_traceback(tb)
 
-    def retry_function_on_deadlock(self, function, *args, **kwargs):
+    async def retry_function_on_deadlock(self, function, *args, **kwargs):
         assert callable(function)
-        return self.retry_on_deadlock(function, *args, **kwargs)
+        return await self.retry_on_deadlock(function, *args, **kwargs)
 
-    def retry_sql_on_deadlock(self, executable, *args, **kwargs):
+    async def retry_sql_on_deadlock(self, executable, *args, **kwargs):
         assert isinstance(executable, Executable)
-        return self.retry_on_deadlock(executable, *args, **kwargs)
+        return await self.retry_on_deadlock(executable, *args, **kwargs)
 
-    def retry_multi_sql_on_deadlock(self, executables, *args, **kwargs):
+    async def retry_multi_sql_on_deadlock(self, executables, *args, **kwargs):
         assert isinstance(executables, list)
         assert all([isinstance(_, Executable) for _ in executables])
-        return self.retry_on_deadlock(executables, *args, **kwargs)
+        return await self.retry_on_deadlock(executables, *args, **kwargs)

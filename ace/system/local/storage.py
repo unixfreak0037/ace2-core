@@ -78,8 +78,8 @@ class LocalStorageInterface(DatabaseStorageInterface):
         with open(file_path, "wb") as fp:
             fp.write(data)
 
-        with self.get_db() as db:
-            db.merge(
+        async with self.get_db() as db:
+            await db.merge(
                 Storage(
                     sha256=sha256,
                     name=meta.name,
@@ -89,7 +89,7 @@ class LocalStorageInterface(DatabaseStorageInterface):
                     custom=json.dumps(meta.custom, cls=CustomJSONEncoder),
                 )
             )
-            db.commit()
+            await db.commit()
 
         return sha256
 

@@ -33,7 +33,7 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     # always used
 
     # db_url = "sqlite:///ace.db"
-    db_url = "sqlite://"
+    db_url = "sqlite+aiosqlite://"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -50,18 +50,21 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
 
         # re-initialize and create the database
         await self.initialize()
-        self.create_database()
+        await self.create_database()
 
         # reset the storage_root
         shutil.rmtree(self.storage_root)
         self.storage_root = tempfile.mkdtemp()
 
-    def create_database(self):
+    async def create_database(self):
         from ace.system.database.schema import Base
 
         get_logger().info(f"creating database {self.db_url}")
         Base.metadata.bind = self.engine
-        Base.metadata.create_all()
+        async with self.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        # Base.metadata.create_all()
 
     async def stop(self):
         await super().stop()
@@ -85,7 +88,7 @@ class RedisACETestSystem(RedisACESystem, DatabaseACETestSystem, ThreadedACESyste
 
 
 class DistributedACETestSystem(RedisACETestSystem):
-    db_url = "sqlite:///ace_distributed.db"
+    db_url = "sqlite+aiosqlite:///ace_distributed.db"
 
     async def reset(self):
         if os.path.exists("ace_distributed.db"):

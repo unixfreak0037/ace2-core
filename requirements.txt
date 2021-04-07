@@ -1,4 +1,5 @@
-SQLAlchemy<1.4
+SQLAlchemy<1.5
+aiosqlite
 aiofiles
 fastapi[all]
 httpx

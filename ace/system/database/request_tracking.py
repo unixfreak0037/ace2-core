@@ -17,6 +17,8 @@ from ace.system.caching import generate_cache_key
 from ace.exceptions import UnknownAnalysisModuleTypeError
 
 from sqlalchemy import and_, text
+from sqlalchemy.sql import delete, update, select
+from sqlalchemy.orm import selectinload
 
 
 class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingBaseInterface):
@@ -36,9 +38,9 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingBaseInterf
             json_data=request.to_json(),
         )
 
-        with self.get_db() as db:
-            db.merge(db_request)
-            db.commit()
+        async with self.get_db() as db:
+            await db.merge(db_request)
+            await db.commit()
 
     async def i_link_analysis_requests(self, source: AnalysisRequest, dest: AnalysisRequest) -> bool:
         from sqlalchemy import select, bindparam, String, and_
@@ -46,121 +48,145 @@ class DatabaseAnalysisRequestTrackingInterface(AnalysisRequestTrackingBaseInterf
         # when we process an analysis request we "lock" it by setting the lock field
         # so if we try to link against an analysis request that is "locked" it fails
 
+        # INSERT INTO analysis_request_links ( source_id, dest_id )
+        # SELECT :source.id, :dest.id FROM analysis_tracking_request
+        # WHERE source.id = :source.id AND lock IS NULL
+
         sel = select(
-            [bindparam("s", type_=String).label("source_id"), bindparam("d", type_=String).label("dest_id")],
-            AnalysisRequestTracking.__table__,
+            bindparam("s", type_=String).label("source_id"),
+            bindparam("d", type_=String).label("dest_id"),
         ).where(
             and_(AnalysisRequestTracking.id == source.id, AnalysisRequestTracking.lock == None)
         )  # noqa:E711
         update = analysis_request_links.insert().from_select(["source_id", "dest_id"], sel)
-        with self.get_db() as db:
-            count = db.execute(update, {"s": source.id, "d": dest.id}).rowcount
-            db.commit()
+        async with self.get_db() as db:
+            count = (await db.execute(update, {"s": source.id, "d": dest.id})).rowcount
+            await db.commit()
 
         return count == 1
 
     async def i_get_linked_analysis_requests(self, source: AnalysisRequest) -> list[AnalysisRequest]:
-        with self.get_db() as db:
+        async with self.get_db() as db:
             source_request = (
-                db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == source.id).one_or_none()
+                # NOTE you cannot do lazy loading with async in sqlalchemy 1.4
+                (
+                    await db.execute(
+                        select(AnalysisRequestTracking)
+                        .options(selectinload(AnalysisRequestTracking.linked_requests))
+                        .where(AnalysisRequestTracking.id == source.id)
+                    )
+                ).one_or_none()
             )
 
             if source_request is None:
                 return None
 
-            return [AnalysisRequest.from_dict(json.loads(_.json_data), self) for _ in source_request.linked_requests]
+            # I think this is where you have to be careful with async
+            return [AnalysisRequest.from_dict(json.loads(_.json_data), self) for _ in source_request[0].linked_requests]
 
     async def i_lock_analysis_request(self, request: AnalysisRequest) -> bool:
-        with self.get_db() as db:
-            count = db.execute(
-                AnalysisRequestTracking.__table__.update()
-                .where(
-                    and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock == None)
-                )  # noqa:E711
-                .values(lock=text("CURRENT_TIMESTAMP"))
+        async with self.get_db() as db:
+            count = (
+                await db.execute(
+                    update(AnalysisRequestTracking)
+                    .where(
+                        and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock == None)
+                    )  # noqa:E711
+                    .values(lock=text("CURRENT_TIMESTAMP"))
+                )
             ).rowcount
-            db.commit()
+            await db.commit()
 
         return count == 1
 
     async def i_unlock_analysis_request(self, request: AnalysisRequest) -> bool:
-        with self.get_db() as db:
-            count = db.execute(
-                AnalysisRequestTracking.__table__.update()
-                .where(
-                    and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock != None)
-                )  # noqa:E711
-                .values(lock=None)
+        async with self.get_db() as db:
+            count = (
+                await db.execute(
+                    update(AnalysisRequestTracking)
+                    .where(
+                        and_(AnalysisRequestTracking.id == request.id, AnalysisRequestTracking.lock != None)
+                    )  # noqa:E711
+                    .values(lock=None)
+                )
             ).rowcount
-            db.commit()
+            await db.commit()
 
         return count == 1
 
     async def i_delete_analysis_request(self, key: str) -> bool:
-        with self.get_db() as db:
-            count = db.execute(
-                AnalysisRequestTracking.__table__.delete().where(AnalysisRequestTracking.id == key)
+        async with self.get_db() as db:
+            count = (
+                await db.execute(delete(AnalysisRequestTracking).where(AnalysisRequestTracking.id == key))
             ).rowcount
-            db.commit()
+            await db.commit()
 
         return count == 1
 
     async def i_get_expired_analysis_requests(self) -> list[AnalysisRequest]:
-        with self.get_db() as db:
+        async with self.get_db() as db:
             result = (
-                db.query(AnalysisRequestTracking)
-                .filter(datetime.datetime.now() > AnalysisRequestTracking.expiration_date)
-                .all()
-            )
-            return [AnalysisRequest.from_dict(json.loads(_.json_data), self) for _ in result]
+                await db.execute(
+                    select(AnalysisRequestTracking).where(
+                        datetime.datetime.now() > AnalysisRequestTracking.expiration_date
+                    )
+                )
+            ).all()
+            return [AnalysisRequest.from_dict(json.loads(_[0].json_data), self) for _ in result]
 
     # this is called when an analysis module type is removed (or expired)
     async def i_clear_tracking_by_analysis_module_type(self, amt: AnalysisModuleType):
-        with self.get_db() as db:
-            db.execute(
-                AnalysisRequestTracking.__table__.delete().where(
-                    AnalysisRequestTracking.analysis_module_type == amt.name
-                )
+        async with self.get_db() as db:
+            await db.execute(
+                delete(AnalysisRequestTracking).where(AnalysisRequestTracking.analysis_module_type == amt.name)
             )
-            db.commit()
+            await db.commit()
 
     async def i_get_analysis_request_by_request_id(self, key: str) -> Union[AnalysisRequest, None]:
-        with self.get_db() as db:
-            result = db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.id == key).one_or_none()
+        async with self.get_db() as db:
+            result = (
+                await db.execute(select(AnalysisRequestTracking).where(AnalysisRequestTracking.id == key))
+            ).one_or_none()
 
             if result is None:
                 return None
 
-            return AnalysisRequest.from_dict(json.loads(result.json_data), self)
+            return AnalysisRequest.from_dict(json.loads(result[0].json_data), self)
 
     async def i_get_analysis_requests_by_root(self, key: str) -> list[AnalysisRequest]:
-        with self.get_db() as db:
+        async with self.get_db() as db:
             return [
-                AnalysisRequest.from_dict(json.loads(_.json_data), self)
-                for _ in db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.root_uuid == key).all()
+                AnalysisRequest.from_dict(json.loads(_[0].json_data), self)
+                for _ in (
+                    await db.execute(select(AnalysisRequestTracking).where(AnalysisRequestTracking.root_uuid == key))
+                ).all()
             ]
 
     async def i_get_analysis_request_by_cache_key(self, key: str) -> Union[AnalysisRequest, None]:
         assert isinstance(key, str)
 
-        with self.get_db() as db:
-            result = db.query(AnalysisRequestTracking).filter(AnalysisRequestTracking.cache_key == key).one_or_none()
+        async with self.get_db() as db:
+            result = (
+                await db.execute(select(AnalysisRequestTracking).where(AnalysisRequestTracking.cache_key == key))
+            ).one_or_none()
 
             if result is None:
                 return None
 
-            return AnalysisRequest.from_dict(json.loads(result.json_data), self)
+            return AnalysisRequest.from_dict(json.loads(result[0].json_data), self)
 
     async def i_process_expired_analysis_requests(self, amt: AnalysisModuleType) -> int:
         assert isinstance(amt, AnalysisModuleType)
-        with self.get_db() as db:
-            for db_request in db.query(AnalysisRequestTracking).filter(
-                and_(
-                    AnalysisRequestTracking.analysis_module_type == amt.name,
-                    datetime.datetime.now() > AnalysisRequestTracking.expiration_date,
+        async with self.get_db() as db:
+            for db_request in await db.execute(
+                select(AnalysisRequestTracking).where(
+                    and_(
+                        AnalysisRequestTracking.analysis_module_type == amt.name,
+                        datetime.datetime.now() > AnalysisRequestTracking.expiration_date,
+                    )
                 )
             ):
-                request = AnalysisRequest.from_json(db_request.json_data, self)
+                request = AnalysisRequest.from_json(db_request[0].json_data, self)
                 await self.fire_event(EVENT_AR_EXPIRED, request)
                 try:
                     await self.queue_analysis_request(request)

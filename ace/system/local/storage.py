@@ -80,8 +80,8 @@ class LocalStorageInterface(DatabaseStorageInterface):
 
         get_logger().info(f"stored file content {meta.name} {sha256} at {file_path}")
 
-        with self.get_db() as db:
-            db.merge(
+        async with self.get_db() as db:
+            await db.merge(
                 Storage(
                     sha256=sha256,
                     name=meta.name,
@@ -91,7 +91,7 @@ class LocalStorageInterface(DatabaseStorageInterface):
                     custom=json.dumps(meta.custom, cls=CustomJSONEncoder),
                 )
             )
-            db.commit()
+            await db.commit()
 
         return sha256
 

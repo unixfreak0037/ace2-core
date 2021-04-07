@@ -14,16 +14,22 @@ from ace.logging import get_logger
 from ace.system.base import StorageBaseInterface
 from ace.system.database.schema import Storage, StorageRootTracking
 
+from sqlalchemy.sql import select, delete
+from sqlalchemy.orm import selectinload
+
 
 class DatabaseStorageInterface(StorageBaseInterface):
     """Abstract storage interface that uses a database to track file storage."""
 
     async def i_get_content_meta(self, sha256: str) -> Union[ContentMetadata, None]:
-        with self.get_db() as db:
-            storage = db.query(Storage).filter(Storage.sha256 == sha256).one_or_none()
+        async with self.get_db() as db:
+            storage = (
+                await db.execute(select(Storage).options(selectinload(Storage.roots)).where(Storage.sha256 == sha256))
+            ).one_or_none()
             if storage is None:
                 return None
 
+            storage = storage[0]
             return ContentMetadata(
                 name=storage.name,
                 sha256=sha256,
@@ -36,12 +42,13 @@ class DatabaseStorageInterface(StorageBaseInterface):
             )
 
     async def i_iter_expired_content(self) -> Iterator[ContentMetadata]:
-        with self.get_db() as db:
+        async with self.get_db() as db:
             # XXX use db NOW()
-            for storage in (
-                db.query(Storage)
+            for (storage,) in await db.execute(
+                select(Storage)
+                .options(selectinload(Storage.roots))
                 .outerjoin(StorageRootTracking)
-                .filter(
+                .where(
                     Storage.expiration_date != None,  # noqa: E711
                     datetime.datetime.now() >= Storage.expiration_date,
                     StorageRootTracking.sha256 == None,
@@ -59,13 +66,13 @@ class DatabaseStorageInterface(StorageBaseInterface):
                 )
 
     async def i_track_content_root(self, sha256: str, uuid: str):
-        with self.get_db() as db:
-            db.merge(StorageRootTracking(sha256=sha256, root_uuid=uuid))
-            db.commit()
+        async with self.get_db() as db:
+            await db.merge(StorageRootTracking(sha256=sha256, root_uuid=uuid))
+            await db.commit()
 
     async def i_delete_content(self, sha256: str) -> bool:
-        with self.get_db() as db:
-            count = db.execute(Storage.__table__.delete().where(Storage.sha256 == sha256)).rowcount
-            db.commit()
+        async with self.get_db() as db:
+            count = (await db.execute(delete(Storage).where(Storage.sha256 == sha256))).rowcount
+            await db.commit()
 
         return count == 1

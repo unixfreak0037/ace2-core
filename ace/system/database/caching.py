@@ -14,15 +14,19 @@ from ace.system.requests import AnalysisRequest
 from ace.time import utc_now
 
 from sqlalchemy import func
+from sqlalchemy.sql import select, delete
 
 
 class DatabaseCachingInterface(CachingBaseInterface):
     async def i_get_cached_analysis_result(self, cache_key: str) -> Union[AnalysisRequest, None]:
-        with self.get_db() as db:
-            result = db.query(AnalysisResultCache).filter(AnalysisResultCache.cache_key == cache_key).one_or_none()
+        async with self.get_db() as db:
+            result = (
+                await db.execute(select(AnalysisResultCache).where(AnalysisResultCache.cache_key == cache_key))
+            ).one_or_none()
             if result is None:
                 return None
 
+            result = result[0]
             if result.expiration_date is not None and utc_now() > result.expiration_date:
                 return None
 
@@ -41,31 +45,31 @@ class DatabaseCachingInterface(CachingBaseInterface):
             json_data=request.to_json(),
         )
 
-        with self.get_db() as db:
-            db.merge(cache_result)
-            db.commit()
+        async with self.get_db() as db:
+            await db.merge(cache_result)
+            await db.commit()
 
         return cache_key
 
     async def i_delete_expired_cached_analysis_results(self):
-        with self.get_db() as db:
-            db.execute(AnalysisResultCache.__table__.delete().where(AnalysisResultCache.expiration_date < utc_now()))
-            db.commit()
+        async with self.get_db() as db:
+            await db.execute(delete(AnalysisResultCache).where(AnalysisResultCache.expiration_date < utc_now()))
+            await db.commit()
 
     async def i_delete_cached_analysis_results_by_module_type(self, amt: AnalysisModuleType):
-        with self.get_db() as db:
-            db.execute(
-                AnalysisResultCache.__table__.delete().where(AnalysisResultCache.analysis_module_type == amt.name)
-            )
-            db.commit()
+        async with self.get_db() as db:
+            await db.execute(delete(AnalysisResultCache).where(AnalysisResultCache.analysis_module_type == amt.name))
+            await db.commit()
 
     async def i_get_cache_size(self, amt: Optional[AnalysisModuleType] = None) -> int:
-        with self.get_db() as db:
+        async with self.get_db() as db:
             if amt:
                 return (
-                    db.query(func.count(AnalysisResultCache.cache_key))
-                    .filter(AnalysisResultCache.analysis_module_type == amt.name)
-                    .scalar()
-                )
+                    await db.execute(
+                        select(func.count(AnalysisResultCache.cache_key)).where(
+                            AnalysisResultCache.analysis_module_type == amt.name
+                        )
+                    )
+                ).scalar()
             else:
-                return db.query(func.count(AnalysisResultCache.cache_key)).scalar()
+                return (await db.execute(select(func.count(AnalysisResultCache.cache_key)))).scalar()

@@ -21,6 +21,7 @@ from ace.data_model import (
 )
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable
 from ace.api.base import AceAPI
+from ace.system import ACESystem
 from ace.system.requests import AnalysisRequest
 from ace.constants import ERROR_AMT_VERSION, ERROR_AMT_EXTENDED_VERSION, ERROR_AMT_DEP
 from ace.system.events import EventHandler
@@ -60,16 +61,32 @@ def _raise_exception_from_error_model(error: ErrorModel):
 
 
 class RemoteAceAPI(AceAPI):
+    def __init__(
+        self,
+        system: ACESystem,
+        api_key: str,
+        url: str,
+        client_args: Optional[list] = None,
+        client_kwargs: Optional[dict] = None,
+    ):
+        super().__init__(system, api_key)
 
-    api_key = None
+        self.url = url
+        self.client_args = client_args if client_args else []
+        self.client_kwargs = client_kwargs if client_kwargs else {}
+
+        if "base_url" not in self.client_kwargs:
+            self.client_kwargs["base_url"] = url
 
     def get_client(self):
         kwargs = {}
         kwargs.update(self.client_kwargs)
-        if "headers" not in kwargs:
-            kwargs["headers"] = {}
+        if self.api_key:
+            if "headers" not in kwargs:
+                kwargs["headers"] = {}
 
-        kwargs["headers"].update({"X-API-Key": self.api_key})
+            kwargs["headers"].update({"X-API-Key": self.api_key})
+
         return AsyncClient(*self.client_args, **kwargs)
 
     # alerting

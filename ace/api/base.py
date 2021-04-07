@@ -16,6 +16,7 @@ from ace.system.events import EventHandler
 class AceAPI:
     def __init__(self, system: ACESystem, api_key: str = None):
         assert isinstance(system, ACESystem)
+        assert api_key is None or isinstance(api_key, str)
         self.system = system
         self.api_key = api_key
 

@@ -78,6 +78,8 @@ class LocalStorageInterface(DatabaseStorageInterface):
         with open(file_path, "wb") as fp:
             fp.write(data)
 
+        get_logger().info(f"stored file content {meta.name} {sha256} at {file_path}")
+
         async with self.get_db() as db:
             await db.merge(
                 Storage(
@@ -120,7 +122,7 @@ class LocalStorageInterface(DatabaseStorageInterface):
                     yield data
 
         except IOError as e:
-            get_logger().debug(f"unable to get content stream for {sha256}: {e}")
+            get_logger().warning(f"unable to get content stream for {sha256}: {e}")
             yield None
 
     async def i_load_file(self, sha256: str, path: str) -> Union[ContentMetadata, None]:

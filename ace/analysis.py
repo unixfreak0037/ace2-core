@@ -2042,7 +2042,9 @@ class RootAnalysis(Analysis, MergableObject):
             if await self.save():
                 return True
 
-            get_logger().debug(f"sync iteration {_}")
+            if _:
+                get_logger().info(f"sync iteration {_}")
+
             modified_root = await self.system.get_root_analysis(self)
             if modified_root.version == self.version:
                 raise RuntimeError("RootAnalysis.save() failed but version matches -- check logs for issues")

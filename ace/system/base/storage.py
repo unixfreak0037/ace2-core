@@ -5,6 +5,7 @@
 
 import io
 
+from pathlib import Path
 from typing import Union, Optional, AsyncGenerator, Iterator
 
 from ace import coreapi
@@ -13,11 +14,23 @@ from ace.constants import *
 from ace.analysis import RootAnalysis
 from ace.logging import get_logger
 
+import aiofiles
+
 
 class StorageBaseInterface:
     @coreapi
-    async def store_content(self, content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
-        assert isinstance(content, bytes) or isinstance(content, str) or isinstance(content, io.IOBase)
+    async def store_content(
+        self,
+        content: Union[bytes, str, io.IOBase, aiofiles.threadpool.binary.AsyncBufferedReader, Path],
+        meta: ContentMetadata,
+    ) -> str:
+        assert (
+            isinstance(content, bytes)
+            or isinstance(content, str)
+            or isinstance(content, io.IOBase)
+            or isinstance(content, aiofiles.threadpool.binary.AsyncBufferedReader)
+            or isinstance(content, Path)
+        )
         assert isinstance(meta, ContentMetadata)
         get_logger().debug(f"storing content {meta}")
         sha256 = await self.i_store_content(content, meta)

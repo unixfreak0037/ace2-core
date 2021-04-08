@@ -6,6 +6,7 @@ import io
 import json
 import os.path
 
+from pathlib import Path
 from typing import Union, Any, Optional, AsyncGenerator
 
 import ace.data_model
@@ -333,26 +334,41 @@ class RemoteAceAPI(AceAPI):
         _raise_exception_on_error(response)
 
     # storage
-    async def store_content(self, content: Union[bytes, str, io.IOBase], meta: ContentMetadata) -> str:
-        if isinstance(content, str):
-            content = io.BytesIO(content.encode())
-        elif isinstance(content, bytes):
-            content = io.BytesIO(content)
+    async def store_content(
+        self,
+        content: Union[bytes, str, io.IOBase, aiofiles.threadpool.binary.AsyncBufferedReader, Path],
+        meta: ContentMetadata,
+    ) -> str:
+        try:
+            if isinstance(content, str):
+                content = io.BytesIO(content.encode())
+            elif isinstance(content, bytes):
+                content = io.BytesIO(content)
+            elif isinstance(content, aiofiles.threadpool.binary.AsyncBufferedReader):
+                content = io.BytesIO(await content.read())
+            elif isinstance(content, Path):
+                content = open(str(content), "rb")
 
-        files = {"file": content}
-        data = {"name": meta.name}
+            files = {"file": content}
+            data = {"name": meta.name}
 
-        if meta.expiration_date:
-            data["expiration_date"] = meta.expiration_date.isoformat()
+            if meta.expiration_date:
+                data["expiration_date"] = meta.expiration_date.isoformat()
 
-        if meta.custom:
-            data["custom"] = meta.custom
+            if meta.custom:
+                data["custom"] = meta.custom
 
-        async with self.get_client() as client:
-            response = await client.post("/storage", files=files, data=data)
+            async with self.get_client() as client:
+                response = await client.post("/storage", files=files, data=data)
 
-        _raise_exception_on_error(response)
-        return ContentMetadata(**response.json()).sha256
+            _raise_exception_on_error(response)
+            return ContentMetadata(**response.json()).sha256
+        finally:
+            if isinstance(content, io.IOBase):
+                try:
+                    content.close()
+                except Exception as e:
+                    get_logger().exception("unable to close file handle")
 
     async def get_content_bytes(self, sha256: str) -> Union[bytes, None]:
         async with self.get_client() as client:
@@ -392,8 +408,10 @@ class RemoteAceAPI(AceAPI):
 
     async def save_file(self, path: str, **kwargs) -> Union[str, None]:
         meta = ContentMetadata(name=os.path.basename(path), **kwargs)
-        with open(path, "rb") as fp:
-            return await self.store_content(fp, meta)
+        # by passing in a Path object we let the HTTPX client read it as it needs it
+        return await self.store_content(Path(path), meta)
+        # async with aiofiles.open(path, "rb") as fp:
+        # return await self.store_content(fp, meta)
 
     async def load_file(self, sha256: str, path: str) -> Union[ContentMetadata, None]:
         meta = await self.get_content_meta(sha256)

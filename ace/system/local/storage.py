@@ -181,10 +181,12 @@ class LocalStorageInterface(DatabaseStorageInterface):
             # fastest way to "copy" data is to just create a new link to it
             src_path = os.path.join(await self.get_storage_root(), meta.location)
             await asyncio.get_running_loop().run_in_executor(None, os.link, src_path, path)
+            get_logger().debug(f"hard linked {src_path} to {path}")
         except IOError:
             # otherwise we have to actually make a copy
             src_path = os.path.join(await self.get_storage_root(), meta.location)
             await asyncio.get_running_loop().run_in_executor(None, os.copy, src_path, path)
+            get_logger().debug(f"copied {src_path} to {path}")
 
         return meta
 

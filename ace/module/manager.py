@@ -463,6 +463,7 @@ class AnalysisModuleManager:
 
         if request:
             request = await self.execute_module(module, whoami, request)
+            await request.modified_root.discard()
 
         # we just continue executing if there is no scaling required
         # OR this is the last task for this module
@@ -479,6 +480,11 @@ class AnalysisModuleManager:
 
         return module
 
+    async def load_file_content(self, request: AnalysisRequest):
+        """Loads any file observables present in the RootAnalysis of the request."""
+        for file_observable in request.root.find_observables_by_type("file"):
+            await file_observable.load
+
     async def execute_module(self, module: AnalysisModule, whoami: str, request: AnalysisRequest) -> AnalysisRequest:
         """Processes the request with the analysis module.
         Returns a copy of the original request with the results added"""
@@ -488,6 +494,17 @@ class AnalysisModuleManager:
         assert isinstance(request, AnalysisRequest)
 
         request.initialize_result()
+        # if this module is going to be analyzing a file observable then we
+        # want to go ahead and load the content
+        if request.modified_observable.type == "file":
+            if not await request.modified_observable.load():
+                # if we can't load the file we don't bother asking the module to analyze it
+                get_logger().warning(f"unable to load file {request.modified_observable} for {request}")
+                request.modified_observable.add_analysis(
+                    Analysis(type=module.type, details={}, error_message="unknown file")
+                )
+                return request
+
         if module.is_multi_process:
             try:
                 request_json = request.to_json()

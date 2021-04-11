@@ -607,3 +607,69 @@ async def test_module_add_file(manager, tmpdir, module_class):
 
     content = await manager.system.get_content_bytes(file_observable.value)
     assert content.decode() == "test"
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_analyze_file_observable(manager, tmpdir):
+
+    # basic analysis module
+    class TestFileAnalysisModule(AnalysisModule):
+        # define the type for this analysis module
+        type = AnalysisModuleType("test", "", ["file"])
+
+        # define it as an async module
+        async def execute_analysis(self, root, observable, analysis):
+            analysis.set_details({"result": os.path.exists(observable.path)})
+            return True
+
+    # create an instance of it
+    module = TestFileAnalysisModule()
+
+    # register the type to the core
+    await manager.system.register_analysis_module_type(module.type)
+
+    target_file = str(tmpdir / "test.txt")
+    with open(target_file, "w") as fp:
+        fp.write("test")
+
+    # submit the file ahead of time
+    sha256 = await manager.system.save_file(target_file)
+
+    # delete our copy of it
+    os.remove(target_file)
+
+    root = manager.system.new_root()
+    observable = root.add_observable("file", sha256)
+    await root.submit()
+
+    manager.add_module(module)
+    await manager.run_once()
+
+    # check the results in the core
+    root = await manager.system.get_root_analysis(root)
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(module.type)
+    assert analysis
+    details = await analysis.get_details()
+    assert details["result"] is True
+
+    #
+    # when the requested file content is unavailable the analysis is not requested
+    #
+
+    root = manager.system.new_root()
+    observable = root.add_observable("file", sha256)
+    await root.submit()
+
+    await app.state.system.delete_content(sha256)
+
+    manager.add_module(module)
+    await manager.run_once()
+
+    # check the results in the core
+    root = await manager.system.get_root_analysis(root)
+    observable = root.get_observable(observable)
+    analysis = observable.get_analysis(module.type)
+    assert analysis
+    assert analysis.error_message == "unknown file"

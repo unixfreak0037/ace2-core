@@ -16,6 +16,7 @@ from ace.system.database.schema import Storage, StorageRootTracking
 
 from sqlalchemy.sql import select, delete
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 
 
 class DatabaseStorageInterface(StorageBaseInterface):
@@ -66,9 +67,12 @@ class DatabaseStorageInterface(StorageBaseInterface):
                 )
 
     async def i_track_content_root(self, sha256: str, uuid: str):
-        async with self.get_db() as db:
-            await db.merge(StorageRootTracking(sha256=sha256, root_uuid=uuid))
-            await db.commit()
+        try:
+            async with self.get_db() as db:
+                await db.merge(StorageRootTracking(sha256=sha256, root_uuid=uuid))
+                await db.commit()
+        except IntegrityError as e:
+            get_logger().warning("unable to track roots for {uuid}: {e}")
 
     async def i_delete_content(self, sha256: str) -> bool:
         async with self.get_db() as db:

@@ -57,6 +57,11 @@ class DatabaseACESystem(
 
     engine = None
 
+    def __init__(self, *args, db_url=None, db_kwargs={}, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db_url = db_url
+        self.db_kwargs = db_kwargs
+
     async def initialize(self):
         """Initializes database connections by creating the SQLAlchemy engine and session objects."""
         # see https://github.com/PyMySQL/PyMySQL/issues/644

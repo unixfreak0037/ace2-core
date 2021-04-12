@@ -34,10 +34,11 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     # always used
 
     # db_url = "sqlite:///ace.db"
-    db_url = "sqlite+aiosqlite://"
+    # db_url = "sqlite+aiosqlite://"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.db_url = "sqlite+aiosqlite://"
         self.storage_root = tempfile.mkdtemp()
 
     async def reset(self):
@@ -90,7 +91,9 @@ class RedisACETestSystem(RedisACESystem, DatabaseACETestSystem, ThreadedACESyste
 
 
 class DistributedACETestSystem(RedisACETestSystem):
-    db_url = "sqlite+aiosqlite:///ace_distributed.db"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db_url = "sqlite+aiosqlite:///ace_distributed.db"
 
     async def reset(self):
         if os.path.exists("ace_distributed.db"):

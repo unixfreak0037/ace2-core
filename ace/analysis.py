@@ -1,6 +1,7 @@
 # vim: sw=4:ts=4:et:cc=120
 
 
+import asyncio
 import datetime
 import hashlib
 import json
@@ -822,7 +823,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
 
     async def add_file(self, path: str, **kwargs) -> "Observable":
         """Utility function that adds a file observable to the root analysis by passing a path to the file."""
-        return self.add_observable("file", await self.root.system.save_file(path, roots=[self.uuid], **kwargs))
+        observable = self.add_observable("file", await self.root.system.save_file(path, roots=[self.uuid], **kwargs))
+        observable.path = path
+        return observable
 
     def __str__(self):
         return f"Analysis({self.uuid},{self.type},{self.observable})"
@@ -1562,7 +1565,7 @@ class FileObservable(Observable):
         self.root.initialize_storage()
         # store the contents of the file inside this directory named after the hash
         self.path = os.path.join(self.root.storage_dir, self.value)
-        self.meta = await self.root.system.storage.load_file(self.value, path=self.path)
+        self.meta = await self.root.system.load_file(self.value, path=self.path)
         self._loaded = self.meta is not None
         return self._loaded
 
@@ -2057,18 +2060,17 @@ class RootAnalysis(Analysis, MergableObject):
 
     def __del__(self):
         # make sure that any remaining storage directories are wiped out
-        if self.discard():
-            get_logger().warning(f"discard() was not called on {self}")
+        if self.storage_dir and os.path.exists(self.storage_dir):
+            get_logger().error(f"discard() was not called on {self}")
 
-    # XXX this should be async as well
-    def discard(self) -> bool:
+    async def discard(self) -> bool:
         """Discards a local RootAnalysis object. This has the effect of
         deleting the storage directory for this analysis, which deletes any
         files that were downloaded.
 
         Returns True if something was deleted, False otherwise."""
         if self.storage_dir and os.path.exists(self.storage_dir):
-            shutil.rmtree(self.storage_dir)
+            await asyncio.get_running_loop().run_in_executor(None, shutil.rmtree, self.storage_dir)
             get_logger().debug(f"deleted {self.storage_dir}")
             self.storage_dir = None
             return True

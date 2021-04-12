@@ -689,8 +689,9 @@ def test_root_copy():
     assert not (analysis_copy is analysis)
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_storage_dir(tmpdir):
+async def test_storage_dir(tmpdir):
     root = RootAnalysis()
     assert root.storage_dir is None
     # use the default temp dir
@@ -698,7 +699,7 @@ def test_storage_dir(tmpdir):
     assert root.storage_dir
     assert os.path.isdir(root.storage_dir)
     path = root.storage_dir
-    root.discard()
+    await root.discard()
     assert root.storage_dir is None
     assert not os.path.isdir(path)
 
@@ -709,7 +710,7 @@ def test_storage_dir(tmpdir):
     root.initialize_storage(path)
     assert root.storage_dir == path
     assert os.path.exists(path)
-    root.discard()
+    await root.discard()
     assert root.storage_dir is None
     assert not os.path.exists(path)
 
@@ -720,19 +721,8 @@ def test_storage_dir(tmpdir):
     root.initialize_storage(path)  # does not currently exist
     assert root.storage_dir == path
     assert os.path.exists(path)
-    root.discard()
+    await root.discard()
     assert root.storage_dir is None
-    assert not os.path.exists(path)
-
-    # delete on gc
-    root = RootAnalysis()
-    root.initialize_storage()
-    assert os.path.exists(root.storage_dir)
-    path = root.storage_dir
-    root = None
-    import gc
-
-    gc.collect()
     assert not os.path.exists(path)
 
 

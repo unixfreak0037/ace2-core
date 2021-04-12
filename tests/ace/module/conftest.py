@@ -35,9 +35,7 @@ async def manager(request, redis, redis_url, tmpdir):
     app.state.system.encryption_settings.load_aes_key("test")
 
     # set the storage root for the local file system storage
-    from ace.system.local.storage import CONFIG_DB_FILE_STORAGE_ROOT
-
-    await app.state.system.set_config(CONFIG_DB_FILE_STORAGE_ROOT, str(tmpdir))
+    # app.state.system.storage_root = str(tmpdir)
 
     await app.state.system.initialize()
     await app.state.system.reset()  # XXX do we need this here?

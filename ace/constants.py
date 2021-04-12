@@ -1,5 +1,14 @@
 # vim: ts=4:sw=4:et:cc=120
 
+# environment variables
+ACE_ADMIN_PASSWORD = "ACE_ADMIN_PASSWORD"
+ACE_URI = "ACE_URI"
+ACE_DB = "ACE_DB"
+ACE_REDIS = "ACE_REDIS"
+ACE_STORAGE_ROOT = "ACE_STORAGE_ROOT"
+ACE_PACKAGE_URL = "ACE_PACKAGE_URL"
+ACE_API_KEY = "ACE_API_KEY"
+
 # supported tracking systems
 TRACKING_SYSTEM_ANALYSIS_MODULE_TYPES = "analysis_module_types"
 TRACKING_SYSTEM_ANALYSIS_REQUESTS = "analysis_requests"

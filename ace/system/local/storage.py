@@ -21,15 +21,13 @@ import aiofiles
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql import insert
 
-CONFIG_DB_FILE_STORAGE_ROOT = "/ace/core/storage/path"
-
 
 class LocalStorageInterface(DatabaseStorageInterface):
     """Storage interface that stores files in the local file system."""
 
-    async def get_storage_root(self):
-        """Returns the full path to the storage root directory."""
-        return await self.get_config_value(CONFIG_DB_FILE_STORAGE_ROOT, self.storage_root, "ACE_STORAGE_ROOT")
+    def __init__(self, *args, storage_root=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.storage_root = storage_root
 
     async def get_file_path(self, sha256: str) -> str:
         """Returns the full path to the local path that should be used to store
@@ -45,7 +43,7 @@ class LocalStorageInterface(DatabaseStorageInterface):
         """Initializes a file path for storage of a file. Returns the full path
         to the target file."""
         file_name = str(uuid.uuid4())
-        sub_dir = os.path.join(await self.get_storage_root(), file_name[0:3])
+        sub_dir = os.path.join(self.storage_root, file_name[0:3])
         if not await asyncio.get_running_loop().run_in_executor(None, os.path.isdir, sub_dir):
             await asyncio.get_running_loop().run_in_executor(None, os.mkdir, sub_dir)
 
@@ -179,12 +177,14 @@ class LocalStorageInterface(DatabaseStorageInterface):
 
         try:
             # fastest way to "copy" data is to just create a new link to it
-            src_path = os.path.join(await self.get_storage_root(), meta.location)
+            src_path = os.path.join(self.storage_root, meta.location)
             await asyncio.get_running_loop().run_in_executor(None, os.link, src_path, path)
+            get_logger().debug(f"hard linked {src_path} to {path}")
         except IOError:
             # otherwise we have to actually make a copy
-            src_path = os.path.join(await self.get_storage_root(), meta.location)
+            src_path = os.path.join(self.storage_root, meta.location)
             await asyncio.get_running_loop().run_in_executor(None, os.copy, src_path, path)
+            get_logger().debug(f"copied {src_path} to {path}")
 
         return meta
 

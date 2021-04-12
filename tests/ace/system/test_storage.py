@@ -212,7 +212,7 @@ async def test_file_expiration_with_root_reference(tmpdir, system):
     # have the file expire right away
     file_observable = await root.add_file(path, expiration_date=utc_now())
     await root.save()
-    root.discard()
+    await root.discard()
 
     # this should return 0 since it still has a valid root reference
     assert len([_ async for _ in await system.iter_expired_content()]) == 0
@@ -251,13 +251,13 @@ async def test_file_expiration_with_multiple_root_reference(tmpdir, system):
     root_1 = system.new_root()
     file_observable = await root_1.add_file(path, expiration_date=utc_now())
     await root_1.save()
-    root_1.discard()
+    await root_1.discard()
 
     # do it again but reference the same file
     root_2 = system.new_root()
     file_observable = await root_2.add_file(path, expiration_date=utc_now())
     await root_2.save()
-    root_2.discard()
+    await root_2.discard()
 
     # the content meta should reference two different roots
     meta = await system.get_content_meta(file_observable.value)

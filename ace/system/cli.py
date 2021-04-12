@@ -1,11 +1,20 @@
 # vim: ts=4:sw=4:et:cc=120
 
-from ace.cli import get_cli_sp
+import tempfile
+
+from ace.cli import get_cli_sp, display_analysis
 from ace.env import get_uri, get_api_key
 from ace.logging import get_logger
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
 from ace.system.database import DatabaseACESystem
+from ace.system.threaded import ThreadedACESystem
 from ace.system.remote import RemoteACESystem
+
+
+class CommandLineSystem(DatabaseACESystem, ThreadedACESystem):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db_url = db_url = "sqlite+aiosqlite://"
 
 
 async def analyze(args):
@@ -16,29 +25,33 @@ async def analyze(args):
 
     targets = args.targets
 
+    is_local = True
     uri = get_uri()
     api_key = get_api_key()
 
     if uri and api_key:
+        is_local = False
         system = RemoteACESystem(uri, api_key)
     else:
-        system = DatabaseACESystem(db_url="sqlite+aiosqlite://")
+        system = CommandLineSystem()
+        system.storage_root = tempfile.mkdtemp()
 
     await system.initialize()
 
     # TODO move this to the system
-    if isinstance(system, DatabaseACESystem):
-        from ace.system.database.schema import Base
-
-        Base.metadata.bind = system.engine
-        async with system.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+    if is_local:
+        await system.create_database()
 
     manager = AnalysisModuleManager(system, type(system), (system.db_url,), concurrency_mode=CONCURRENCY_MODE_PROCESS)
-    # TODO load all the analysis modules we know about
+    manager.load_modules()
+
     if not manager.analysis_modules:
         get_logger().error("no modules loaded")
         return False
+
+    if is_local:
+        for module in manager.analysis_modules:
+            await system.register_analysis_module_type(module.type)
 
     root = system.new_root()
 
@@ -48,13 +61,18 @@ async def analyze(args):
         o_value = args.targets[index + 1]
 
         # TODO if you add a file then add_observable should call add_file
-        root.add_observable(o_type, o_value)
+        if o_type == "file":
+            await root.add_file(o_value)
+        else:
+            root.add_observable(o_type, o_value)
+
+        index += 2
 
     await root.submit()
     await manager.run_once()
 
     root = await system.get_root_analysis(root)
-    root.stdout()  # TODO
+    display_analysis(root)
     return True
 
 

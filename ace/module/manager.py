@@ -1,6 +1,7 @@
 # vim: ts=4:sw=4:et:cc=120
 #
 
+import importlib
 import asyncio
 import concurrent.futures
 import logging
@@ -298,6 +299,50 @@ class AnalysisModuleManager:
         # by default we never scale up
         # implement custom algorithms in subclasses
         return SCALE_DOWN
+
+    def load_modules(self):
+        package_dir = os.path.join(os.path.expanduser("~"), ".ace", "packages")
+        if not os.path.isdir(package_dir):
+            return
+
+        package_dirs = []
+        for target in os.listdir(package_dir):
+            target = os.path.join(package_dir, target)
+            if os.path.isdir(os.path.realpath(target)):
+                package_dirs.append(target)
+
+        for package_dir in package_dirs:
+            get_logger().debug(f"processing package directory {package_dir}")
+            pkg_path = os.path.join(package_dir, "ace.pkg")
+            if not os.path.exists(pkg_path):
+                get_logger().warning(f"ace package dir {package_dir} missing ace.pkg file")
+                continue
+
+            sys.path.append(package_dir)
+            with open(pkg_path, "r") as fp:
+                for module_spec in fp:
+                    module_spec = module_spec.strip()
+                    get_logger().info(f"loading module {module_spec}")
+
+                    module_name, module_class = module_spec.rsplit(".", 1)
+
+                    try:
+                        _module = importlib.import_module(module_name)
+                    except Exception as e:
+                        get_logger().exception(f"unable to import module {module_name}")
+                        continue
+
+                    try:
+                        _class = getattr(_module, module_class)
+                    except AttributeError as e:
+                        get_logger().exception(f"class {module_class} does not exist in module {module_name}")
+                        continue
+
+                    try:
+                        self.add_module(_class())
+                    except Exception as e:
+                        get_logger().exception(f"unable to load analysis module {module_spec}")
+                        continue
 
     def add_module(self, module: AnalysisModule) -> AnalysisModule:
         """Adds the given AnalysisModule to this manager. Duplicate modules are ignored.

@@ -62,6 +62,14 @@ class DatabaseACESystem(
         self.db_url = db_url
         self.db_kwargs = db_kwargs
 
+    async def create_database(self):
+        """Creates the database at the target URL."""
+        from ace.system.database.schema import Base
+
+        Base.metadata.bind = self.engine
+        async with self.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
     async def initialize(self):
         """Initializes database connections by creating the SQLAlchemy engine and session objects."""
         # see https://github.com/PyMySQL/PyMySQL/issues/644

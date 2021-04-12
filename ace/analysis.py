@@ -823,7 +823,9 @@ class Analysis(TaggableObject, DetectableObject, MergableObject):
 
     async def add_file(self, path: str, **kwargs) -> "Observable":
         """Utility function that adds a file observable to the root analysis by passing a path to the file."""
-        return self.add_observable("file", await self.root.system.save_file(path, roots=[self.uuid], **kwargs))
+        observable = self.add_observable("file", await self.root.system.save_file(path, roots=[self.uuid], **kwargs))
+        observable.path = path
+        return observable
 
     def __str__(self):
         return f"Analysis({self.uuid},{self.type},{self.observable})"

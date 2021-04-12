@@ -2,9 +2,11 @@
 # vim: ts=4:sw=4:et:cc=120
 
 import asyncio
+import logging
 import sys
 
 from ace.cli import parse_args
+from ace.logging import initialize_logging
 
 #
 # TODO figure out how this should work
@@ -13,6 +15,10 @@ from ace.cli import parse_args
 import ace.system.cli
 
 if __name__ == "__main__":
+
+    logging.basicConfig(level=logging.DEBUG)
+
     args = parse_args()
+    initialize_logging(args.logging_config_path)
     asyncio.get_event_loop().run_until_complete(args.func(args))
     sys.exit(0)

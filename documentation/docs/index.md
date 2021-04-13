@@ -1,186 +1,153 @@
-# ACE
+# Analysis Correlation Engine
 
-The Analysis Correlation Engine is a recursive analysis engine geared towards cyber security. It defines basic data types which it uses to recursively analyze data.
+If you're looking to just try this out, just down to the [quick start guide]() on this page to see what this system is capable of.
 
-Something (called the **root**) is submitted to ACE for analysis. **Observations** are made on the **analysis**. Those observations are also analyzed producing additional analysis until all observations are analyzed. Analysis is performed by **analysis modules**. An **alert** is created by adding a **detection** to an observation or analysis. Alerts are submitted to an **alert management system** for review.
+If you're an analyst and you want to add something new to ACE, then [look here.]()
+
+## The Somewhat Long-winded Description of ACE
+
+The Analysis Correlation Engine (ACE) is a recursive analysis engine geared towards cyber security. You submit stuff, the stuff you submit gets analyzed, and then you get a result back.
+
+Most of the time there are already certain things you know about what you're submitting. You've probably already **analyzed** the thing you're submitting, and as part of that **analysis**, you've made some **observations**.
+
+In ACE we take that idea and build on it, and we give names to specific parts of the idea.
+
+The "thing" we're submitting is called a **Root Analysis**. It's essentially a container for all the stuff we want to analyze.
+
+All the things we've already observed that we understand we identify as **Observables**. Each observable has a type (such as username, ip address, or file name), a value, and maybe a time recorded for the observation.
+
+And then, naturally, that thing you observed has be analyzed. When you analyze something, you produce some kind of a result, or at least draw some kind of a conclusion. Usually you're trying to answer a question you need to have answered before you can move on to the next thing. For example, if you have observed an ip address in your environment, you might want to answer the question of "Does this IP address exist in that list of IP addresses my intelligence team gave me last week?"
+
+We call the output of analyzing an observable an **Analysis**. And then, as a part of doing this additional analysis, you might make more observations. For example, you might actually find that the ip address was actually in that list you were looking at, so you would say that you have observed a suspect ip address interacting with your environment. In ACE, an **Analysis** can produce additional **Observables**, which can also be analyzed.
+
+The next step would be to search in all of your logs for any occurrence of this ip address to see if anyone in your environment interacted with it around the time the original observation was made. If you found something, say a user browsed to a site hosted on the ip address through your corporate proxy, then you might want to spend your precious time on **that**!
+
+In ACE we would add a **Detection** to the observation of the url that was used to access the suspect site hosted on the suspect ip address.
+
+And then any **Root Analysis** with at least one **Detection** ends up turning into an **Alert** that gets sent to an **Alert Management System** analysts can use to really dive into the details of what happened.
+
+## TL;DR
+
+ACE defines very basic data types which it uses to recursively analyze data. *Something* is submitted to ACE for analysis. We call this *something* a **Root Analysis**. **Observations** are made on the **analysis**. Those observations are also analyzed producing additional analysis until all observations are analyzed. Analysis is performed by **analysis modules**. An **alert** is created by adding a **detection** to an observation or analysis. Alerts are submitted to an **alert management system** for review.
 
 ACE uses free-form JSON data structures to represent the results of analysis.
 
-## Quick Start - Installation
+## Why ACE?
+
+Good question. There's a lot of stuff in the cyber security world that you can use for this. Here are some of the strengths and weaknesses of this one.
+
+### Strengths
+
+- Alert enrichment: ACE can be used to enrich existing alert data, hopefully cutting down the time it takes an analyst to come to a conclusion on any given alert.
+- Detection: The same engine that enriches alerts can also be used as a generic detection engine. Throw stuff at it that you're not sure about, it'll alert if it finds something.
+- Email Scanning: ACE has special support built-in for scanning your corporate email as it's delivered to your user's mailboxes. This gives you a real shot at stopping some of the most popular attacks we've been seeing, without risking blocking legitimate emails.
+- Extendable: ACE has be **easily** extended to add additional functionality. As a matter of fact, this was one of the primary focus points of the design of the entire system. Analysts with even basic programming skills can add new capabilities to the system without having an administrator worry about the impact to it.
+- Scalable - The design of the system is super scalable. If you find you're system falling behind, you can just spin up ACE on another system and hook it up with a few commands.
+- Usable - If you're an analyst, you can just use it on your own. You really don't need someone to do a full deployment for you in order to use it.
+- Tooling - The tools are built with a Unix design philosophy in mind, meaning you can run ACE as part of a chain of commands tied together with pipes.
+
+### Weaknesses
+
+- Like nobody is using it yet.
+- Only a few people support it so far.
+- You need someone with some decent IT skills to run it for a team. It's not a point-and-click kind of thing.
+- You probably still need to build all the integration with all the random stuff your company runs that this project probably doesn't support yet. But if you do that, maybe consider joining the project!
+
+## Quick Start
 
 ```python
+#
+# let's analyze something right now
+#
+# requires python3.9
+python3.9 -m venv .venv
+source .venv/bin/activate
+
+# this installs everything at once
 pip install ace2[all]
+
+# install the packages we know about
+# this connects to our public github page and gets the list of all the known packages
+# it can also use the env var ACE_PACKAGE_URI to get a different custom list
+ace2 package install --all
+
+# now analyze that suspicious file your boss's boss sent your boss who sent it to you
+ace2 analyze file email_attachment.doc
+
+# or a URL
+ace2 analyze url http://bit.ly/blahblah
+
+# or an IP (v4) address
+ace2 analyze ipv4 8.8.4.4 
 ```
 
-## Quick Start - Root Analysis
-
-All analysis starts with a [root]() object. The root contains the details of the analysis in a schema-less JSON format. The process making the submission identifies the initial [observations]().
-
-Any kind of process in any programming language can be used to feed [root]() objects to ACE using the [API]().
+## Advanced Usage
 
 ```python
-from ace.analysis import RootAnalysis
-root = RootAnalysis(details={"source_ip": "1.2.3.4"})
-observable = root.add_observable("ipv4", "1.2.3.4")
-root.submit()
-```
-
-## Quick Start - Analysis Modules
-
-All analysis is performed by [analysis modules](). Modules execute as a separate component of the system. ACE has a built-in module manager that can be used to build analysis modules in Python. You are free to author analysis modules in any programming language using the [API]().
-
-```python
-class IPv4Lookup(AnalysisModule):
-    type = AnalysisModuleType(
-        name ="ipv4_lookup",
-        description = "Looks up IPv4 addresses in some useful way.")
-
-    def execute_analysis(self, root, observable, result):
-        result.details = self.execute_cool_analysis(observable)
-
-manger = AnalysisModuleManager()
-manager.add_module(IPv4Lookup())
-manager.run()
-
-```
-
-## System Design Overview
-
-ACE is split up into three pieces: *core system*, *analysis modules*, and *alert management*. Each system operates on its own, independent of each other. Communication is performed through defined interfaces.
-
-### Analysis Module Overview
-
-An **analysis module** takes an observable as input, generates analysis results, and may produce zero or more observables as output. ACE can support any number of analysis modules in any programming language.
-
-### Core System Overview
-
-The **core system** is responsible for tracking analysis requests/results, storing file content, maintaining a result cache, and other required operations.
-
-The core system is itself composed of individual components that are simple to extend to provide additional functionality.
-
-### Alert Management Overview
-
-The **alert management system** manages alerts generated by a core system. It provides basic alert management tooling, as well as a graphical user interface for analysts to review and disposition the alerts.
-
-## Core System Details
-
-The core system is composed of multiple *abstract interfaces*, which can each be implemented in any manner required. These core system interfaces are listed below.
-
-- alerting: provides an interface to send an alert to the alert management system
-- analysis tracking: keeps track of root analysis data and analysis details
-- caching: keeps a cache of recent analysis results
-- configuration: provides a way to read and write configuration data
-- events: provides a way to subscribe to events generated by the core system
-- module tracking: keeps track of registered analysis modules
-- request tracking: keeps track of analysis requests
-- storage: provides a generic interface to read and write arbitrary binary data
-- work queue: provides an interface for analysis modules to receive analysis requests
-
-Each interface is defined in `ace.system.*` Each abstract interface function is wrapped by an importable function that may provide additional functionality, error checking, or simplification for use.
-
-### Core System Initialization
-
-The first step is to provide a running core system that implements all the interfaces listed above.
-
-### Analysis Module Registration
-
-Once the core system is running, analysis modules must then register themselves to the system. This is accomplished by calling the `register_analysis_module_type` function.
-
-An analysis module type defines what requirements and restrictions are around certain kinds of observables that the analysis module will accept. The most simple and common requirement is providing a list of one or more observable types the module supports. The core system will only generate analysis requests for observables that match the given type(s). A more complex example might be an analysis module that depends on another analysis module, in which case, ACE would not submit an analysis request until the dependency is met.
-
-Analysis modules also register under specific versions. The core system keeps track of the registration data.
-
-Finally, each module asks the core system for the next analysis request to process by calling the `get_next_analysis_request` function, which blocks until work is available or the analysis reaches time out. 
-
-### Analysis Module Versioning
-
-Analysis modules have two version fields: `version` and `extended_version`. The **version**** field simply contains a free-form string version of the module, such as `1.0.0`. The **extended_version** contains zero or more optional version strings. These can be used to represent the version of data that is used by the module, such as detection signatures.
-
-Each call to `get_next_analysis_request` includes the version data of the current analysis module. If the version data does not match then the call is rejected. This gives the module as chance to update data, or exit to allow automation to update the module.
-
-### Root Analysis Request Processing
-
-New analysis requests are submitted to the core system by submitting a **root analysis request**. The analysis is tracked, and new *observable analysis requests* are generated for each observable that requires analysis by any registered analysis module. These requests are placed into the work queues assigned to each analysis module type. The requests are then picked up by the analysis modules through these queues.
-
-### Analysis Result Processing
-
-Analysis modules post the results of the analysis by submitting an **observable analysis result**, which includes both the original request, as well as the results of the analysis.
-
-The *difference* between the original request and the generated analysis is computed. Then the difference is applied to the tracked analysis objects.
-
-Any additional observations are analyzed as before, generating new observable analysis requests. This process continues until all analysis modules have completed analysis for all observables they accept.
-
-### Alerting
-
-Any root analysis that has one or more detection points is submitted to the alert management system. This can occur multiple times for the same root analysis.
-
-### Analysis Result Cache
-
-The result of the analysis of an observation can be *cached* if an analysis module is registered with a time-to-live value set for the cache. If the module types has this value, then it looks up results in the cache *before* making any analysis requests. This prevents duplicate analysis work in the cases where the results can be cached.
-
-### Storage
-
-ACE provides a very generic way to store any binary content. Data is stored as binary and referenced by sha256 hash. All data is associated to a root analysis. Any data that is no longer referenced automatically expires after some configurable time.
-
-### Work Queues
-
-When a new analysis module type is registered, a new **work queue** is created for that type. When the core system generates analysis requests for that type, those requests are sent to the work queue. The external analysis module instances then acquire these analysis requests through the work queue.
-
-A single analysis request cannot be acquired by multiple analysis module instances. The queues are FIFO.
-
-## Workflow Example
-
-This walks you through a really simple example of pretending to analyze an observable of type "test." Note that we are showing pseudo code for different components of ACE.
-
-```python
-# assume this initializes a core system
-initialize_system()
-
 # 
-# assume the role of analysis module first
-# ----------------------------------------
+# here's some more stuff you can do
+#
+# we could install packages manually
+# directly from github
+ace2 package install ace2 package install git@github.com:ace-ecosystem/ace2-modules.git
+# or from a url
+ace2 package install ace2 package install http://someserver.com/ace2-package.zip
+# or from a local zip file you downloaded with curl
+ace2 package install ace2 package install /path/to/ace2-package.zip
 
-# register a basic analysis module
-# in this case we register an analysis module of type "test" which accepts observables of type "test"
-amt = AnalysisModuleType("test", "this is a test analysis module", ['test'])
-register_analysis_module_type(amt)
+# make sure all the packages are up to date
+# this also updates all the modules
+ace2 package update
 
+# could also do this to just update modules (signatures and such)
+# for the ones that support it
+ace2 module update
+
+# now I can see what packages I have installed
+ace2 package list
+
+# and even see what modules I have available
+# from all the packages I have installed
+ace2 module list
+
+# and what services I can start
+ace2 service list
+
+#
+# PARTICIPATING IN A CORE
+#
+
+# a little more advanced usage here
+
+# specify the core to connect to
+export ACE_URI="https://ace2.local/"
+export ACE_API_KEY="6a36ffce-507e-469f-8d68-39ca00fa9ccb"
+
+# attach all the modules we have on this system to the remote core
+# and start processing requests
+# this is an example of how to scale (manually anyways)
+ace2 service start manager
+
+#
+# REMOTE USAGE OF A CORE
+#
+
+# now this command uses the remote core
+# since we have our env vars set up
+ace2 analyze ipv4 3.127.0.4
+
+# this lists the analysis modules of the remote core
+ace2 module list
+
+#
+# PRODUCTION COMMANDS
 # 
-# assume the role of something that collects stuff to analyze
-# -----------------------------------------------------------
 
-# create a new root analysis as our analysis "container"
-root = RootAnalysis()
-# add a new observable with type "type" and value "test"
-observable = root.add_observable("test", "test")
-# submit the root for analysis to the core system
-process_analysis_request(root.create_analysis_request())
+# start a production core system
+docker-compose -f ace2-core.yml
 
-# at this point the core system has taken the request and generated
-# a new observable analysis request which is placed in the work queue for analysis module type "test"
+# start containers that run the modules
+docker-compose -f ace2-modules.yml
 
-#
-# assume the role of the analysis module
-# --------------------------------------
-
-# first we create an identity
-# this is just some unique name that identifies the *instance* of the executing analysis module
-owner_uuid = "test host localhost pid 12343 tid 12343353"
-
-# receive the next work item
-# the format is get_next_analysis_request(who_you_are, which_analysis_module_type, how_long_to_wait)
-request = get_next_analysis_request(owner_uuid, amt, 0)
-
-# pretend to analyze it by generating details
-analysis_details = {"test": "result"}
-request.result = request.create_result()
-request.result.observable.add_analysis(type=amt, details=analysis_details)
-
-# submit the result of the analysis to the core system
-process_analysis_request(request)
-
-#
-# at this point the analysis is complete because we did not add an additional observables
-#
-
+# more to come as development continues...
 ```

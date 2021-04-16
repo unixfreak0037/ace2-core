@@ -15,9 +15,6 @@ from ace.logging import initialize_logging
 import ace.system.cli
 
 if __name__ == "__main__":
-
-    logging.basicConfig(level=logging.DEBUG)
-
     args = parse_args()
     initialize_logging(args.logging_config_path)
     asyncio.get_event_loop().run_until_complete(args.func(args))

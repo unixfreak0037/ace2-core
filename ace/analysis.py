@@ -307,7 +307,10 @@ class AnalysisModuleType:
     # a value of None means it is not cached
     cache_ttl: Optional[int] = None
     # what additional values should be included to determine the cache key?
-    extended_version: list[str] = field(default_factory=list)
+    # for example, for an analysis module that uses yara rules
+    # you could store a reference to the remote as the key and then the commit hash as the value
+    # { "git@some.server.com:yara_rules.git": "3d71bcef38ff86bdc44365dc4ce6cf549afbb00b" }
+    extended_version: dict[str, str] = field(default_factory=dict)
     # what kind of analysis module does this classify as?
     # examples: [ 'sandbox' ], [ 'splunk' ], etc...
     types: list[str] = field(default_factory=list)
@@ -352,11 +355,7 @@ class AnalysisModuleType:
 
     def extended_version_matches(self, amt) -> bool:
         """Returns True if the given amt is the same version as this amt."""
-        return (
-            self.name == amt.name
-            and self.version == amt.version
-            and sorted(self.extended_version) == sorted(amt.extended_version)
-        )
+        return self.name == amt.name and self.version == amt.version and self.extended_version == amt.extended_version
 
     async def accepts(self, observable: Observable, system: "ace.system.ACESystem") -> bool:
         assert isinstance(observable, Observable)

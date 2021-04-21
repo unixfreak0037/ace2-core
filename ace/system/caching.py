@@ -27,7 +27,7 @@ def generate_cache_key(observable: "ace.analysis.Observable", amt: "ace.analysis
     h.update(amt.name.encode("utf8", errors="ignore"))
     h.update(amt.version.encode("utf8", errors="ignore"))
 
-    for key in sorted(amt.extended_version):
-        h.update(key.encode("utf8", errors="ignore"))
+    for key in sorted(amt.extended_version.keys()):
+        h.update(amt.extended_version[key].encode("utf8", errors="ignore"))
 
     return h.hexdigest()

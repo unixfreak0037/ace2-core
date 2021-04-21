@@ -209,7 +209,7 @@ async def test_expected_status(system):
 @pytest.mark.system
 async def test_amt_version_upgrade(system):
     # register an analysis module for a specific version of the "intel"
-    amt = await system.register_analysis_module_type(AnalysisModuleType("test", "", extended_version=["intel:v1"]))
+    amt = await system.register_analysis_module_type(AnalysisModuleType("test", "", extended_version={"intel": "v1"}))
 
     # (assume amt goes offline)
     # add something to be analyzed
@@ -218,7 +218,7 @@ async def test_amt_version_upgrade(system):
     await root.submit()
 
     # amt comes back on, re-register
-    amt = await system.register_analysis_module_type(AnalysisModuleType("test", "", extended_version=["intel:v1"]))
+    amt = await system.register_analysis_module_type(AnalysisModuleType("test", "", extended_version={"intel": "v1"}))
     request = await system.get_next_analysis_request("test", amt, 0)
     request.initialize_result()
     request.modified_observable.add_analysis(type=amt).add_observable("test", "other")
@@ -226,7 +226,7 @@ async def test_amt_version_upgrade(system):
 
     # amt gets upgraded from another process
     amt_upgraded = await system.register_analysis_module_type(
-        AnalysisModuleType("test", "", extended_version=["intel:v2"])
+        AnalysisModuleType("test", "", extended_version={"intel": "v2"})
     )
 
     # but we're still using the old one so this should fail

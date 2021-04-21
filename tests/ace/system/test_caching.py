@@ -23,28 +23,28 @@ amt_extended_version_1 = AnalysisModuleType(
     name="test_extended_version",
     description="test_extended_version",
     cache_ttl=600,
-    extended_version=["yara_rules:v1.0.0"],
+    extended_version={"yara_rules": "v1.0.0"},
 )
 
 amt_extended_version_2 = AnalysisModuleType(
     name="test_extended_version",
     description="test_extended_version",
     cache_ttl=600,
-    extended_version=["yara_rules:v1.0.1"],
+    extended_version={"yara_rules": "v1.0.1"},
 )
 
 amt_multiple_cache_keys_1 = AnalysisModuleType(
     name="test_multiple_cache_keys",
     description="test_multiple_cache_keys",
     cache_ttl=600,
-    extended_version=["key_a", "key_b"],
+    extended_version={"key_a": "value_a", "key_b": "value_b"},
 )
 
 amt_multiple_cache_keys_2 = AnalysisModuleType(
     name="test_multiple_cache_keys",
     description="test_multiple_cache_keys",
     cache_ttl=600,
-    extended_version=["key_b", "key_a"],
+    extended_version={"key_b": "value_b", "key_a": "value_a"},
 )
 
 TEST_1 = "test_1"

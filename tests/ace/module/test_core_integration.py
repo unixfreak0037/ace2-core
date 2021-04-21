@@ -384,9 +384,9 @@ async def test_upgraded_extended_version_async_analysis_module(manager):
             step_2.set()
 
         async def upgrade(self):
-            self.type.extended_version = ["intel:v2"]
+            self.type.extended_version = {"intel": "v2"}
 
-    amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
+    amt = AnalysisModuleType("test", "", extended_version={"intel": "v1"})
     await manager.system.register_analysis_module_type(amt)
 
     module = CustomAnalysisModule(type=amt)
@@ -404,7 +404,7 @@ async def test_upgraded_extended_version_async_analysis_module(manager):
         nonlocal root_2
         await step_1.wait()
         # update the extended version data for this module type
-        updated_amt = AnalysisModuleType("test", "", extended_version=["intel:v2"])
+        updated_amt = AnalysisModuleType("test", "", extended_version={"intel": "v2"})
         await manager.system.register_analysis_module_type(updated_amt)
         await root_2.submit()
 
@@ -422,7 +422,7 @@ async def test_upgraded_extended_version_async_analysis_module(manager):
 
     root = await manager.system.get_root_analysis(root_2)
     observable = root.get_observable(observable)
-    assert (await observable.get_analysis(amt).get_details())["extended_version"] == ["intel:v2"]
+    assert (await observable.get_analysis(amt).get_details())["extended_version"] == {"intel": "v2"}
 
 
 class UpgradableAnalysisModule(MultiProcessAnalysisModule):
@@ -430,7 +430,7 @@ class UpgradableAnalysisModule(MultiProcessAnalysisModule):
         analysis.set_details({"extended_version": self.type.extended_version})
 
     async def upgrade(self):
-        self.type.extended_version = ["intel:v2"]
+        self.type.extended_version = {"intel": "v2"}
 
 
 @pytest.mark.parametrize("concurrency_mode", [CONCURRENCY_MODE_THREADED, CONCURRENCY_MODE_PROCESS])
@@ -465,7 +465,7 @@ async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode, 
     # TODO when events are distributed modify this to use that
     await app.state.system.register_event_handler(EVENT_ANALYSIS_ROOT_COMPLETED, CustomEventHandler())
 
-    amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
+    amt = AnalysisModuleType("test", "", extended_version={"intel": "v1"})
     await custom_manager.system.register_analysis_module_type(amt)
 
     module = UpgradableAnalysisModule(type=amt)
@@ -479,7 +479,7 @@ async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode, 
         # wait for the event loop to start
         await custom_manager.event_loop_starting_event.wait()
         # update the extended version data for this module type
-        updated_amt = AnalysisModuleType("test", "", extended_version=["intel:v2"])
+        updated_amt = AnalysisModuleType("test", "", extended_version={"intel": "v2"})
         await custom_manager.system.register_analysis_module_type(updated_amt)
         # and then submit for analysis
         await root.submit()
@@ -491,14 +491,14 @@ async def test_upgraded_extended_version_sync_analysis_module(concurrency_mode, 
 
     root = await custom_manager.system.get_root_analysis(root)
     observable = root.get_observable(observable)
-    assert (await observable.get_analysis(amt).get_details())["extended_version"] == ["intel:v2"]
+    assert (await observable.get_analysis(amt).get_details())["extended_version"] == {"intel": "v2"}
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_upgrade_analysis_module_failure(manager):
 
-    amt = AnalysisModuleType("test", "", extended_version=["intel:v1"])
+    amt = AnalysisModuleType("test", "", extended_version={"intel": "v1"})
     await manager.system.register_analysis_module_type(amt)
 
     class CustomAnalysisModule(MultiProcessAnalysisModule):
@@ -511,7 +511,7 @@ async def test_upgrade_analysis_module_failure(manager):
     module = CustomAnalysisModule(type=amt)
     manager.add_module(module)
 
-    amt = AnalysisModuleType("test", "", extended_version=["intel:v2"])
+    amt = AnalysisModuleType("test", "", extended_version={"intel": "v2"})
     await manager.system.register_analysis_module_type(amt)
 
     # this should fail since the upgrade fails

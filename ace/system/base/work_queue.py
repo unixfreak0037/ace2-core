@@ -114,7 +114,7 @@ class WorkQueueBaseInterface:
         amt: Union[AnalysisModuleType, str],
         timeout: Optional[int] = 0,
         version: Optional[str] = None,
-        extended_version: Optional[list[str]] = [],
+        extended_version: Optional[dict[str, str]] = {},
     ) -> Union[AnalysisRequest, None]:
         """Returns the next AnalysisRequest for the given AnalysisModuleType, or None if nothing is available.
         This function is called by the analysis modules to get the next work item.
@@ -137,7 +137,7 @@ class WorkQueueBaseInterface:
         assert isinstance(amt, AnalysisModuleType) or (isinstance(amt, str) and amt)
         assert isinstance(timeout, int)
         assert version is None or (isinstance(version, str) and version)
-        assert isinstance(extended_version, list)
+        assert isinstance(extended_version, dict)
 
         # did we just pass the name and version?
         if isinstance(amt, str):

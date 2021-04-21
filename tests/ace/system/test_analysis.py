@@ -242,7 +242,7 @@ def test_analysis_module_type_serialization():
         tags=["test1", "test2"],
         modes=["test1", "test2"],
         cache_ttl=60,
-        extended_version=["test1", "test2"],
+        extended_version={"test1": "test2"},
         types=["test1", "test2"],
     )
 

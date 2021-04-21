@@ -14,7 +14,7 @@ class RemoteWorkQueueManagerInterface(WorkQueueBaseInterface):
         amt: Union[AnalysisModuleType, str],
         timeout: Optional[int] = 0,
         version: Optional[str] = None,
-        extended_version: Optional[list[str]] = [],
+        extended_version: Optional[dict[str, str]] = [],
     ) -> Union[AnalysisRequest, None]:
         return await self.get_api().get_next_analysis_request(owner_uuid, amt, timeout, version, extended_version)
 

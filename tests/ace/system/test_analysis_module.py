@@ -9,19 +9,19 @@ from ace.exceptions import (
 )
 
 amt_1 = AnalysisModuleType(
-    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, extended_version=["key1"]
+    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, extended_version={"key1": "value1"}
 )
 
 amt_1_same = AnalysisModuleType(
-    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, extended_version=["key1"]
+    name="test", description="test", version="1.0.0", timeout=30, cache_ttl=600, extended_version={"key1": "value1"}
 )
 
 amt_1_upgraded_version = AnalysisModuleType(
-    name="test", description="test", version="2.0.0", timeout=30, extended_version=["key1"]
+    name="test", description="test", version="2.0.0", timeout=30, extended_version={"key1": "value1"}
 )
 
 amt_1_upgraded_cache_keys = AnalysisModuleType(
-    name="test", description="test", version="1.0.0", timeout=30, extended_version=["key2"]
+    name="test", description="test", version="1.0.0", timeout=30, extended_version={"key1": "value2"}
 )
 
 
@@ -85,7 +85,7 @@ async def test_register_existing_analysis_module_type(system):
             "test",
             0,
             "1.0.0",
-            ["key1"],
+            {"key1": "value1"},
         )  # now this request is invalid because am1 has different extended version
     assert await system.get_next_analysis_request("test", amt_1_upgraded_cache_keys, 0) is None  # but this works
 

@@ -232,6 +232,6 @@ class AceAPI:
         amt: Union[AnalysisModuleType, str],
         timeout: Optional[int] = 0,
         version: Optional[str] = None,
-        extended_version: Optional[list[list]] = [],
+        extended_version: Optional[dict[str, str]] = [],
     ) -> Union[AnalysisRequest, None]:
         raise NotImplementedError()

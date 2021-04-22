@@ -31,7 +31,7 @@ async def manager(request, redis, redis_url, tmpdir):
     await app.state.system.set_config(CONFIG_REDIS_HOST, redis_url)
 
     # initialize encryption settings with a password of "test"
-    app.state.system.encryption_settings = initialize_encryption_settings("test")
+    app.state.system.encryption_settings = await initialize_encryption_settings("test")
     app.state.system.encryption_settings.load_aes_key("test")
 
     # set the storage root for the local file system storage

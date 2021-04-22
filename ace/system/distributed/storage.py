@@ -34,7 +34,15 @@ async def api_store_content(
 
     meta = ContentMetadata(name=name, expiration_date=expiration_date, custom=custom)
 
-    sha256 = await app.state.system.store_content(file.file._file, meta)
+    async def _reader(target):
+        while True:
+            chunk = target.read(io.DEFAULT_BUFFER_SIZE)
+            if not chunk:
+                break
+
+            yield chunk
+
+    sha256 = await app.state.system.store_content(_reader(file.file._file), meta)
     return await app.state.system.get_content_meta(sha256)
 
 
@@ -50,7 +58,7 @@ async def api_get_content(sha256: str = Query(..., description="The sha256 hash 
         raise HTTPException(status_code=404, detail=f"Content with sha256 {sha256} not found.")
 
     # see https://www.starlette.io/responses/#streamingresponse
-    return StreamingResponse(app.state.system.iter_content(sha256), media_type="application/octet-stream")
+    return StreamingResponse(await app.state.system.iter_content(sha256), media_type="application/octet-stream")
 
 
 @app.get(

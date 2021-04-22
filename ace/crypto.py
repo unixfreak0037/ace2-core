@@ -19,6 +19,8 @@ from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Protocol.KDF import PBKDF2
 
+import aiofiles
+
 CHUNK_SIZE = 64 * 1024
 
 ENV_CRYPTO_VERIFICATION_KEY = "ACE_CRYPTO_VERIFICATION_KEY"
@@ -91,7 +93,7 @@ def get_decryption_key(password: str, settings: EncryptionSettings) -> bytes:
     return result[:32]
 
 
-def initialize_encryption_settings(
+async def initialize_encryption_settings(
     password: str,
     old_password: typing.Optional[str] = None,
     key: typing.Optional[bytes] = None,
@@ -117,7 +119,7 @@ def initialize_encryption_settings(
         # did we provide a password for it?
         if old_password is not None:
             # get the existing encryption password
-            encryption_password = get_aes_key(old_password)
+            encryption_password = await get_aes_key(old_password)
 
     if encryption_password is None:
         # otherwise we just make a new one
@@ -139,79 +141,269 @@ def initialize_encryption_settings(
     result = PBKDF2(password, settings.salt, 64, settings.iterations)
     user_encryption_key = result[:32]  # the first 32 bytes is the user encryption key
     settings.verification_key = result[32:]  # and the second 32 bytes is used for password verification
-    settings.encrypted_key = encrypt_chunk(user_encryption_key, encryption_password)
+    settings.encrypted_key = await encrypt_chunk(user_encryption_key, encryption_password)
 
     return settings
 
 
-def get_aes_key(password: str, settings: EncryptionSettings) -> bytes:
+async def get_aes_key(password: str, settings: EncryptionSettings) -> bytes:
     """Returns the 32 byte system encryption key."""
     assert isinstance(password, str)
     assert isinstance(settings, EncryptionSettings)
-    return decrypt_chunk(get_decryption_key(password, settings), settings.encrypted_key)
+    return await decrypt_chunk(get_decryption_key(password, settings), settings.encrypted_key)
 
 
-def encrypt_chunk(
-    password: typing.Union[str, bytes], chunk: bytes, settings: typing.Optional[EncryptionSettings] = None
-):
-    """Encrypts the given chunk of data and returns the encrypted chunk.
-    If password is None then saq.ENCRYPTION_PASSWORD is used instead.
-    password must be a byte string 32 bytes in length."""
+#
+# file format is as follows
+# IV(16)
+# CHUNK,CHUNK,...
+#
+# where IV is the 16 byte IV used
+# and CHUNK is defined as follows
+# original_size (8 byte int) (little endian)
+# padded_size (8 byte int) (little endian)
+# byte data (of padded_size bytes)
+#
+# CHUNK_SIZE defines how big the chunks are (max)
+#
+
+#
+# credit where credit is due
+# https://eli.thegreenplace.net/2010/06/25/aes-encryption-of-files-in-python-with-pycrypto
+#
+
+
+async def iter_encrypt_stream(
+    password: typing.Union[str, bytes],
+    source: [io.BytesIO, aiofiles.threadpool.binary.AsyncBufferedIOBase, typing.AsyncGenerator[bytes, None]],
+    settings: typing.Optional[EncryptionSettings] = None,
+) -> typing.AsyncGenerator[bytes, None]:
+    """Encrypts the data on the source stream with the given encryption settings. If the password parameter
+    is a string, it is used as the password to decrypt the actual AES 32 byte password that is used to perform
+    the encryption. The source can be either an io.BytesIO object, or an AsyncBufferedIOBase from aiofiles.
+
+    Each encrypted chunk of data is yielded as a result. Use in a for async iterator like this:
+
+    async for chunk in iter_encrypt_stream(my_password, my_source, settings):
+        do_something_with(chunk)
+    """
 
     assert (isinstance(password, str) or (isinstance(password, bytes) and len(password) == 32)) and password
-    assert isinstance(chunk, bytes) and chunk
     assert settings is None or isinstance(settings, EncryptionSettings)
     # if you pass the password as str then you need to also provide the settings
     # otherwise you just need to provide the aes 32 byte password
     assert (isinstance(password, bytes) and settings is None) or (
         isinstance(password, str) and isinstance(settings, EncryptionSettings)
     )
+    assert (
+        isinstance(source, io.BytesIO)
+        or isinstance(source, aiofiles.threadpool.binary.AsyncBufferedIOBase)
+        or isinstance(source, typing.AsyncGenerator)
+    )
+
+    # used to buffer data from an async generator
+    _async_buffer = b""
+
+    # utility function to read n bytes regardless of type of source
+    async def _read(n: int) -> bytes:
+        nonlocal _async_buffer
+
+        if isinstance(source, io.BytesIO):
+            return source.read(n)
+        elif isinstance(source, aiofiles.threadpool.binary.AsyncBufferedIOBase):
+            return await source.read(n)
+        else:
+            # we break out of this loop once we have enough data
+            while len(_async_buffer) < n:
+                # get more data from the async generator
+                try:
+                    chunk = await source.__anext__()
+                except StopAsyncIteration:
+                    chunk = None
+
+                if not chunk:
+                    # if we didn't get anything then we just return what we have left
+                    # (which may be nothing)
+                    break
+
+                # otherwise append it to the end of our buffer
+                _async_buffer += chunk
+
+            # we may have more bytes in our buffer then we asked for
+            result = _async_buffer[:n]
+            _async_buffer = _async_buffer[n:]
+            return result
 
     if isinstance(password, str):
-        password = get_aes_key(password, settings)
+        password = await get_aes_key(password, settings)
 
     iv = Crypto.Random.get_random_bytes(AES.block_size)
     encryptor = AES.new(password, AES.MODE_CBC, iv)
+    yield iv
 
-    original_size = len(chunk)
+    while True:
+        chunk = await _read(CHUNK_SIZE)
+        chunk_size = len(chunk)
+        if chunk_size == 0:
+            break
+        elif chunk_size % 16 != 0:
+            chunk += b" " * (16 - chunk_size % 16)
 
-    if len(chunk) % 16 != 0:
-        chunk += b" " * (16 - len(chunk) % 16)
+        # write the original size first so the decryption process knows how much to truncate
+        yield struct.pack("<Q", chunk_size)
+        # write the actual (padded) size so the decryptor knows how many bytes to actually read next
+        yield struct.pack("<Q", len(chunk))
+        yield encryptor.encrypt(chunk)
 
-    result = struct.pack("<Q", original_size) + iv + encryptor.encrypt(chunk)
-    return result
 
+async def iter_decrypt_stream(
+    password: typing.Union[str, bytes],
+    source: [io.BytesIO, aiofiles.threadpool.binary.AsyncBufferedIOBase, typing.AsyncGenerator[bytes, None]],
+    settings: typing.Optional[EncryptionSettings] = None,
+) -> typing.AsyncGenerator[bytes, None]:
+    """Decrypts the data on the source stream with the given encryption settings. If the password parameter
+    is a string, it is used as the password to decrypt the actual AES 32 byte password that is used to perform
+    the encryption. The source can be either an io.BytesIO object, or an AsyncBufferedIOBase from aiofiles.
 
-def decrypt_chunk(
-    password: typing.Union[str, bytes], chunk: bytes, settings: typing.Optional[EncryptionSettings] = None
-):
-    """Decrypts the given encrypted chunk with the given password and returns the decrypted chunk.
-    If password is None then saq.ENCRYPTION_PASSWORD is used instead.
-    password must be a byte string 32 bytes in length."""
+    Each decrypted chunk of data is yielded as a result. Use in a for async iterator like this:
+
+    async for chunk in iter_decrypt_stream(my_password, my_source, settings):
+        do_something_with(chunk)
+    """
 
     assert (isinstance(password, str) or (isinstance(password, bytes) and len(password) == 32)) and password
-    assert isinstance(chunk, bytes) and chunk
     assert settings is None or isinstance(settings, EncryptionSettings)
     # if you pass the password as str then you need to also provide the settings
     # otherwise you just need to provide the aes 32 byte password
     assert (isinstance(password, bytes) and settings is None) or (
         isinstance(password, str) and isinstance(settings, EncryptionSettings)
     )
+    assert (
+        isinstance(source, io.BytesIO)
+        or isinstance(source, aiofiles.threadpool.binary.AsyncBufferedIOBase)
+        or isinstance(source, typing.AsyncGenerator)
+    )
+
+    # XXX copy pasta
+
+    # used to buffer data from an async generator
+    _async_buffer = b""
+
+    # utility function to read n bytes regardless of type of source
+    async def _read(n: int) -> bytes:
+        nonlocal _async_buffer
+
+        if isinstance(source, io.BytesIO):
+            return source.read(n)
+        elif isinstance(source, aiofiles.threadpool.binary.AsyncBufferedIOBase):
+            return await source.read(n)
+        else:
+            # we break out of this loop once we have enough data
+            while len(_async_buffer) < n:
+                # get more data from the async generator
+                try:
+                    chunk = await source.__anext__()
+                except StopAsyncIteration:
+                    chunk = None
+
+                if not chunk:
+                    # if we didn't get anything then we just return what we have left
+                    # (which may be nothing)
+                    break
+
+                # otherwise append it to the end of our buffer
+                _async_buffer += chunk
+
+            # we may have more bytes in our buffer then we asked for
+            result = _async_buffer[:n]
+            _async_buffer = _async_buffer[n:]
+            return result
 
     if isinstance(password, str):
-        password = get_aes_key(password, settings)
+        password = await get_aes_key(password, settings)
 
-    _buffer = io.BytesIO(chunk)
-    original_size = struct.unpack("<Q", _buffer.read(struct.calcsize("Q")))[0]
-    iv = _buffer.read(16)
-    chunk = _buffer.read()
+    # the IV is the first 16 bytes
+    iv = await _read(16)
     decryptor = AES.new(password, AES.MODE_CBC, iv)
-    result = decryptor.decrypt(chunk)
-    return result[:original_size]
+
+    while True:
+        # for each "chunk" the size of the chunk is stored first
+        _buffer = await _read(struct.calcsize("Q"))
+        if not _buffer:
+            break
+
+        original_chunk_size = struct.unpack("<Q", _buffer)[0]
+        _buffer = await _read(struct.calcsize("Q"))
+        if not _buffer:
+            break
+
+        padded_chunk_size = struct.unpack("<Q", _buffer)[0]
+        if padded_chunk_size > CHUNK_SIZE + 16:
+            raise ValueError("decryption error - invalid chunk size: {padded_chunk_size} (file corrupted?)")
+
+        chunk = await _read(padded_chunk_size)
+        if not chunk:
+            break
+
+        decrypted_chunk = decryptor.decrypt(chunk)
+
+        if original_chunk_size < padded_chunk_size:
+            decrypted_chunk = decrypted_chunk[:original_chunk_size]
+
+        yield decrypted_chunk
 
 
-# https://eli.thegreenplace.net/2010/06/25/aes-encryption-of-files-in-python-with-pycrypto
-def encrypt_file(
+async def encrypt_stream(
+    password: typing.Union[str, bytes],
+    source: [io.BytesIO, aiofiles.threadpool.binary.AsyncBufferedIOBase],
+    target: [io.BytesIO, aiofiles.threadpool.binary.AsyncBufferedIOBase],
+    settings: typing.Optional[EncryptionSettings] = None,
+):
+    assert (isinstance(password, str) or (isinstance(password, bytes) and len(password) == 32)) and password
+    assert settings is None or isinstance(settings, EncryptionSettings)
+    # if you pass the password as str then you need to also provide the settings
+    # otherwise you just need to provide the aes 32 byte password
+    assert (isinstance(password, bytes) and settings is None) or (
+        isinstance(password, str) and isinstance(settings, EncryptionSettings)
+    )
+    assert isinstance(source, io.BytesIO) or isinstance(source, aiofiles.threadpool.binary.AsyncBufferedIOBase)
+    assert isinstance(target, io.BytesIO) or isinstance(target, aiofiles.threadpool.binary.AsyncBufferedIOBase)
+
+    async for chunk in iter_encrypt_stream(password, source, settings):
+        if isinstance(target, io.BytesIO):
+            target.write(chunk)
+        else:
+            await target.write(chunk)
+
+
+async def decrypt_stream(
+    password: typing.Union[str, bytes],
+    source: [io.BytesIO, aiofiles.threadpool.binary.AsyncBufferedIOBase, typing.AsyncGenerator[bytes, None]],
+    target: [io.BytesIO, aiofiles.threadpool.binary.AsyncBufferedIOBase],
+    settings: typing.Optional[EncryptionSettings] = None,
+):
+    assert (isinstance(password, str) or (isinstance(password, bytes) and len(password) == 32)) and password
+    assert settings is None or isinstance(settings, EncryptionSettings)
+    # if you pass the password as str then you need to also provide the settings
+    # otherwise you just need to provide the aes 32 byte password
+    assert (isinstance(password, bytes) and settings is None) or (
+        isinstance(password, str) and isinstance(settings, EncryptionSettings)
+    )
+    assert (
+        isinstance(source, io.BytesIO)
+        or isinstance(source, aiofiles.threadpool.binary.AsyncBufferedIOBase)
+        or isinstance(source, typing.AsyncGenerator)
+    )
+    assert isinstance(target, io.BytesIO) or isinstance(target, aiofiles.threadpool.binary.AsyncBufferedIOBase)
+
+    async for chunk in iter_decrypt_stream(password, source, settings):
+        if isinstance(target, io.BytesIO):
+            target.write(chunk)
+        else:
+            await target.write(chunk)
+
+
+async def encrypt_file(
     password: typing.Union[str, bytes],
     source_path: str,
     target_path: str,
@@ -220,40 +412,15 @@ def encrypt_file(
     """Encrypts the given file at source_path with the given password and saves the results in target_path.
     If password is None then saq.ENCRYPTION_PASSWORD is used instead.
     password must be a byte string 32 bytes in length."""
-
-    assert (isinstance(password, str) or (isinstance(password, bytes) and len(password) == 32)) and password
-    assert settings is None or isinstance(settings, EncryptionSettings)
-    # if you pass the password as str then you need to also provide the settings
-    # otherwise you just need to provide the aes 32 byte password
-    assert (isinstance(password, bytes) and settings is None) or (
-        isinstance(password, str) and isinstance(settings, EncryptionSettings)
-    )
     assert isinstance(source_path, str) and source_path
     assert isinstance(target_path, str) and target_path
 
-    if isinstance(password, str):
-        password = get_aes_key(password, settings)
-
-    iv = Crypto.Random.get_random_bytes(AES.block_size)
-    encryptor = AES.new(password, AES.MODE_CBC, iv)
-    file_size = os.path.getsize(source_path)
-
-    with open(source_path, "rb") as fp_in:
-        with open(target_path, "wb") as fp_out:
-            fp_out.write(struct.pack("<Q", file_size))
-            fp_out.write(iv)
-
-            while True:
-                chunk = fp_in.read(CHUNK_SIZE)
-                if len(chunk) == 0:
-                    break
-                elif len(chunk) % 16 != 0:
-                    chunk += b" " * (16 - len(chunk) % 16)
-
-                fp_out.write(encryptor.encrypt(chunk))
+    async with aiofiles.open(source_path, "rb") as fp_in:
+        async with aiofiles.open(target_path, "wb") as fp_out:
+            await encrypt_stream(password, fp_in, fp_out, settings)
 
 
-def decrypt_file(
+async def decrypt_file(
     password: typing.Union[str, bytes],
     source_path: str,
     target_path: str,
@@ -263,31 +430,38 @@ def decrypt_file(
     If target_path is None then output will be sent to standard output.
     If password is None then saq.ENCRYPTION_PASSWORD is used instead.
     password must be a byte string 32 bytes in length."""
-
-    assert (isinstance(password, str) or (isinstance(password, bytes) and len(password) == 32)) and password
-    assert settings is None or isinstance(settings, EncryptionSettings)
-    # if you pass the password as str then you need to also provide the settings
-    # otherwise you just need to provide the aes 32 byte password
-    assert (isinstance(password, bytes) and settings is None) or (
-        isinstance(password, str) and isinstance(settings, EncryptionSettings)
-    )
     assert isinstance(source_path, str) and source_path
     assert isinstance(target_path, str) and target_path
 
-    if isinstance(password, str):
-        password = get_aes_key(password, settings)
+    async with aiofiles.open(source_path, "rb") as fp_in:
+        async with aiofiles.open(target_path, "wb") as fp_out:
+            await decrypt_stream(password, fp_in, fp_out, settings)
 
-    with open(source_path, "rb") as fp_in:
-        original_size = struct.unpack("<Q", fp_in.read(struct.calcsize("Q")))[0]
-        iv = fp_in.read(16)
-        decryptor = AES.new(password, AES.MODE_CBC, iv)
 
-        with open(target_path, "wb") as fp_out:
-            while True:
-                chunk = fp_in.read(CHUNK_SIZE)
-                if len(chunk) == 0:
-                    break
+async def encrypt_chunk(
+    password: typing.Union[str, bytes], chunk: bytes, settings: typing.Optional[EncryptionSettings] = None
+):
+    """Encrypts the given chunk of data and returns the encrypted chunk.
+    If password is None then saq.ENCRYPTION_PASSWORD is used instead.
+    password must be a byte string 32 bytes in length."""
+    assert isinstance(chunk, bytes) and chunk
 
-                fp_out.write(decryptor.decrypt(chunk))
+    input_buffer = io.BytesIO(chunk)
+    output_buffer = io.BytesIO()
+    await encrypt_stream(password, input_buffer, output_buffer, settings)
+    return output_buffer.getvalue()
 
-            fp_out.truncate(original_size)
+
+async def decrypt_chunk(
+    password: typing.Union[str, bytes], chunk: bytes, settings: typing.Optional[EncryptionSettings] = None
+):
+    """Decrypts the given encrypted chunk with the given password and returns the decrypted chunk.
+    If password is None then saq.ENCRYPTION_PASSWORD is used instead.
+    password must be a byte string 32 bytes in length."""
+
+    assert isinstance(chunk, bytes) and chunk
+
+    input_buffer = io.BytesIO(chunk)
+    output_buffer = io.BytesIO()
+    await decrypt_stream(password, input_buffer, output_buffer, settings)
+    return output_buffer.getvalue()

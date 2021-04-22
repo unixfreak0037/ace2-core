@@ -7,6 +7,8 @@ import pytest
 
 from ace.analysis import RootAnalysis
 from ace.data_model import ContentMetadata
+from ace.exceptions import UnknownFileError
+from ace.system.base.storage import CONFIG_STORAGE_ENCRYPTION_ENABLED
 from ace.time import utc_now
 
 TEST_STRING = lambda: "hello world"
@@ -14,6 +16,11 @@ TEST_BYTES = lambda: b"hello world"
 TEST_IO = lambda: io.BytesIO(b"hello world")
 
 TEST_NAME = "test.txt"
+
+
+@pytest.fixture(scope="function", params=[False, True])
+async def set_storage_encryption(system, request):
+    await system.set_config(CONFIG_STORAGE_ENCRYPTION_ENABLED, request.param)
 
 
 @pytest.mark.asyncio
@@ -26,7 +33,8 @@ TEST_NAME = "test.txt"
     ],
 )
 @pytest.mark.integration
-async def test_get_store_delete_content(generate_input_data, name, meta, tmpdir, system):
+async def test_get_store_delete_content(set_storage_encryption, generate_input_data, name, meta, tmpdir, system):
+
     input_data = generate_input_data()
     sha256 = await system.store_content(input_data, meta)
     meta = await system.get_content_meta(sha256)
@@ -49,14 +57,21 @@ async def test_get_store_delete_content(generate_input_data, name, meta, tmpdir,
 
     target_path = str(tmpdir / "target.data")
     meta = await system.load_file(sha256, target_path)
-    assert filecmp.cmp(meta.location, target_path)
+
+    # if we're not using encryption then the copied file should be the same as
+    # the original
+    if not await system.storage_encryption_enabled():
+        assert filecmp.cmp(meta.location, target_path)
 
     # make sure we can delete content
     assert await system.delete_content(sha256)
     assert await system.get_content_meta(sha256) is None
-    assert await system.get_content_bytes(sha256) is None
-    async for _buffer in system.iter_content(sha256):
-        assert _buffer is None
+    with pytest.raises(UnknownFileError):
+        assert await system.get_content_bytes(sha256) is None
+
+    with pytest.raises(UnknownFileError):
+        async for _buffer in await system.iter_content(sha256):
+            pass
 
     # make sure copied file still exists
     assert os.path.exists(target_path)
@@ -83,7 +98,7 @@ async def test_iter_content(generate_input_data, name, meta, tmpdir, system):
 
     # the optional buffer size works for the local storage system
     # so we use that to test reading one byte at the time
-    async for data in system.iter_content(sha256, 1):
+    async for data in await system.iter_content(sha256, 1):
         assert data
         _buffer.append(data)
 
@@ -98,8 +113,9 @@ async def test_iter_content(generate_input_data, name, meta, tmpdir, system):
     elif isinstance(input_data, io.BytesIO):
         pass
 
-    async for data in system.iter_content("unknown"):
-        assert data is None
+    with pytest.raises(UnknownFileError):
+        async for data in await system.iter_content("unknown"):
+            pass
 
 
 @pytest.mark.asyncio

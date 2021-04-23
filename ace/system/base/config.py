@@ -55,7 +55,7 @@ class ConfigurationBaseInterface:
         if value is None and documentation is None:
             raise ValueError("cannot set configuration value to None")
 
-        get_logger().debug(f"modified config key {key}")
+        get_logger().debug(f"modified config key {key} value {value}")
         result = await self.i_set_config(key, value, documentation)
         await self.fire_event(EVENT_CONFIG_SET, [key, value, documentation])
         return result

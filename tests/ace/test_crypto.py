@@ -1,8 +1,11 @@
 # vim: sw=4:ts=4:et:cc=120
 
 import base64
+import io
 import os
 import os.path
+
+import aiofiles
 
 from ace.crypto import (
     ENV_CRYPTO_ENCRYPTED_KEY,
@@ -13,11 +16,15 @@ from ace.crypto import (
     EncryptionSettings,
     decrypt_chunk,
     decrypt_file,
+    decrypt_stream,
     encrypt_chunk,
     encrypt_file,
+    encrypt_stream,
     get_aes_key,
     initialize_encryption_settings,
     is_valid_password,
+    iter_decrypt_stream,
+    iter_encrypt_stream,
 )
 
 from ace.exceptions import InvalidPasswordError
@@ -26,16 +33,17 @@ import pytest
 
 
 @pytest.fixture(scope="function")
-def settings():
-    return initialize_encryption_settings("test")
+async def settings():
+    return await initialize_encryption_settings("test")
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_initialize_encryption_settings():
+async def test_initialize_encryption_settings():
     with pytest.raises(AssertionError):
-        initialize_encryption_settings("")
+        await initialize_encryption_settings("")
 
-    settings = initialize_encryption_settings("test")
+    settings = await initialize_encryption_settings("test")
     assert settings.salt_size == 32
     assert settings.iterations == 8192
     assert isinstance(settings.encrypted_key, bytes)
@@ -55,23 +63,27 @@ def test_load_aes_key(settings):
     assert isinstance(settings.aes_key, bytes) and len(settings.aes_key) == 32
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_get_aes_key(settings):
-    key = get_aes_key("test", settings)
+async def test_get_aes_key(settings):
+    key = await get_aes_key("test", settings)
     assert isinstance(key, bytes) and len(key) == 32
 
     with pytest.raises(InvalidPasswordError):
-        get_aes_key("t3st", settings)
+        await get_aes_key("t3st", settings)
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_chunk_crypto(settings):
+async def test_chunk_crypto(settings):
     chunk = b"1234567890"
-    assert decrypt_chunk("test", encrypt_chunk("test", chunk, settings), settings) == chunk
+    assert await decrypt_chunk("test", await encrypt_chunk("test", chunk, settings), settings) == chunk
+    assert chunk not in await encrypt_chunk("test", chunk, settings)
 
 
+@pytest.mark.asyncio
 @pytest.mark.unit
-def test_file_crypto(settings, tmp_path):
+async def test_file_crypto(settings, tmp_path):
     source_path = str(tmp_path / "plain_text.txt")
     target_path = str(tmp_path / "crypto.txt")
 
@@ -79,12 +91,12 @@ def test_file_crypto(settings, tmp_path):
         fp.write(b"1234567890")
 
     assert not os.path.exists(target_path)
-    encrypt_file("test", source_path, target_path, settings)
+    await encrypt_file("test", source_path, target_path, settings)
     assert os.path.exists(target_path)
 
     os.unlink(source_path)
     assert not os.path.exists(source_path)
-    decrypt_file("test", target_path, source_path, settings)
+    await decrypt_file("test", target_path, source_path, settings)
     with open(source_path, "rb") as fp:
         assert fp.read() == b"1234567890"
 
@@ -105,3 +117,85 @@ def test_load_from_env(settings, monkeypatch):
     assert new_settings.salt_size == settings.salt_size
     assert new_settings.iterations == settings.iterations
     assert new_settings.encrypted_key == settings.encrypted_key
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_stream_crypto(settings):
+    source = io.BytesIO(b"test")
+    encrypted_target = io.BytesIO()
+    await encrypt_stream("test", source, encrypted_target, settings)
+    assert source.getvalue() != encrypted_target.getvalue()
+    encrypted_target = io.BytesIO(encrypted_target.getvalue())
+    decrypted_target = io.BytesIO()
+    await decrypt_stream("test", encrypted_target, decrypted_target, settings)
+    assert source.getvalue() == decrypted_target.getvalue()
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_iter_stream_crypto_BytesIO(settings):
+    source = io.BytesIO(b"test")
+    encrypted_target = io.BytesIO()
+    async for _buffer in iter_encrypt_stream("test", source, settings):
+        encrypted_target.write(_buffer)
+
+    assert source.getvalue() != encrypted_target.getvalue()
+    encrypted_target = io.BytesIO(encrypted_target.getvalue())
+    decrypted_target = io.BytesIO()
+    async for _buffer in iter_decrypt_stream("test", encrypted_target, settings):
+        decrypted_target.write(_buffer)
+
+    assert source.getvalue() == decrypted_target.getvalue()
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_iter_stream_crypto_AsyncBufferedReader(tmp_path, settings):
+    target_file = str(tmp_path / "text.txt")
+    with open(target_file, "w") as fp:
+        fp.write("test")
+
+    async with aiofiles.open(target_file, "rb") as source:
+        encrypted_target = io.BytesIO()
+        async for _buffer in iter_encrypt_stream("test", source, settings):
+            encrypted_target.write(_buffer)
+
+    assert encrypted_target.getvalue() != b"test"
+
+    encrypted_target = io.BytesIO(encrypted_target.getvalue())
+    decrypted_target = io.BytesIO()
+    async for _buffer in iter_decrypt_stream("test", encrypted_target, settings):
+        decrypted_target.write(_buffer)
+
+    assert decrypted_target.getvalue() == b"test"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_iter_stream_crypto_AsyncGenerator(tmp_path, settings):
+    target_file = str(tmp_path / "text.txt")
+    with open(target_file, "w") as fp:
+        fp.write("test")
+
+    async def _reader(target):
+        while True:
+            chunk = target.read(io.DEFAULT_BUFFER_SIZE)
+            if not chunk:
+                break
+
+            yield chunk
+
+    with open(target_file, "rb") as source:
+        encrypted_target = io.BytesIO()
+        async for _buffer in iter_encrypt_stream("test", _reader(source), settings):
+            encrypted_target.write(_buffer)
+
+    assert encrypted_target.getvalue() != b"test"
+
+    encrypted_target = io.BytesIO(encrypted_target.getvalue())
+    decrypted_target = io.BytesIO()
+    async for _buffer in iter_decrypt_stream("test", _reader(encrypted_target), settings):
+        decrypted_target.write(_buffer)
+
+    assert decrypted_target.getvalue() == b"test"

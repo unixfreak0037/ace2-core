@@ -30,7 +30,7 @@ async def system(request, redis):
         )
 
     # initialize encryption settings with a password of "test"
-    test_system.encryption_settings = initialize_encryption_settings("test")
+    test_system.encryption_settings = await initialize_encryption_settings("test")
     test_system.encryption_settings.load_aes_key("test")
 
     await test_system.initialize()

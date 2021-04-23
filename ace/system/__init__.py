@@ -4,6 +4,8 @@
 # a system is an object that extends all of these interfaces
 #
 
+from ace.crypto import EncryptionSettings
+
 from ace.system.base import (
     AlertingBaseInterface,
     AnalysisModuleTrackingBaseInterface,
@@ -16,7 +18,6 @@ from ace.system.base import (
     WorkQueueBaseInterface,
     AuthenticationBaseInterface,
     AuditTrackingBaseInterface,
-    EncryptionBaseInterface,
     TokenizationBaseInterface,
 )
 
@@ -33,9 +34,13 @@ class ACESystem(
     WorkQueueBaseInterface,
     AuthenticationBaseInterface,
     AuditTrackingBaseInterface,
-    EncryptionBaseInterface,
     TokenizationBaseInterface,
 ):
+
+    # the encryption settings for this system
+    # encryption is not enabled by default
+    encryption_settings: EncryptionSettings
+
     def new_root(self, *args, **kwargs):
         """Returns a new RootAnalysis object for this system."""
         from ace.analysis import RootAnalysis

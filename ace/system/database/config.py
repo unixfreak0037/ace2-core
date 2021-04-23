@@ -2,6 +2,7 @@
 
 from typing import Any, Optional
 
+from ace.logging import get_logger
 from ace.data_model import ConfigurationSetting
 from ace.system.base import ConfigurationBaseInterface
 from ace.system.database.schema import Config
@@ -27,6 +28,7 @@ class DatabaseConfigurationInterface(ConfigurationBaseInterface):
         # this happens when the system first starts up as it collects the configuration of the database
         async with self.get_db() as db:
             if db is None:
+                get_logger().debug(f"obtaining config key {key} from temporary memory space")
                 return self.temp_config.get(key, None)
 
         result = await self.get_config_obj(key)
@@ -45,6 +47,7 @@ class DatabaseConfigurationInterface(ConfigurationBaseInterface):
         config = Config(key=key, value=encoded_value, documentation=documentation)
         async with self.get_db() as db:
             if db is None:
+                get_logger().debug(f"storing config key {key} value {setting} into temporary memory space")
                 self.temp_config[key] = setting
             else:
                 await db.merge(config)

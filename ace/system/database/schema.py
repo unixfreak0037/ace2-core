@@ -7,6 +7,7 @@ from sqlalchemy import (
     Column,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     text,
@@ -78,7 +79,7 @@ class AnalysisDetailsTracking(Base):
         nullable=False,
     )
 
-    json_data = Column(Text, nullable=False)
+    json_data = Column(LargeBinary, nullable=False)
 
     insert_date = Column(TimeStamp, nullable=False, index=True, server_default=text("CURRENT_TIMESTAMP"))
 

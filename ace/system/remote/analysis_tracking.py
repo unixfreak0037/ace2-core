@@ -11,7 +11,7 @@ class RemoteAnalysisTrackingInterface(AnalysisTrackingBaseInterface):
     async def i_get_root_analysis(self, uuid: str) -> Union[RootAnalysis, None]:
         return await self.get_api().get_root_analysis(uuid)
 
-    async def i_get_analysis_details(self, uuid: str) -> Any:
+    async def get_analysis_details(self, uuid: str) -> Any:
         return await self.get_api().get_analysis_details(uuid)
 
     async def track_root_analysis(self, root: RootAnalysis) -> bool:

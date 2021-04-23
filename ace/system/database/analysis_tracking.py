@@ -89,7 +89,7 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingBaseInterface):
 
         return result.rowcount > 0
 
-    async def i_get_analysis_details(self, uuid: str) -> Any:
+    async def i_get_analysis_details(self, uuid: str) -> bytes:
         """Returns the details for the given Analysis object, or None if is has not been set."""
         async with self.get_db() as db:
             result = (
@@ -99,13 +99,19 @@ class DatabaseAnalysisTrackingInterface(AnalysisTrackingBaseInterface):
         if not result:
             return None
 
-        return json.loads(result[0].json_data)
+        return result[0].json_data
 
-    async def i_track_analysis_details(self, root_uuid: str, uuid: str, value: Any):
+    async def i_track_analysis_details(self, root_uuid: str, uuid: str, value: bytes):
         """Tracks the details for the given Analysis object (uuid) in the given root (root_uuid)."""
+        assert isinstance(root_uuid, str) and root_uuid
+        assert isinstance(uuid, str) and uuid
+        assert isinstance(value, bytes) and value
+
         try:
             tracking = AnalysisDetailsTracking(
-                uuid=uuid, root_uuid=root_uuid, json_data=json.dumps(value, sort_keys=True)
+                uuid=uuid,
+                root_uuid=root_uuid,
+                json_data=value,
             )
 
             async with self.get_db() as db:

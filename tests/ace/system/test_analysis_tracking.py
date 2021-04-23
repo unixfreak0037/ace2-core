@@ -6,6 +6,7 @@ import pytest
 
 from ace.analysis import RootAnalysis, Observable, Analysis, AnalysisModuleType
 from ace.exceptions import UnknownRootAnalysisError
+from ace.system.base.analysis_tracking import CONFIG_ANALYSIS_ENCRYPTION_ENABLED
 
 TEST_DETAILS = {"hello": "world"}
 OBSERVABLE_VALUE = "observable value"
@@ -211,6 +212,27 @@ async def test_track_analysis_details(system):
     assert await system.delete_analysis_details(root.uuid)
     # make sure it's gone
     assert await system.get_analysis_details(root.uuid) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_track_analysis_encrypted_details(system):
+    # enable analysis detail encryption
+    await system.set_config(CONFIG_ANALYSIS_ENCRYPTION_ENABLED, True)
+    root = system.new_root()
+    root.set_details(TEST_DETAILS)
+    await system.track_root_analysis(root)
+    # track the details of the root analysis
+    await system.track_analysis_details(root, root.uuid, await root.get_details())
+    # make sure it's there
+    assert await system.get_analysis_details(root.uuid) == TEST_DETAILS
+
+    # disable encryption
+    await system.set_config(CONFIG_ANALYSIS_ENCRYPTION_ENABLED, False)
+    # then this actually doesn't even work because the data is encrypted
+    # and we're trying to decode it as utf8
+    with pytest.raises(UnicodeDecodeError):
+        assert await system.get_analysis_details(root.uuid) != TEST_DETAILS
 
 
 @pytest.mark.asyncio

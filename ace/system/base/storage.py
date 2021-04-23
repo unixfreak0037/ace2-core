@@ -34,7 +34,7 @@ class MetaComputation:
 
 
 class StorageBaseInterface:
-    def storage_encryption_enabled(self) -> bool:
+    async def storage_encryption_enabled(self) -> bool:
         """Returns True if encryption is configured and storage is configured to be encrypted."""
         # the settings need to be configured
         if self.encryption_settings is None:
@@ -45,7 +45,7 @@ class StorageBaseInterface:
             return False
 
         # and this needs to return True
-        return self.get_config_value(CONFIG_STORAGE_ENCRYPTION_ENABLED, False)
+        return await self.get_config_value(CONFIG_STORAGE_ENCRYPTION_ENABLED, False)
 
     @coreapi
     async def store_content(

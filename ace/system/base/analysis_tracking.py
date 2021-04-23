@@ -3,18 +3,32 @@
 #
 #
 
+import json
+
 from typing import Union, Any
 
 from ace import coreapi
 from ace.analysis import RootAnalysis
 from ace.logging import get_logger
 from ace.constants import *
+from ace.crypto import encrypt_chunk, decrypt_chunk
+
+CONFIG_ANALYSIS_ENCRYPTION_ENABLED = "/core/analysis/encrypted"
 
 
 class AnalysisTrackingBaseInterface:
-    #
-    # analysis tracking
-    #
+    async def analysis_encryption_enabled(self) -> bool:
+        """Returns True if encryption is configured and analysis is configured to be encrypted."""
+        # the settings need to be configured
+        if self.encryption_settings is None:
+            return False
+
+        # and the key needs to be loaded
+        if self.encryption_settings.aes_key is None:
+            return False
+
+        # and this needs to return True
+        return await self.get_config_value(CONFIG_ANALYSIS_ENCRYPTION_ENABLED, False)
 
     @coreapi
     async def get_root_analysis(self, root: Union[RootAnalysis, str]) -> Union[RootAnalysis, None]:
@@ -120,9 +134,16 @@ class AnalysisTrackingBaseInterface:
     async def get_analysis_details(self, uuid: str) -> Any:
         assert isinstance(uuid, str)
 
-        return await self.i_get_analysis_details(uuid)
+        details = await self.i_get_analysis_details(uuid)
+        if details is None:
+            return None
 
-    async def i_get_analysis_details(self, uuid: str) -> Any:
+        if await self.analysis_encryption_enabled():
+            details = await decrypt_chunk(self.encryption_settings.aes_key, details)
+
+        return json.loads(details.decode())
+
+    async def i_get_analysis_details(self, uuid: str) -> bytes:
         """Returns the details for the given Analysis object, or None if is has not been set."""
         raise NotImplementedError()
 
@@ -137,7 +158,17 @@ class AnalysisTrackingBaseInterface:
 
         get_logger().debug(f"tracking {root} analysis details {uuid}")
         exists = await self.analysis_details_exists(root.uuid)
-        await self.i_track_analysis_details(root.uuid, uuid, value)
+
+        # the thing to be tracked must be able to serialize into json
+        json_value = json.dumps(value, sort_keys=True)
+
+        if await self.analysis_encryption_enabled():
+            encoded_value = await encrypt_chunk(self.encryption_settings.aes_key, json_value.encode())
+        else:
+            encoded_value = json_value.encode()
+
+        await self.i_track_analysis_details(root.uuid, uuid, encoded_value)
+
         if not exists:
             await self.fire_event(EVENT_ANALYSIS_DETAILS_NEW, [root, root.uuid])
         else:
@@ -145,7 +176,7 @@ class AnalysisTrackingBaseInterface:
 
         return True
 
-    async def i_track_analysis_details(self, root_uuid: str, uuid: str, value: Any):
+    async def i_track_analysis_details(self, root_uuid: str, uuid: str, value: bytes):
         """Tracks the details for the given Analysis object (uuid) in the given root (root_uuid)."""
         raise NotImplementedError()
 

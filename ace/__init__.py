@@ -5,6 +5,10 @@ import functools
 import pytz
 import tzlocal
 
+import ace
+import ace.cli
+import ace.packages_cli
+
 # local timezone
 LOCAL_TIMEZONE = pytz.timezone(tzlocal.get_localzone().zone)
 

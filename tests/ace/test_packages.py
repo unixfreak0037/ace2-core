@@ -1,10 +1,13 @@
 # vim: sw=4:ts=4:et:cc=120
 
+import os
+import os.path
+
 import pytest
 import yaml
 
 from ace.module.base import AnalysisModule
-from ace.packages import load_package_from_dict
+from ace.packages import load_packages, load_package_from_dict, ACEPackage
 
 
 class TestModule1(AnalysisModule):
@@ -64,10 +67,9 @@ sample_yaml = """
 """
 
 
-@pytest.mark.unit
-def test_load_package_from_dict():
-    package = load_package_from_dict(yaml.safe_load(sample_yaml), "test")
-    assert package.source == "test"
+def verify_loaded_package(package: ACEPackage):
+    assert isinstance(package, ACEPackage)
+    # assert package.source == "test"
     assert package.name == "Sample Package"
     assert package.description == "Sample Description"
     assert package.version == "1.0.0"
@@ -77,3 +79,22 @@ def test_load_package_from_dict():
         assert issubclass(package.modules[i], AnalysisModule)
         module_instance = package.modules[i]()
         assert isinstance(module_instance, AnalysisModule)
+
+
+@pytest.mark.unit
+def test_load_package_from_dict():
+    verify_loaded_package(load_package_from_dict(yaml.safe_load(sample_yaml), "test"))
+
+
+@pytest.mark.unit
+def test_load_packages(tmpdir):
+    package_dir = str(tmpdir / "packages")
+    os.mkdir(package_dir)
+    path = os.path.join(package_dir, "test.yml")
+
+    with open(path, "w") as fp:
+        fp.write(sample_yaml)
+
+    packages = load_packages(package_dir)
+    assert len(packages) == 1
+    verify_loaded_package(packages[0])

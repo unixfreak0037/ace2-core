@@ -31,28 +31,18 @@ def load_packages(package_dir: Optional[str] = None) -> list[ACEPackage]:
     if not package_dir:
         package_dir = get_package_dir()
 
+    if not os.path.isdir(package_dir):
+        return []
+
     for target in os.listdir(package_dir):
-        if not target.endswith(".yml"):
+        if not target.endswith(".yml") and not target.endswith(".yaml"):
             continue
 
         target = os.path.join(package_dir, target)
         with open(target, "r") as fp:
             package_definition = yaml.load(fp, Loader=yaml.FullLoader)
 
-        _package = ACEPackage(
-            source=target,
-            name=package_definition["name"],
-            description=package_definition["description"],
-            version=package_definition["version"],
-        )
-
-        if "modules" in package_definition:
-            for module_spec in package["modules"]:
-                module_name, class_name = module_spec.rsplit(".", 1)
-                _module = importlib.import_module(module_name)
-                _package.modules.append(getattr(_module, class_name))
-
-        result.append(target)
+        result.append(load_package_from_dict(package_definition, target))
 
     return result
 

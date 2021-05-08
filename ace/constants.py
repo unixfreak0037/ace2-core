@@ -3,6 +3,7 @@
 # environment variables
 ACE_ADMIN_PASSWORD = "ACE_ADMIN_PASSWORD"
 ACE_API_KEY = "ACE_API_KEY"
+ACE_BASE_DIR = "ACE_BASE_DIR"
 ACE_DB = "ACE_DB"
 ACE_PACKAGE_DIR = "ACE_PACKAGE_DIR"
 ACE_REDIS = "ACE_REDIS"
@@ -94,3 +95,12 @@ ERROR_ROOT_EXISTS = "root_exists"
 ERROR_ROOT_UNKNOWN = "unknown_root"
 ERROR_STORE_UNKNOWN_FILE = "unknown_file"
 ERROR_WQ_INVALID = "invalid_work_queue"
+
+#
+# service status codes
+#
+SERVICE_STATUS_RUNNING = "running"
+SERVICE_STATUS_STOPPED = "stopped"
+SERVICE_STATUS_STALE = "stale"
+SERVICE_STATUS_DISABLED = "disabled"
+SERVICE_STATUS_UNKNOWN = "unknown"

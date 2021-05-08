@@ -170,3 +170,32 @@ exception_map = {
     ERROR_STORE_UNKNOWN_FILE: UnknownFileError,
     ERROR_WQ_INVALID: InvalidWorkQueueError,
 }
+
+#
+# all the exceptions defined below are not used by the api
+#
+
+
+class UnknownServiceError(Exception):
+    """Thrown when a reference is made to an unknown service."""
+
+    pass
+
+
+class ServiceAlreadyRunningError(Exception):
+    """Thrown when we try to start a service that is already running."""
+
+    pass
+
+
+class ServiceDisabledError(Exception):
+    """Thrown when we try to start a service that is disabled."""
+
+    pass
+
+
+class InvalidServiceStateError(Exception):
+    """Thrown when an attempt is made to execute something against a service
+    when the service is in the wrong state."""
+
+    pass

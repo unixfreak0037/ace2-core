@@ -2,7 +2,7 @@
 
 from ace.cli import get_cli, get_cli_sp, display_analysis
 from ace.env import get_package_dir
-from ace.packages import load_packages
+from ace.packages import get_package_manager
 
 get_cli().add_argument(
     "--package-dir",
@@ -15,7 +15,7 @@ package_sp = package_parser.add_subparsers(dest="package_cmd")
 
 
 async def list_packages(args):
-    packages = load_packages()
+    packages = get_package_manager().load_packages()
     if not packages:
         print(f"no packages installed in {get_package_dir()}")
         return

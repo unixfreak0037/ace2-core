@@ -13,6 +13,7 @@ parser = argparse.ArgumentParser(description="Analysis Correlation Engine")
 subparsers = parser.add_subparsers(dest="cmd")
 args = None
 
+parser.add_argument("-b", "--base-dir", help="Base directory for local ace storage. Defaults to ~/.ace")
 parser.add_argument("-u", "--uri", help="Target core URI. Defaults to ACE_URI environment variable.")
 parser.add_argument("-k", "--api-key", help="Core API key. Defaults to ACE_API_KEY environment variable.")
 parser.add_argument("-L", "--logging-config-path", default=None, help="Path to the logging configuration file.")

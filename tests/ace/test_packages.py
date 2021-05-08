@@ -7,15 +7,26 @@ import pytest
 import yaml
 
 from ace.module.base import AnalysisModule
-from ace.packages import load_packages, load_package_from_dict, ACEPackage
+from ace.packages import ACEPackage, get_package_manager
+from ace.service.base import ACEService
 
 
 class TestModule1(AnalysisModule):
-    pass
+    __test__ = False
 
 
 class TestModule2(AnalysisModule):
-    pass
+    __test__ = False
+
+
+class TestService1(ACEService):
+    __test__ = False
+    name = "test_1"
+
+
+class TestService2(ACEService):
+    __test__ = False
+    name = "test_2"
 
 
 sample_yaml = """
@@ -29,7 +40,8 @@ sample_yaml = """
     - tests.ace.test_packages.TestModule2
 
   services:
-    - core_modules.services.SomeCoolService
+    - tests.ace.test_packages.TestService1
+    - tests.ace.test_packages.TestService2
 
   config:
     core_modules:
@@ -83,7 +95,7 @@ def verify_loaded_package(package: ACEPackage):
 
 @pytest.mark.unit
 def test_load_package_from_dict():
-    verify_loaded_package(load_package_from_dict(yaml.safe_load(sample_yaml), "test"))
+    verify_loaded_package(get_package_manager().load_package_from_dict(yaml.safe_load(sample_yaml), "test"))
 
 
 @pytest.mark.unit
@@ -95,6 +107,6 @@ def test_load_packages(tmpdir):
     with open(path, "w") as fp:
         fp.write(sample_yaml)
 
-    packages = load_packages(package_dir)
+    packages = get_package_manager().load_packages(package_dir)
     assert len(packages) == 1
     verify_loaded_package(packages[0])

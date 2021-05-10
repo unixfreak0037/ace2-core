@@ -75,6 +75,16 @@ class ACEServiceDB:
 
             return ServiceInfo(name=name, status=row[0], pid=row[1])
 
+    def get_all_service_info(self) -> list[ServiceInfo]:
+        with sqlite3.connect(self.db_path) as db:
+            c = db.cursor()
+            c.execute("SELECT status, pid FROM services")
+            result = []
+            for row in c:
+                result.append(ServiceInfo(name=name, status=row[0], pid=row[1]))
+
+            return result
+
     def delete_service(self, name: str):
         with sqlite3.connect(self.db_path) as db:
             c = db.cursor()
@@ -83,6 +93,8 @@ class ACEServiceDB:
 
 
 class ACEServiceManager:
+    """Responsible for managing the execution of ACE services."""
+
     def __init__(self, db_path: Optional[str] = None):
         self.db = ACEServiceDB(db_path)
 
@@ -93,6 +105,7 @@ class ACEServiceManager:
         self.loop = None
 
     def schedule_service(self, service: ACEService):
+        """Schedules a service to start when start() is called."""
 
         status = self.get_service_status(service.name)
         if status == SERVICE_STATUS_RUNNING:
@@ -106,6 +119,7 @@ class ACEServiceManager:
         self.db.set_service_info(service.name, SERVICE_STATUS_STOPPED)
 
     def stop_service(self, name: str):
+        """Stops a service specified by name."""
         assert isinstance(name, str)
 
         status = self.get_service_status(name)
@@ -158,6 +172,7 @@ class ACEServiceManager:
             service.signal_handler_USR2()
 
     def start(self):
+        """Starts all scheduled services. Blocks until all services complete."""
 
         if self.loop:
             return
@@ -176,9 +191,11 @@ class ACEServiceManager:
 
     async def async_start(self):
         tasks = []
+        # start all services as tasks
         for service in self.services.values():
             tasks.append(asyncio.create_task(self.async_start_service(service)))
 
+        # wait for all services to complete
         done, pending = await asyncio.wait(tasks)
 
     async def async_start_service(self, service: ACEService):
@@ -187,7 +204,7 @@ class ACEServiceManager:
         self.db.set_service_info(service.name, SERVICE_STATUS_STOPPED)
 
     def stop(self):
-        pass
+        raise NotImplementedError()
 
     def get_service_status(self, name: str) -> str:
         """Returns the actual status of the given service."""

@@ -7,8 +7,9 @@ import importlib
 from dataclasses import dataclass, field
 from typing import Optional
 
-from ace.module.base import AnalysisModule
 from ace.env import get_package_dir
+from ace.logging import get_logger
+from ace.module.base import AnalysisModule
 from ace.service.base import ACEService
 
 import yaml
@@ -40,6 +41,7 @@ class ACEPackageManager:
 
     @property
     def modules(self) -> list[type[AnalysisModule]]:
+        """Returns the list of all available AnalysisModule types."""
         result = []
         for package in self.packages:
             result.extend(package.modules)
@@ -47,7 +49,8 @@ class ACEPackageManager:
         return result
 
     @property
-    def services(self) -> list[type]:
+    def services(self) -> list[type[ACEService]]:
+        """Returns the list of all available ACEService types."""
         result = []
         for package in self.packages:
             result.extend(package.services)
@@ -84,6 +87,8 @@ class ACEPackageManager:
             version=package_definition["version"],
         )
 
+        get_logger().debug(f"loading package from {source}")
+
         # load any defined modules
         if "modules" in package_definition:
             for module_spec in package_definition["modules"]:
@@ -96,7 +101,12 @@ class ACEPackageManager:
             for service_spec in package_definition["services"]:
                 module_name, class_name = service_spec.rsplit(".", 1)
                 _module = importlib.import_module(module_name)
-                _package.services.append(getattr(_module, class_name))
+                _type = getattr(_module, class_name)
+                # sanity check type definition
+                if not issubclass(_type, ACEService):
+                    raise RuntimeError(f"service definition {service_spec} in {source} does not extend ACEService")
+
+                _package.services.append(_type)
 
         return _package
 

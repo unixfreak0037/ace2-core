@@ -4,18 +4,25 @@
 import asyncio
 import logging
 import sys
+import types
 
 from ace.cli import parse_args
 from ace.logging import initialize_logging
 
-#
-# TODO figure out how this should work
-#
-
 import ace.system.cli
 
 if __name__ == "__main__":
+    # parse command line arguments
     args = parse_args()
+    # initialize logging
     initialize_logging(args.logging_config_path)
-    asyncio.get_event_loop().run_until_complete(args.func(args))
+    # load all available packages
+    get_package_manager().load_packages()
+    # execute command
+    result = args.func(args)
+
+    # this allows cli commands to optionally be defined async
+    if isinstance(result, types.CoroutineType):
+        asyncio.get_event_loop().run_until_complete(result)
+
     sys.exit(0)

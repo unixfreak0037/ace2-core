@@ -36,6 +36,9 @@ class ACEService:
     # the name of the service (must be overridden)
     name: str = None
 
+    # a useful description for the person who is managing the system
+    description: str = None
+
     def __init__(self):
         # event that gets set when the service should shut down
         self.shutdown_event = asyncio.Event()

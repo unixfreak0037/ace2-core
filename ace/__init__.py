@@ -8,6 +8,9 @@ import tzlocal
 import ace
 import ace.cli
 import ace.packages_cli
+import ace.service.cli
+
+from ace.packages import get_package_manager
 
 # local timezone
 LOCAL_TIMEZONE = pytz.timezone(tzlocal.get_localzone().zone)

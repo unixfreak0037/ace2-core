@@ -86,11 +86,16 @@ def verify_loaded_package(package: ACEPackage):
     assert package.description == "Sample Description"
     assert package.version == "1.0.0"
     assert len(package.modules) == 2
-
     for i in range(2):
         assert issubclass(package.modules[i], AnalysisModule)
         module_instance = package.modules[i]()
         assert isinstance(module_instance, AnalysisModule)
+
+    assert len(package.services) == 2
+    for i in range(2):
+        assert issubclass(package.services[i], ACEService)
+        service_instance = package.services[i]()
+        assert isinstance(service_instance, ACEService)
 
 
 @pytest.mark.unit

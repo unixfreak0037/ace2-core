@@ -14,7 +14,7 @@ package_parser = get_cli_sp().add_parser("package", help="ACE package management
 package_sp = package_parser.add_subparsers(dest="package_cmd")
 
 
-async def list_packages(args):
+def list_packages(args):
     packages = get_package_manager().load_packages()
     if not packages:
         print(f"no packages installed in {get_package_dir()}")

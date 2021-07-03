@@ -1,0 +1,6 @@
+htmlcov/*
+.circleci/*
+.git/*
+.pytest_cache/*
+.venv/*
+.vscode/*

@@ -10,16 +10,6 @@ services:
         networks:
             - ace
 
-    http:
-        image: nginx:stable
-        ports:
-            - "443:443"
-        restart: always
-        hostname: http
-        container_name: ace-http
-        networks:
-            - ace
-
     database:
         image: postgres:latest
         ports:
@@ -36,11 +26,10 @@ services:
         build:
             context: .
         image: ace2:latest
-        command: .venv/bin/uwsgi --ini etc/uwsgi.ini
         ports:
-            - 3030
+            - "443:443"
         restart: always
-        hostname: core
+        hostname: ace-core
         container_name: ace-core
         environment:
             - ACE_API_KEY
@@ -49,6 +38,7 @@ services:
             - ACE_REDIS
             - ACE_STORAGE_ROOT
             - ACE_URI=https://ace/core
+            - PORT=443
         networks:
             - ace
 

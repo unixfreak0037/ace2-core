@@ -3,6 +3,7 @@ aiofiles
 aioredis<2.0
 aiosqlite
 fastapi[all]
+gunicorn
 httpx
 psutil
 pycryptodome
@@ -12,4 +13,4 @@ pytz
 redis
 tld
 tzlocal
-uwsgi
+uvicorn[standard]

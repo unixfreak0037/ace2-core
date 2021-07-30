@@ -8,6 +8,9 @@ import types
 
 from ace.cli import parse_args
 from ace.logging import initialize_logging
+from ace.packages import get_package_manager
+
+# from ace.system.distributed import app
 
 import ace.system.cli
 

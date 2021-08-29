@@ -22,6 +22,7 @@ from ace.system.threaded import ThreadedACESystem
 
 from httpx import AsyncClient
 import redislite
+from sqlalchemy import event
 
 
 class ThreadedACETestSystem(ThreadedACESystem):
@@ -40,6 +41,15 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
         super().__init__(*args, **kwargs)
         self.db_url = "sqlite+aiosqlite://"
         self.storage_root = tempfile.mkdtemp()
+
+    async def initialize(self):
+        await super().initialize()
+
+        @event.listens_for(self.engine.sync_engine, "engine_connect")
+        def connect(dbapi_connection, connection_record):
+            cursor = dbapi_connection.connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
 
     async def reset(self):
         result = await super().reset()

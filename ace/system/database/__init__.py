@@ -18,7 +18,6 @@ import ace
 from ace.system import ACESystem
 
 from ace.logging import get_logger
-from sqlalchemy import event
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm.session import Session, sessionmaker
@@ -76,17 +75,14 @@ class DatabaseACESystem(
         # /usr/local/lib/python3.6/dist-packages/pymysql/cursors.py:170: Warning: (1300, "Invalid utf8mb4 character string: '800363'")
         warnings.filterwarnings(action="ignore", message=".*Invalid utf8mb4 character string.*")
 
-        self.db_url = await self.get_config_value(CONFIG_DB_URL, env="ACE_DB_URL", default=self.db_url)
-        self.db_kwargs = await self.get_config_value(CONFIG_DB_KWARGS, default=self.db_kwargs)
+        if not self.db_url:
+            self.db_url = await self.get_config_value(CONFIG_DB_URL, env="ACE_DB_URL", default=self.db_url)
+
+        if not self.db_kwargs:
+            self.db_kwargs = await self.get_config_value(CONFIG_DB_KWARGS, default=self.db_kwargs)
+
+        print(f"connecting to {self.db_url} with {self.db_kwargs}")
         self.engine = create_async_engine(self.db_url, **self.db_kwargs)
-
-        @event.listens_for(self.engine.sync_engine, "engine_connect")
-        def connect(dbapi_connection, connection_record):
-            # TODO check for sqlite
-            cursor = dbapi_connection.connection.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.close()
-
         self.async_session = sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession)
         await super().initialize()
 

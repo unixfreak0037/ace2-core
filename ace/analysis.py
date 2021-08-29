@@ -34,6 +34,9 @@ from ace.data_model import (
 from ace.logging import get_logger
 from ace.time import parse_datetime_string, utc_now
 
+import tzlocal
+import pytz
+
 
 #
 # MERGING
@@ -1005,8 +1008,9 @@ class Observable(TaggableObject, DetectableObject, MergableObject):
         elif isinstance(value, datetime.datetime):
             # if we didn't specify a timezone then we use the timezone of the local system
             if value.tzinfo is None:
-                value = ace.LOCAL_TIMEZONE.localize(value)
-            self._time = value
+                value = tzlocal.get_localzone().localize(value)
+            # always convert to utc
+            self._time = value.astimezone(pytz.utc)
         elif isinstance(value, str):
             self._time = parse_datetime_string(value)
         else:
@@ -1871,8 +1875,9 @@ class RootAnalysis(Analysis, MergableObject):
         elif isinstance(value, datetime.datetime):
             # if we didn't specify a timezone then we use the timezone of the local system
             if value.tzinfo is None:
-                value = ace.LOCAL_TIMEZONE.localize(value)
-            self._event_time = value
+                value = tzlocal.get_localzone().localize(value)
+            # always convert to utc
+            self._event_time = value.astimezone(pytz.utc)
         elif isinstance(value, str):
             self._event_time = parse_datetime_string(value)
         else:

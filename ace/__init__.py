@@ -12,9 +12,6 @@ import ace.service.cli
 
 from ace.packages import get_package_manager
 
-# local timezone
-LOCAL_TIMEZONE = pytz.timezone(tzlocal.get_localzone().zone)
-
 
 def coreapi(func):
     """Specifies the given function is a core api function."""

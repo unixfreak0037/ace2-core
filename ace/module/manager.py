@@ -392,7 +392,7 @@ class AnalysisModuleManager:
             return
 
         for process in psutil.Process(os.getpid()).children():
-            get_logger().warning(f"sending KILL to {process}")
+            get_logger().warning(f"sending TERM to {process}")
             process.send_signal(signal.SIGTERM)
 
     async def run_once(self) -> bool:

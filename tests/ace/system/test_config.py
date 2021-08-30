@@ -57,8 +57,8 @@ async def test_config_missing_value(system):
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_config_env_value(system):
-    os.environ["ACE_TEST"] = "test"
+async def test_config_env_value(system, monkeypatch):
+    monkeypatch.setitem(os.environ, "ACE_TEST", "test")
 
     # without the setting it should return what is in the env var
     assert await system.get_config_value("/test", env="ACE_TEST") == "test"
@@ -66,3 +66,10 @@ async def test_config_env_value(system):
     # but when it gets set it should return that
     await system.set_config("/test", "that")
     assert await system.get_config_value("/test") == "that"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_config_env_value_with_type(system, monkeypatch):
+    monkeypatch.setitem(os.environ, "ACE_TEST", "1")
+    assert await system.get_config_value("/test", env="ACE_TEST", env_type=int) == 1

@@ -19,10 +19,15 @@ class ConfigurationBaseInterface:
         key: str,
         default: Optional[Any] = None,
         env: Optional[str] = None,
+        env_type: Optional[type] = str,
     ) -> Any:
-        """Returns the value of the configuration setting.  If the configuration setting is not found and env is not None
-        then the OS environment variable in the env parameter is used. Only plain string values can be used with environment
-        variables.  Otherwise, default is returned, None if default is not defined."""
+        """Returns the value of the configuration setting.  If the
+        configuration setting is not found and env is not None then the OS
+        environment variable in the env parameter is used. The env_type
+        parameter can be used to set the type if an environment variable is
+        used, the string value is simply passed to the type constructor
+        (default is str.) Otherwise, default is returned, None if default is
+        not defined."""
         assert isinstance(key, str) and key
         assert env is None or (isinstance(env, str) and str)
 
@@ -31,7 +36,7 @@ class ConfigurationBaseInterface:
             return result.value
 
         if result is None and env and env in os.environ:
-            return os.environ[env]
+            return env_type(os.environ[env])
 
         return default
 

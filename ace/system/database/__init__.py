@@ -17,7 +17,7 @@ import ace
 
 from ace.system import ACESystem
 
-from ace.logging import get_logger
+from ace.logging import logger
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm.session import Session, sessionmaker
@@ -81,7 +81,7 @@ class DatabaseACESystem(
         if not self.db_kwargs:
             self.db_kwargs = await self.get_config_value(CONFIG_DB_KWARGS, default=self.db_kwargs)
 
-        print(f"connecting to {self.db_url} with {self.db_kwargs}")
+        logger.info(f"connecting to {self.db_url} ({self.db_kwargs})")
         self.engine = create_async_engine(self.db_url, **self.db_kwargs)
         self.async_session = sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession)
         await super().initialize()
@@ -206,11 +206,11 @@ class DatabaseACESystem(
                 if (
                     e.args[0] == 1213 or e.args[0] == 1205 or (isinstance(e.args[0], str) and e.args[0] == "DEADLOCK")
                 ) and count < attempts:
-                    get_logger().warning("deadlock detected -- trying again (attempt #{})".format(count))
+                    logger.warning("deadlock detected -- trying again (attempt #{})".format(count))
                     try:
                         await db.rollback()
                     except Exception as rollback_error:
-                        get_logger().error("rollback failed for transaction in deadlock: {}".format(rollback_error))
+                        logger.error("rollback failed for transaction in deadlock: {}".format(rollback_error))
                         raise e
 
                     count += 1
@@ -220,7 +220,7 @@ class DatabaseACESystem(
                     if not callable(sql_or_func):
                         i = 0
                         for _sql, _params in zip(sql_or_func, params):
-                            get_logger().warning(
+                            logger.warning(
                                 "DEADLOCK STATEMENT #{} SQL {} PARAMS {}".format(
                                     i, _sql, ",".join([str(_) for _ in _params])
                                 )
@@ -283,14 +283,14 @@ class DatabaseACESystem(
                         or (isinstance(e.orig.args[0], str) and e.orig.args[0] == "DEADLOCK")
                         and current_attempt < attempts
                     ):
-                        get_logger().debug(
+                        logger.debug(
                             f"DEADLOCK STATEMENT attempt #{current_attempt + 1} SQL {e.statement} PARAMS {e.params}"
                         )
 
                         try:
                             await db.rollback()  # rolls back to the begin_nested()
                         except Exception as e:
-                            get_logger().error(f"unable to roll back transaction: {e}")
+                            logger.error(f"unable to roll back transaction: {e}")
 
                             et, ei, tb = sys.exc_info()
                             raise e.with_traceback(tb)

@@ -5,8 +5,6 @@ services:
         ports:
             - "6379:6379"
         restart: always
-        hostname: redis
-        container_name: ace-redis
         networks:
             - ace
 
@@ -15,32 +13,44 @@ services:
         ports:
             - "5432:5432"
         restart: always
-        hostname: database
-        container_name: ace-database
         environment:
-            POSTGRES_PASSWORD: example
+            POSTGRES_PASSWORD: ace
+            POSTGRES_USER: ace
         networks:
             - ace
+        volumes:
+            - postgres_data:/var/lib/postgresql/data/
 
-    core:
+    ace:
         build:
             context: .
         image: ace2:latest
+        depends_on:
+            - database
+            - redis
         ports:
             - "443:443"
         restart: always
-        hostname: ace-core
-        container_name: ace-core
         environment:
             - ACE_API_KEY
+            - ACE_ADMIN_PASSWORD
             - ACE_BASE_DIR=/opt/ace
-            - ACE_DB
-            - ACE_REDIS
+            - ACE_CRYPTO_VERIFICATION_KEY
+            - ACE_CRYPTO_SALT
+            - ACE_CRYPTO_SALT_SIZE
+            - ACE_CRYPTO_ITERATIONS
+            - ACE_CRYPTO_ENCRYPTED_KEY
+            - ACE_DB_URL=postgresql+asyncpg://ace:ace@database/ace
+            - ACE_REDIS_HOST=redis
+            - ACE_REDIS_PORT=6379
             - ACE_STORAGE_ROOT
             - ACE_URI=https://ace/core
             - PORT=443
         networks:
             - ace
+
+volumes:
+    postgres_data:
 
 networks:
     ace:

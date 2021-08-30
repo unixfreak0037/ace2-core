@@ -76,8 +76,6 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-        # Base.metadata.create_all()
-
     async def stop(self):
         await super().stop()
 

@@ -1,8 +1,12 @@
+import os
+import sys
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import APIKeyHeader
 
-from ace.system.redis import RedisACESystem
-from ace.system.database import DatabaseACESystem
+from ace.constants import ACE_ADMIN_PASSWORD
+from ace.crypto import EncryptionSettings
+from ace.system.default import DefaultACESystem
 
 TAG_ALERTS = "alerts"
 TAG_AUTH = "authentication"
@@ -64,12 +68,14 @@ app = FastAPI(
 )
 
 
-class DistributedACESystem(RedisACESystem, DatabaseACESystem):
-    pass
-
-
 @app.on_event("startup")
 async def startup_event():
-    app.state.system = DistributedACESystem()
-    await app.state.system.initialize()
+    if ACE_ADMIN_PASSWORD not in os.environ:
+        sys.stderr.write(f"\n\nERROR: missing {ACE_ADMIN_PASSWORD} env var\n\n")
+        sys.exit(1)
+
+    app.state.system = DefaultACESystem()
+    app.state.system.encryption_settings = EncryptionSettings()
     app.state.system.encryption_settings.load_from_env()
+    app.state.system.encryption_settings.load_aes_key(os.environ[ACE_ADMIN_PASSWORD])
+    await app.state.system.initialize()

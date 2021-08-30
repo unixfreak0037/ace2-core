@@ -27,3 +27,6 @@ def initialize_logging(logging_config_path):
     # logging.getLogger('sqlalchemy.dialects').setLevel(logging.DEBUG)
     # logging.getLogger('sqlalchemy.pool').setLevel(logging.DEBUG)
     # logging.getLogger('sqlalchemy.orm').setLevel(logging.DEBUG)
+
+
+logger = get_logger()

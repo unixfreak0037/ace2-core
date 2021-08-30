@@ -4,6 +4,7 @@ import contextlib
 import os
 import threading
 
+from ace.constants import ACE_REDIS_HOST, ACE_REDIS_PORT
 from ace.logging import get_logger
 from ace.system import ACESystem
 
@@ -43,8 +44,8 @@ class RedisACESystem(RedisAlertTrackingInterface, RedisEventInterface, RedisWork
         # if the pid or tid change then we create a new pool
         pool_key = _pool_key()
         if pool_key not in self.pools:
-            host = await self.get_config_value(CONFIG_REDIS_HOST)
-            port = await self.get_config_value(CONFIG_REDIS_PORT)
+            host = await self.get_config_value(CONFIG_REDIS_HOST, env=ACE_REDIS_HOST)
+            port = await self.get_config_value(CONFIG_REDIS_PORT, env=ACE_REDIS_PORT, env_type=int)
             db = await self.get_config_value(CONFIG_REDIS_DB, default=0)
             pool_size = await self.get_config_value(CONFIG_REDIS_DB, default=100)
 

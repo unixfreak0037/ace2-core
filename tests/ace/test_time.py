@@ -12,7 +12,7 @@ import pytz
 
 @pytest.fixture
 def mock_tz(monkeypatch):
-    def get_localzone():
+    def get_localzone(*args, **kwags):
         return pytz.timezone("Etc/GMT+1")
 
     monkeypatch.setattr(tzlocal, "get_localzone", get_localzone)

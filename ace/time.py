@@ -35,8 +35,8 @@ def parse_datetime_string(event_time):
         return datetime.datetime.strptime(event_time, event_time_format_tz).astimezone(pytz.utc)
     elif RE_ET_OLD_FORMAT.match(event_time):
         return (
-            tzlocal.get_localzone()
-            .localize(datetime.datetime.strptime(event_time, event_time_format))
+            datetime.datetime.strptime(event_time, event_time_format)
+            .replace(tzinfo=tzlocal.get_localzone())
             .astimezone(pytz.utc)
         )
     elif RE_ET_JSON_FORMAT.match(event_time):
@@ -48,8 +48,8 @@ def parse_datetime_string(event_time):
         return datetime.datetime.strptime(event_time, event_time_format_json_tz).astimezone(pytz.utc)
     elif RE_ET_OLD_JSON_FORMAT.match(event_time):
         return (
-            tzlocal.get_localzone()
-            .localize(datetime.datetime.strptime(event_time, event_time_format_json))
+            datetime.datetime.strptime(event_time, event_time_format_json)
+            .replace(tzinfo=tzlocal.get_localzone())
             .astimezone(pytz.utc)
         )
     else:

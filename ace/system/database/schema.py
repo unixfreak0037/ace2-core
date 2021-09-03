@@ -18,10 +18,10 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.schema import Table
 from sqlalchemy.ext.declarative import declarative_base
 
-import tzlocal
-
 
 Base = declarative_base()
+
+import tzlocal
 
 
 # https://mike.depalatis.net/blog/sqlalchemy-timestamps.html
@@ -34,7 +34,7 @@ class TimeStamp(sqlalchemy.types.TypeDecorator):
             return None
 
         if value.tzinfo is None:
-            value = value.astimezone(tzlocal.get_localzone())
+            value = value.replace(tzinfo=tzlocal.get_localzone())
 
         return value.astimezone(timezone.utc)
 

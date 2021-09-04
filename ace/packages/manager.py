@@ -7,29 +7,13 @@ import importlib
 from dataclasses import dataclass, field
 from typing import Optional
 
-from ace.env import get_package_dir
+import ace.env
 from ace.logging import get_logger
 from ace.module.base import AnalysisModule
+from ace.packages.package import ACEPackage
 from ace.service.base import ACEService
 
 import yaml
-
-
-@dataclass
-class ACEPackage:
-    source: str
-    name: str
-    description: str
-    version: str
-
-    # the list of AnalysisModule types that this package provides
-    modules: Optional[type[AnalysisModule]] = field(default_factory=list)
-    services: Optional[type[ACEService]] = field(default_factory=list)
-
-
-def get_package_manager():
-    """Returns the global ACEPackageManager for this system."""
-    return PACKAGE_MANAGER
 
 
 class ACEPackageManager:
@@ -62,7 +46,7 @@ class ACEPackageManager:
         self.packages = []
 
         if not package_dir:
-            package_dir = get_package_dir()
+            package_dir = ace.env.get_env().get_package_dir()
 
         if not os.path.isdir(package_dir):
             return []
@@ -116,6 +100,10 @@ class ACEPackageManager:
 
         return self.load_package_from_dict(package_definition, path)
 
+    def load_cli_commands(self, parser, subparsers):
+        # TODO
+        pass
 
-# the global package manager
-PACKAGE_MANAGER = ACEPackageManager()
+
+def get_package_manager() -> ACEPackageManager:
+    return ace.env.get_env().get_package_manager()

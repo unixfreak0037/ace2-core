@@ -9,34 +9,6 @@ import tempfile
 import os.path
 
 
-parser = argparse.ArgumentParser(description="Analysis Correlation Engine")
-subparsers = parser.add_subparsers(dest="cmd")
-args = None
-
-parser.add_argument("-b", "--base-dir", help="Base directory for local ace storage. Defaults to ~/.ace")
-parser.add_argument("-u", "--uri", help="Target core URI. Defaults to ACE_URI environment variable.")
-parser.add_argument("-k", "--api-key", help="Core API key. Defaults to ACE_API_KEY environment variable.")
-parser.add_argument("-L", "--logging-config-path", default=None, help="Path to the logging configuration file.")
-
-
-def get_cli():
-    return parser
-
-
-def get_cli_sp():
-    return subparsers
-
-
-def parse_args():
-    global args
-    args = parser.parse_args()
-    return args
-
-
-def get_args():
-    return args
-
-
 def recurse_analysis(analysis, level=0, current_tree=[]):
     """Used to generate a textual display of the analysis results."""
     if not analysis:

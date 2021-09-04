@@ -7,6 +7,7 @@ import logging
 import pytest
 
 import ace.crypto
+import ace.env
 import ace.system.distributed
 
 from ace.logging import get_logger
@@ -29,7 +30,7 @@ from redislite import Redis
 @pytest.fixture(autouse=True, scope="session")
 def initialize_logging():
     logging.getLogger("redislite").setLevel(logging.WARNING)
-    get_logger().setLevel(logging.DEBUG)
+    logging.getLogger().setLevel(logging.DEBUG)
 
 
 @pytest.fixture(scope="session")
@@ -46,3 +47,11 @@ def redis():
         yield redis_connection
     finally:
         redis_connection.close()
+
+
+@pytest.fixture(scope="function", autouse=True)
+def ace_env(monkeypatch):
+    # register a global env with no arguments passed in
+    ace.env.register_global_env(ace.env.ACEOperatingEnvironment([]))
+    yield
+    ace.env.ACE_ENV = None

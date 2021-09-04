@@ -9,8 +9,8 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Optional
 
+import ace.env
 from ace.constants import *
-from ace.env import get_base_dir
 from ace.exceptions import (
     UnknownServiceError,
     InvalidServiceStateError,
@@ -40,11 +40,11 @@ class ServiceInfo:
 class ACEServiceDB:
     def __init__(self, db_path: Optional[str] = None):
         """Initializes the service database at the given path.
-        Defaults to get_base_dir()/services.db"""
+        Defaults to ace.env.get_env().get_base_dir()/services.db"""
 
         self.db_path = db_path
         if self.db_path is None:
-            self.db_path = os.path.join(get_base_dir(), "services.db")
+            self.db_path = os.path.join(ace.env.get_env().get_base_dir(), "services.db")
 
         if not os.path.isdir(os.path.dirname(self.db_path)):
             os.makedirs(os.path.dirname(self.db_path))

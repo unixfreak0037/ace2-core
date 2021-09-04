@@ -5,15 +5,15 @@ import logging.config
 import os.path
 import sys
 
-
-def get_logger():
-    return logging.getLogger("ace")
+from typing import Optional
 
 
-def initialize_logging(logging_config_path):
+def initialize_logging(logging_config_path: Optional[str] = None):
     try:
         if logging_config_path is None:
             logging_config_path = os.path.join("etc", "console_logging.ini")
+
+        # TODO handle case when logging configuration is missing
 
         logging.config.fileConfig(logging_config_path, disable_existing_loggers=False)
     except Exception as e:
@@ -29,4 +29,5 @@ def initialize_logging(logging_config_path):
     # logging.getLogger('sqlalchemy.orm').setLevel(logging.DEBUG)
 
 
-logger = get_logger()
+def get_logger():
+    return logging.getLogger("ace")

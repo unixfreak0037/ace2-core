@@ -6,6 +6,8 @@ import os.path
 import pytest
 import yaml
 
+import ace.env
+
 from ace.module.base import AnalysisModule
 from ace.packages import ACEPackage, get_package_manager
 from ace.service.base import ACEService

@@ -6,19 +6,22 @@ import logging
 import sys
 import types
 
-from ace.cli import parse_args
+from ace.env import ACEOperatingEnvironment
 from ace.logging import initialize_logging
 from ace.packages import get_package_manager
 
-import ace.system.cli
-
 if __name__ == "__main__":
+    ace_env = ACEOperatingEnvironment()
+
     # parse command line arguments
-    args = parse_args()
+    ace_env.parse_args()
+
     # initialize logging
     initialize_logging(args.logging_config_path)
+
     # load all available packages
     get_package_manager().load_packages()
+
     # execute command
     result = args.func(args)
 

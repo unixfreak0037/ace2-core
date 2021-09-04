@@ -6,7 +6,9 @@ import os
 import sys
 import tempfile
 
-from ace.cli import get_cli_sp, display_analysis
+import ace.env
+
+from ace.cli import display_analysis
 from ace.constants import ACE_ADMIN_PASSWORD
 from ace.crypto import (
     initialize_encryption_settings,
@@ -16,8 +18,7 @@ from ace.crypto import (
     ENV_CRYPTO_ITERATIONS,
     ENV_CRYPTO_ENCRYPTED_KEY,
 )
-from ace.env import get_uri, get_api_key
-from ace.logging import logger
+from ace.logging import get_logger
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
 from ace.system.database import DatabaseACESystem
 from ace.system.database.schema import Base
@@ -101,29 +102,11 @@ async def analyze(args):
     return True
 
 
-analyze_parser = get_cli_sp().add_parser("analyze", help="Analyze given observables.")
-# options on the RootAnalysis
-analyze_parser.add_argument("-m", "--analysis-mode", help="Sets the analysis mode of the root.")
-analyze_parser.add_argument(
-    "--from-stdin",
-    action="store_true",
-    default=False,
-    help="Read observables from standard input. Default observable type is file. Use --stdin-type to change the type.",
-)
-analyze_parser.add_argument(
-    "--stdin-type",
-    default="file",
-    help="Specify the observable type when reading observables from stdin. Defaults to file.",
-)
-analyze_parser.add_argument("targets", nargs="*", help="One or more pairs of indicator types and values.")
-analyze_parser.set_defaults(func=analyze)
-
-
 async def initialize(args):
     # initialize the default system
     system = DefaultACESystem()
     await system.initialize()
-    logger.info("creating database...")
+    get_logger().info("creating database...")
     Base.metadata.bind = system.engine
     async with system.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -158,5 +141,23 @@ async def initialize(args):
     print(f'export ACE_API_KEY="{api_key}"')
 
 
-init_parser = get_cli_sp().add_parser("initialize", help="Initialize a new ACE system.")
-init_parser.set_defaults(func=initialize)
+def initialize_argparse(parser, subparsers):
+    init_parser = subparsers.add_parser("initialize", help="Initialize a new ACE system.")
+    init_parser.set_defaults(func=initialize)
+
+    analyze_parser = subparsers.add_parser("analyze", help="Analyze given observables.")
+    # options on the RootAnalysis
+    analyze_parser.add_argument("-m", "--analysis-mode", help="Sets the analysis mode of the root.")
+    analyze_parser.add_argument(
+        "--from-stdin",
+        action="store_true",
+        default=False,
+        help="Read observables from standard input. Default observable type is file. Use --stdin-type to change the type.",
+    )
+    analyze_parser.add_argument(
+        "--stdin-type",
+        default="file",
+        help="Specify the observable type when reading observables from stdin. Defaults to file.",
+    )
+    analyze_parser.add_argument("targets", nargs="*", help="One or more pairs of indicator types and values.")
+    analyze_parser.set_defaults(func=analyze)

@@ -13,6 +13,7 @@ from ace.system.distributed.application import (
     TAG_WORK_QUEUE,
 )
 
+# TODO don't depend on import order to load the routes
 # importing these modules is what ends up loading the routes
 import ace.system.distributed.alerting
 import ace.system.distributed.analysis_tracking

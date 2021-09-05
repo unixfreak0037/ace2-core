@@ -2,7 +2,7 @@ FROM python:3.9-buster
 ENV TZ UTC
 ENV DEBIAN_FRONTEND noninteractive
 ENV VIRTUAL_ENV=/venv
-ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
+ENV PATH="${VIRTUAL_ENV}/bin:$PATH:."
 ARG ACE_UID=1000
 ARG ACE_GID=1000
 SHELL ["/bin/bash", "-c"]

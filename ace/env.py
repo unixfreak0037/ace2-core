@@ -56,7 +56,7 @@ class ACEOperatingEnvironment:
         return parser, subparsers
 
     def execute(self):
-        pass
+        return self.args.func(self.args)
 
     def get_uri(self) -> Union[str, None]:
         if self.args.uri:

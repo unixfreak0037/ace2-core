@@ -106,6 +106,9 @@ async def initialize(args):
     # initialize the default system
     system = DefaultACESystem()
     await system.initialize()
+
+    # create the database if it does not exist
+    # TODO how to tell if the database already exists?
     get_logger().info("creating database...")
     Base.metadata.bind = system.engine
     async with system.engine.begin() as conn:

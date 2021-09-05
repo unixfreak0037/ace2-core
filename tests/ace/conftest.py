@@ -3,6 +3,7 @@
 
 import asyncio
 import logging
+import os
 
 import pytest
 
@@ -25,6 +26,29 @@ from tests.systems import (
 # from yellowbox.extras.redis import RedisService
 
 from redislite import Redis
+
+
+@pytest.fixture(scope="session", autouse=True)
+def initialize_env_vars():
+    # ensure a consistent environment
+    for var in [
+        "ACE_BASE_DIR",
+        "ACE_URI",
+        "ACE_DB_URL",
+        "ACE_REDIS_HOST",
+        "ACE_REDIS_PORT",
+        "ACE_API_KEY",
+        "ACE_CRYPTO_ENCRYPTED_KEY",
+        "ACE_CRYPTO_ITERATIONS",
+        "ACE_CRYPTO_SALT",
+        "ACE_CRYPTO_SALT_SIZE",
+        "ACE_CRYPTO_VERIFICATION_KEY",
+        "ACE_ADMIN_PASSWORD",
+    ]:
+        try:
+            del os.environ[var]
+        except KeyError:
+            pass
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -50,8 +74,11 @@ def redis():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def ace_env(monkeypatch):
+def ace_env(monkeypatch, tmp_path):
     # register a global env with no arguments passed in
     ace.env.register_global_env(ace.env.ACEOperatingEnvironment([]))
     yield
     ace.env.ACE_ENV = None
+
+    # ensure that we use a temporary directory as the base directory for testing
+    monkeypatch.setenv("ACE_BASE_DIR", str(tmp_path))

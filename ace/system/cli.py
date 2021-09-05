@@ -6,8 +6,6 @@ import os
 import sys
 import tempfile
 
-import ace.env
-
 from ace.cli import display_analysis
 from ace.constants import ACE_ADMIN_PASSWORD
 from ace.crypto import (
@@ -18,6 +16,7 @@ from ace.crypto import (
     ENV_CRYPTO_ITERATIONS,
     ENV_CRYPTO_ENCRYPTED_KEY,
 )
+from ace.env import get_base_dir
 from ace.logging import get_logger
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
 from ace.system.database import DatabaseACESystem
@@ -102,17 +101,15 @@ async def analyze(args):
     return True
 
 
-async def initialize(args):
+async def initialize(args) -> bool:
+    """Initializes the ACE system.
+    - creates the database if one has not already been created
+    - initializes encryption settings
+    - creates the initial admin api key
+    Returns True on success, False on failure."""
     # initialize the default system
     system = DefaultACESystem()
     await system.initialize()
-
-    # create the database if it does not exist
-    # TODO how to tell if the database already exists?
-    get_logger().info("creating database...")
-    Base.metadata.bind = system.engine
-    async with system.engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
 
     encryption_password = None
     if ACE_ADMIN_PASSWORD in os.environ:
@@ -125,23 +122,39 @@ async def initialize(args):
         logging.error(f"missing {ACE_ADMIN_PASSWORD}")
         sys.exit(1)
 
+    get_logger().info("initializing database")
+    Base.metadata.bind = system.engine
+    async with system.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     # initialize encryption settings
+    get_logger().info("initializing encryption settings")
     system.encryption_settings = await initialize_encryption_settings(encryption_password)
 
     verification_key_encoded = base64.b64encode(system.encryption_settings.verification_key).decode()
-    print(f'export {ENV_CRYPTO_VERIFICATION_KEY}="{verification_key_encoded}"')
     salt_encoded = base64.b64encode(system.encryption_settings.salt).decode()
-    print(f'export {ENV_CRYPTO_SALT}="{salt_encoded}"')
     salt_size_encoded = str(system.encryption_settings.salt_size)
-    print(f'export {ENV_CRYPTO_SALT_SIZE}="{salt_size_encoded}"')
     iterations_encoded = str(system.encryption_settings.iterations)
-    print(f'export {ENV_CRYPTO_ITERATIONS}="{iterations_encoded}"')
     encrypted_key_encoded = base64.b64encode(system.encryption_settings.encrypted_key).decode()
-    print(f'export {ENV_CRYPTO_ENCRYPTED_KEY}="{encrypted_key_encoded}"')
+
+    # print settings to stdout to be included in a docker compose env file
+    print("START CRYPTO")
+    print(f"export {ENV_CRYPTO_VERIFICATION_KEY}={verification_key_encoded}")
+    print(f"export {ENV_CRYPTO_SALT}={salt_encoded}")
+    print(f"export {ENV_CRYPTO_SALT_SIZE}={salt_size_encoded}")
+    print(f"export {ENV_CRYPTO_ITERATIONS}={iterations_encoded}")
+    print(f"export {ENV_CRYPTO_ENCRYPTED_KEY}={encrypted_key_encoded}")
+    print("END CRYPTO")
 
     # install root api key
+    get_logger().info("initializing admin api key")
     api_key = await system.create_api_key("root", "admin", is_admin=True)
-    print(f'export ACE_API_KEY="{api_key}"')
+    # print settings to stdout to be included in a docker compose env file
+    print("START API KEY")
+    print(f"export ACE_API_KEY={api_key}")
+    print("STOP API KEY")
+
+    return True
 
 
 def initialize_argparse(parser, subparsers):

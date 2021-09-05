@@ -1,13 +1,13 @@
 # vim: ts=4:sw=4:et:cc=120
 
-import ace.env
+from ace.env import get_package_manager, get_package_dir
 from ace.cli import display_analysis
 
 
 def list_packages(args):
-    packages = ace.env.get_env().package_manager.load_packages()
+    packages = get_package_manager().load_packages()
     if not packages:
-        print(f"no packages installed in {ace.env.get_env().get_package_dir()}")
+        print(f"no packages installed in {get_package_dir()}")
         return
 
     for package in packages:

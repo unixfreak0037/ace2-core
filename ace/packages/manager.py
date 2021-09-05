@@ -7,7 +7,7 @@ import importlib
 from dataclasses import dataclass, field
 from typing import Optional
 
-import ace.env
+from ace.env import get_package_dir, get_package_manager
 from ace.logging import get_logger
 from ace.module.base import AnalysisModule
 from ace.packages.package import ACEPackage
@@ -46,7 +46,7 @@ class ACEPackageManager:
         self.packages = []
 
         if not package_dir:
-            package_dir = ace.env.get_env().get_package_dir()
+            package_dir = get_package_dir()
 
         if not os.path.isdir(package_dir):
             return []
@@ -103,7 +103,3 @@ class ACEPackageManager:
     def load_cli_commands(self, parser, subparsers):
         # TODO
         pass
-
-
-def get_package_manager() -> ACEPackageManager:
-    return ace.env.get_env().get_package_manager()

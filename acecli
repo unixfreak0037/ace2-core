@@ -8,13 +8,7 @@ import types
 import ace.env
 
 if __name__ == "__main__":
-    ace.env.register_global_env(ace.env.ACEOperatingEnvironment())
-
-    # execute command
-    result = ace.env.get_env().execute()
-
-    # this allows cli commands to optionally be defined async
-    if isinstance(result, types.CoroutineType):
-        asyncio.get_event_loop().run_until_complete(result)
-
-    sys.exit(0)
+    result = asyncio.get_event_loop().run_until_complete(
+        ace.env.register_global_env(ace.env.ACEOperatingEnvironment()).execute()
+    )
+    sys.exit(0)  # TODO return 1 on failure

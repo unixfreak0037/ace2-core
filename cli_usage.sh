@@ -39,6 +39,18 @@ ace2 analyze ipv4 3.127.0.4
 # analyze something with a specific analysis module
 ace2 analyze ipv4 3.127.0.4 --module whois
 
+# 
+# INITIALIZING A NEW CORE
+#
+
+docker-compose run --rm ace acecli initialize
+
+#
+# STARTING A CORE
+#
+
+docker-compose up
+
 #
 # PARTICIPATING IN A CORE
 #

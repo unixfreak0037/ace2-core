@@ -43,12 +43,13 @@ ace2 analyze ipv4 3.127.0.4 --module whois
 # INITIALIZING A NEW CORE
 #
 
-docker-compose run --rm ace acecli initialize
+dc run --rm ace acecli initialize | sed -ne '/^# START EXPORT/,/^# STOP EXPORT/ p' | tr -d '\r' > .ace-env
 
 #
 # STARTING A CORE
 #
 
+source .ace-env
 docker-compose up
 
 #

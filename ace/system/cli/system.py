@@ -61,22 +61,16 @@ async def initialize(args) -> bool:
     iterations_encoded = str(system.encryption_settings.iterations)
     encrypted_key_encoded = base64.b64encode(system.encryption_settings.encrypted_key).decode()
 
-    # print settings to stdout to be included in a docker compose env file
-    print("START CRYPTO")
+    api_key = await system.create_api_key("root", "admin", is_admin=True)
+
+    print("# START EXPORT")
     print(f"export {ENV_CRYPTO_VERIFICATION_KEY}={verification_key_encoded}")
     print(f"export {ENV_CRYPTO_SALT}={salt_encoded}")
     print(f"export {ENV_CRYPTO_SALT_SIZE}={salt_size_encoded}")
     print(f"export {ENV_CRYPTO_ITERATIONS}={iterations_encoded}")
     print(f"export {ENV_CRYPTO_ENCRYPTED_KEY}={encrypted_key_encoded}")
-    print("END CRYPTO")
-
-    # install root api key
-    get_logger().info("initializing admin api key")
-    api_key = await system.create_api_key("root", "admin", is_admin=True)
-    # print settings to stdout to be included in a docker compose env file
-    print("START API KEY")
     print(f"export ACE_API_KEY={api_key}")
-    print("STOP API KEY")
+    print("# STOP EXPORT")
 
     return True
 

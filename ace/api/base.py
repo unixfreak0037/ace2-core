@@ -8,13 +8,16 @@ from typing import Union, Any, Optional, AsyncGenerator
 
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable
 from ace.data_model import ContentMetadata, Event, ConfigurationSetting
-from ace.system import ACESystem
+
+# from ace.system import ACESystem
 from ace.system.requests import AnalysisRequest
 from ace.system.events import EventHandler
 
 
 class AceAPI:
-    def __init__(self, system: ACESystem, api_key: str = None):
+    def __init__(self, system: "ACESystem", api_key: str = None):
+        from ace.system import ACESystem
+
         assert isinstance(system, ACESystem)
         assert api_key is None or isinstance(api_key, str)
         self.system = system

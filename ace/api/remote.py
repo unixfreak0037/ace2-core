@@ -12,6 +12,8 @@ from typing import Union, Any, Optional, AsyncGenerator
 import ace.data_model
 
 from ace.data_model import (
+    ApiKeyModel,
+    ApiKeyListModel,
     AlertListModel,
     AnalysisRequestQueryModel,
     ConfigurationSetting,
@@ -21,6 +23,7 @@ from ace.data_model import (
     Event,
 )
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable
+from ace.api import ApiKey
 from ace.api.base import AceAPI
 from ace.logging import get_logger
 from ace.system import ACESystem
@@ -482,7 +485,7 @@ class RemoteAceAPI(AceAPI):
 
     async def create_api_key(
         self, name: str, description: Optional[str] = None, is_admin: Optional[bool] = False
-    ) -> str:
+    ) -> ApiKey:
         async with self.get_client() as client:
             data = {"name": name, "is_admin": is_admin}
             if description is not None:
@@ -498,7 +501,7 @@ class RemoteAceAPI(AceAPI):
         if response.status_code == 200:
             raise DuplicateApiKeyNameError()
 
-        return ace.data_model.ApiKeyResponseModel(**response.json()).api_key
+        return ApiKey.from_model(ApiKeyModel(**response.json()))
 
     async def delete_api_key(self, name: str) -> bool:
         async with self.get_client() as client:
@@ -513,3 +516,15 @@ class RemoteAceAPI(AceAPI):
 
     async def verify_api_key(self, api_key: str, is_admin: Optional[bool] = False) -> bool:
         raise NotImplementedError()
+
+    async def get_api_keys(self) -> list[ApiKey]:
+        async with self.get_client() as client:
+            response = await client.get(f"/auth")
+
+        _raise_exception_on_error(response)
+
+        if response.status_code == 200:
+            api_key_list = ApiKeyListModel(**response.sjon())
+            return [ApiKey.from_model(_) for _ in api_key_list.api_keys]
+        else:
+            return []

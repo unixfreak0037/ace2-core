@@ -1,4 +1,7 @@
 # vim: sw=4:ts=4:et:cc=120
+#
+# data models used to communicate over HTTP
+#
 
 import datetime
 import json
@@ -379,8 +382,15 @@ class ErrorModel(BaseModel):
     details: str
 
 
-class ApiKeyResponseModel(BaseModel):
+class ApiKeyModel(BaseModel):
     api_key: str
+    name: str
+    description: Optional[str]
+    is_admin: bool = Field("True if the key is an administrative level key.")
+
+
+class ApiKeyListModel(BaseModel):
+    api_keys: list[ApiKeyModel]
 
 
 def custom_json_encoder(obj):

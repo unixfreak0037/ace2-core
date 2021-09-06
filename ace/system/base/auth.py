@@ -6,6 +6,7 @@
 from typing import Optional, Union
 
 from ace import coreapi
+from ace.api import ApiKey
 from ace.exceptions import MissingEncryptionSettingsError
 
 
@@ -13,14 +14,14 @@ class AuthenticationBaseInterface:
     @coreapi
     async def create_api_key(
         self, name: str, description: Optional[str] = None, is_admin: Optional[bool] = False
-    ) -> str:
+    ) -> ApiKey:
         """Creates a new api_key. Returns the newly created api_key."""
         if not self.encryption_settings:
             raise MissingEncryptionSettingsError()
 
         return await self.i_create_api_key(name, description, is_admin)
 
-    async def i_create_api_key(self, name: str, description: Optional[str] = None) -> Union[str, None]:
+    async def i_create_api_key(self, name: str, description: Optional[str] = None) -> Union[ApiKey, None]:
         raise NotImplementedError()
 
     @coreapi
@@ -42,4 +43,15 @@ class AuthenticationBaseInterface:
         return await self.i_verify_api_key(api_key, is_admin)
 
     async def i_verify_api_key(self, api_key: str) -> bool:
+        raise NotImplementedError()
+
+    @coreapi
+    async def get_api_keys(self) -> list[ApiKey]:
+        """Returns all api keys."""
+        if not self.encryption_settings:
+            raise MissingEncryptionSettingsError()
+
+        return await self.i_get_api_keys(name)
+
+    async def i_get_api_keys(self) -> list[ApiKey]:
         raise NotImplementedError()

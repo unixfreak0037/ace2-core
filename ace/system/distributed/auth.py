@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from ace.data_model import ErrorModel, ApiKeyResponseModel
+from ace.data_model import ErrorModel, ApiKeyModel, ApiKeyListModel
 from ace.system.distributed import app, verify_admin_api_key, TAG_AUTH
 from ace.exceptions import ACEError
 
@@ -15,10 +15,10 @@ from fastapi.responses import JSONResponse
     name="Create API Key",
     responses={
         200: {
-            "model": ApiKeyResponseModel,
+            "model": ApiKeyModel,
             "description": "The API key was **already** created. In this case the api_key field in the response is empty.",
         },
-        201: {"model": ApiKeyResponseModel, "description": "The API key was created."},
+        201: {"model": ApiKeyModel, "description": "The API key was created."},
         400: {"model": ErrorModel},
     },
     tags=[TAG_AUTH],
@@ -50,10 +50,11 @@ async def api_create_api_key(
         result = await app.state.system.create_api_key(name, description, is_admin)
         if result:
             response.status_code = 201
-            return ApiKeyResponseModel(api_key=result).dict()
+            return result.to_model().dict()
+            return ApiKeyModel(api_key=result).dict()
         else:
             response.status_code = 200
-            return ApiKeyResponseModel(api_key="").dict()
+            return ApiKeyModel(api_key="").dict()
 
     except ACEError as e:
         return JSONResponse(status_code=400, content=ErrorModel(code=e.code, details=str(e)).dict())
@@ -78,6 +79,27 @@ async def api_delete_api_key(name: str = Path(..., description="The name of the 
             return Response(status_code=200)
         else:
             return Response(status_code=404)
+
+    except ACEError as e:
+        return JSONResponse(status_code=400, content=ErrorModel(code=e.code, details=str(e)).dict())
+
+
+@app.get(
+    "/auth",
+    name="Gets API keys.",
+    responses={
+        200: {"description": "All api keys."},
+        400: {"model": ErrorModel},
+    },
+    tags=[TAG_AUTH],
+    dependencies=[Depends(verify_admin_api_key)],
+    description="Returns all api keys.",
+)
+async def api_get_api_keys(response: Response):
+    try:
+        result = await app.state.system.get_api_keys(name)
+        response.status_code = 200
+        return ApiKeyListModel(api_keys=[_.to_model() for _ in result]).dict()
 
     except ACEError as e:
         return JSONResponse(status_code=400, content=ErrorModel(code=e.code, details=str(e)).dict())

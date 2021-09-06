@@ -10,7 +10,7 @@ from typing import Optional, Union
 
 import ace.logging
 
-from ace.constants import ACE_URI, ACE_API_KEY, ACE_PACKAGE_DIR, ACE_BASE_DIR
+from ace.constants import ACE_URI, ACE_API_KEY, ACE_PACKAGE_DIR, ACE_BASE_DIR, ACE_ADMIN_PASSWORD
 
 
 def get_default_base_dir() -> str:
@@ -22,6 +22,7 @@ class ACEOperatingEnvironment:
     """Represents the environment in which ACE runs in."""
 
     def __init__(self, args=None, namespace=None):
+        self.system = None
         parser, subparsers = self.initialize_argparse()
         self.args, remaining_arguments = parser.parse_known_args(args, namespace)
         ace.logging.initialize_logging(logging_config_path=self.args.logging_config_path)
@@ -52,10 +53,10 @@ class ACEOperatingEnvironment:
             help="Path to the directory that contains installed ACE packages. Defaults to ~/.ace/packages",
         )
 
-        import ace.system.cli
+        import ace.cli.arguments
         import ace.packages.cli
 
-        ace.system.cli.initialize_argparse(parser, subparsers)
+        ace.cli.arguments.initialize_argparse(parser, subparsers)
         ace.packages.cli.initialize(parser, subparsers)
         return parser, subparsers
 
@@ -108,6 +109,30 @@ class ACEOperatingEnvironment:
     def get_package_manager(self) -> "ACEPackageManager":
         return self.package_manager
 
+    async def get_system(self) -> "ACESystem":
+        from ace.crypto import EncryptionSettings
+        from ace.cli.system import CommandLineSystem
+        from ace.system.remote import RemoteACESystem
+
+        if self.system:
+            return self.system
+
+        if self.get_uri() and self.get_api_key():
+            is_local = False
+            self.system = RemoteACESystem(self.get_uri(), self.get_api_key())
+            await self.system.initialize()
+        else:
+            self.system = CommandLineSystem()
+            self.system.encryption_settings = EncryptionSettings()
+            self.system.encryption_settings.load_from_env()
+            self.system.encryption_settings.load_aes_key(os.environ[ACE_ADMIN_PASSWORD])
+            await self.system.initialize()
+
+        return self.system
+
+    def set_system(self, system: "ACESystem"):
+        self.system = system
+
 
 # global operating environment
 ACE_ENV: ACEOperatingEnvironment = None
@@ -146,3 +171,7 @@ def get_package_dir() -> str:
 
 def get_package_manager() -> "ACEPackageManager":
     return get_env().get_package_manager()
+
+
+async def get_system() -> "ACESystem":
+    return await get_env().get_system()

@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Union, Iterator, AsyncGenerator
 
+from ace.constants import ACE_STORAGE_ROOT
 from ace.data_model import ContentMetadata, CustomJSONEncoder
 from ace.exceptions import UnknownFileError
 from ace.logging import get_logger
@@ -30,6 +31,10 @@ class LocalStorageInterface(DatabaseStorageInterface):
     def __init__(self, *args, storage_root=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.storage_root = storage_root
+
+        if not self.storage_root:
+            if ACE_STORAGE_ROOT in os.environ:
+                self.storage_root = os.environ[ACE_STORAGE_ROOT]
 
     async def get_file_path(self, sha256: str) -> str:
         """Returns the full path to the local path that should be used to store

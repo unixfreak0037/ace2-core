@@ -6,6 +6,7 @@ from fastapi.security import APIKeyHeader
 
 from ace.constants import ACE_ADMIN_PASSWORD
 from ace.crypto import EncryptionSettings
+from ace.env import register_global_env
 from ace.system.default import DefaultACESystem
 
 TAG_ALERTS = "alerts"
@@ -74,7 +75,12 @@ async def startup_event():
         sys.stderr.write(f"\n\nERROR: missing {ACE_ADMIN_PASSWORD} env var\n\n")
         sys.exit(1)
 
-    app.state.system = DefaultACESystem()
+    # register a default operating environment that ignores command line parameters
+    env = ace.env.register_global_env(ACEOperatingEnvironment([]))
+    system = DefaultACESystem()
+    env.set_system(system)
+
+    app.state.system = system
     app.state.system.encryption_settings = EncryptionSettings()
     app.state.system.encryption_settings.load_from_env()
     app.state.system.encryption_settings.load_aes_key(os.environ[ACE_ADMIN_PASSWORD])

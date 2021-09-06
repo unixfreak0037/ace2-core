@@ -1,7 +1,6 @@
 # vim: ts=4:sw=4:et:cc=120
 
 from ace.env import get_package_manager, get_package_dir
-from ace.cli import display_analysis
 
 
 def list_packages(args):

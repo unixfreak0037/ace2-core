@@ -77,8 +77,7 @@ def redis():
 def ace_env(monkeypatch, tmp_path):
     # register a global env with no arguments passed in
     ace.env.register_global_env(ace.env.ACEOperatingEnvironment([]))
-    yield
-    ace.env.ACE_ENV = None
-
     # ensure that we use a temporary directory as the base directory for testing
     monkeypatch.setenv("ACE_BASE_DIR", str(tmp_path))
+    yield  # XXX don't need this last part
+    ace.env.ACE_ENV = None

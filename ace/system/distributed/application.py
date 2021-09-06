@@ -6,7 +6,7 @@ from fastapi.security import APIKeyHeader
 
 from ace.constants import ACE_ADMIN_PASSWORD
 from ace.crypto import EncryptionSettings
-from ace.env import register_global_env
+from ace.env import register_global_env, ACEOperatingEnvironment
 from ace.system.default import DefaultACESystem
 
 TAG_ALERTS = "alerts"
@@ -76,7 +76,7 @@ async def startup_event():
         sys.exit(1)
 
     # register a default operating environment that ignores command line parameters
-    env = ace.env.register_global_env(ACEOperatingEnvironment([]))
+    env = register_global_env(ACEOperatingEnvironment([]))
     system = DefaultACESystem()
     env.set_system(system)
 

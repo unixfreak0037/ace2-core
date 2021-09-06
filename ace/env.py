@@ -48,6 +48,9 @@ class ACEOperatingEnvironment:
         parser.add_argument("-k", "--api-key", help="API key. Defaults to ACE_API_KEY environment variable.")
         parser.add_argument("-L", "--logging-config-path", default=None, help="Path to the logging configuration file.")
         parser.add_argument(
+            "-V", "--disable-ssl-verification", default=False, action="store_true", help="Disable SSL verification."
+        )
+        parser.add_argument(
             "--package-dir",
             default=None,
             help="Path to the directory that contains installed ACE packages. Defaults to ~/.ace/packages",
@@ -119,7 +122,13 @@ class ACEOperatingEnvironment:
 
         if self.get_uri() and self.get_api_key():
             is_local = False
-            self.system = RemoteACESystem(self.get_uri(), self.get_api_key())
+
+            # keyword arguments to be passed to httpx.AsyncClient constructor
+            client_kwargs = {}
+            if self.args.disable_ssl_verification:
+                client_kwargs["verify"] = False
+
+            self.system = RemoteACESystem(self.get_uri(), self.get_api_key(), client_kwargs=client_kwargs)
             await self.system.initialize()
         else:
             self.system = CommandLineSystem()

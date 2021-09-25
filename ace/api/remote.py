@@ -501,7 +501,7 @@ class RemoteAceAPI(AceAPI):
         if response.status_code == 200:
             raise DuplicateApiKeyNameError()
 
-        return ApiKey.from_model(ApiKeyModel(**response.json()))
+        return ApiKey.from_dict(response.json())
 
     async def delete_api_key(self, name: str) -> bool:
         async with self.get_client() as client:
@@ -524,7 +524,7 @@ class RemoteAceAPI(AceAPI):
         _raise_exception_on_error(response)
 
         if response.status_code == 200:
-            api_key_list = ApiKeyListModel(**response.sjon())
-            return [ApiKey.from_model(_) for _ in api_key_list.api_keys]
+            api_key_list = ApiKeyListModel(**response.json())
+            return [ApiKey.from_dict(_.dict()) for _ in api_key_list.api_keys]
         else:
             return []

@@ -4,7 +4,7 @@ from ace.env import get_system
 async def create_api_key(args):
     system = await get_system()
     api_key = await system.create_api_key(args.name, description=args.description, is_admin=args.is_admin)
-    print(api_key)
+    print(api_key.api_key)
     return True
 
 

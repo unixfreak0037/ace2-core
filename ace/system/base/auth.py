@@ -16,9 +16,6 @@ class AuthenticationBaseInterface:
         self, name: str, description: Optional[str] = None, is_admin: Optional[bool] = False
     ) -> ApiKey:
         """Creates a new api_key. Returns the newly created api_key."""
-        if not self.encryption_settings:
-            raise MissingEncryptionSettingsError()
-
         return await self.i_create_api_key(name, description, is_admin)
 
     async def i_create_api_key(self, name: str, description: Optional[str] = None) -> Union[ApiKey, None]:
@@ -27,9 +24,6 @@ class AuthenticationBaseInterface:
     @coreapi
     async def delete_api_key(self, name: str) -> bool:
         """Deletes the given api key. Returns True if the key was deleted, False otherwise."""
-        if not self.encryption_settings:
-            raise MissingEncryptionSettingsError()
-
         return await self.i_delete_api_key(name)
 
     async def i_delete_api_key(self, name: str) -> bool:
@@ -48,10 +42,7 @@ class AuthenticationBaseInterface:
     @coreapi
     async def get_api_keys(self) -> list[ApiKey]:
         """Returns all api keys."""
-        if not self.encryption_settings:
-            raise MissingEncryptionSettingsError()
-
-        return await self.i_get_api_keys(name)
+        return await self.i_get_api_keys()
 
     async def i_get_api_keys(self) -> list[ApiKey]:
         raise NotImplementedError()

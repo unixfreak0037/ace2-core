@@ -55,7 +55,9 @@ class DatabaseAuthenticationInterface(AuthenticationBaseInterface):
     async def i_get_api_keys(self) -> list[ApiKey]:
         async with self.get_db() as db:
             result = []
-            async for _ in await db.execute(select(ApiKeyDbModel)):
-                result.append(ApiKey(api_key=_.api_key, name=_.name, description=_.description, is_admin=_.is_admin))
+            for _ in await db.execute(select(ApiKeyDbModel)):
+                result.append(
+                    ApiKey(api_key=_[0].api_key, name=_[0].name, description=_[0].description, is_admin=_[0].is_admin)
+                )
 
             return result

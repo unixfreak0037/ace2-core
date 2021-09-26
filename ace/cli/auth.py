@@ -8,6 +8,24 @@ async def create_api_key(args):
     return True
 
 
+async def list_api_keys(args):
+    system = await get_system()
+    for api_key in await system.get_api_keys():
+        print(api_key)
+
+    return True
+
+
+async def delete_api_key(args):
+    system = await get_system()
+    if await system.delete_api_key(args.name):
+        print("key deleted")
+    else:
+        print("key not found")
+
+    return True
+
+
 def initialize_argparse(parser, subparsers):
     api_key_parser = subparsers.add_parser("api-key", help="Manage api keys.")
     api_key_sp = api_key_parser.add_subparsers(dest="api_key_cmd")
@@ -20,3 +38,10 @@ def initialize_argparse(parser, subparsers):
     )
 
     create_api_key_parser.set_defaults(func=create_api_key)
+
+    list_api_key_parser = api_key_sp.add_parser("list", help="List all API keys.")
+    list_api_key_parser.set_defaults(func=list_api_keys)
+
+    delete_api_key_parser = api_key_sp.add_parser("delete", help="Delete an API key.")
+    delete_api_key_parser.add_argument("name", help="The name of the api key to delete.")
+    delete_api_key_parser.set_defaults(func=delete_api_key)

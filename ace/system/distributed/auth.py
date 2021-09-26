@@ -97,7 +97,7 @@ async def api_delete_api_key(name: str = Path(..., description="The name of the 
 )
 async def api_get_api_keys(response: Response):
     try:
-        result = await app.state.system.get_api_keys(name)
+        result = await app.state.system.get_api_keys()
         response.status_code = 200
         return ApiKeyListModel(api_keys=[_.to_model() for _ in result]).dict()
 

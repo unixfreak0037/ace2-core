@@ -20,7 +20,46 @@ async def initialize_crypto():
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_create_api_key(monkeypatch):
-    monkeypatch.setenv(ACE_ADMIN_PASSWORD, "test")
-    environment = ACEOperatingEnvironment(["api-key", "create", "test"])
+async def test_create_api_key(monkeypatch, capsys):
+    monkeypatch.setenv(ACE_ADMIN_PASSWORD, TEST_PASSWORD)
+    environment = ACEOperatingEnvironment(
+        ["api-key", "create", "test_key_1", "--description", "automation functional key", "--is-admin"]
+    )
     assert await environment.execute()
+    captured = capsys.readouterr()
+
+    # grab the api key we got from stdout
+    api_key = captured.out.strip()
+
+    environment = ACEOperatingEnvironment(["api-key", "list"])
+    assert await environment.execute()
+    captured = capsys.readouterr()
+
+    assert "test_key_1" in captured.out
+    assert "automation functional key" in captured.out
+    assert "(admin)" in captured.out
+
+    environment = ACEOperatingEnvironment(["api-key", "delete", "test_key_1"])
+    assert await environment.execute()
+    captured = capsys.readouterr()
+
+    assert "key deleted" in captured.out
+
+    # make sure non-admin keys can be created
+    environment = ACEOperatingEnvironment(
+        ["api-key", "create", "test_key_1", "--description", "automation functional key"]
+    )
+    assert await environment.execute()
+    environment = ACEOperatingEnvironment(["api-key", "list"])
+    assert await environment.execute()
+    captured = capsys.readouterr()
+
+    assert "test_key_1" in captured.out
+    assert "(admin)" not in captured.out
+
+    # test deleting an unknown key
+    environment = ACEOperatingEnvironment(["api-key", "delete", "test_key_2"])
+    assert await environment.execute()
+    captured = capsys.readouterr()
+
+    assert "key not found" in captured.out

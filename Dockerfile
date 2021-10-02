@@ -17,6 +17,7 @@ COPY requirements.txt .
 COPY requirements-dev.txt .
 RUN python3 -m venv /venv && pip install -r requirements.txt && pip install -r requirements-dev.txt
 COPY --chown=ace:ace acecli acecli
+COPY --chown=ace:ace acegui acegui
 COPY --chown=ace:ace ace ace
 COPY --chown=ace:ace ansistrm.py .
 COPY --chown=ace:ace etc etc
@@ -25,4 +26,5 @@ COPY --chown=ace:ace pytest.ini .
 COPY --chown=ace:ace tests tests
 COPY --chown=ace:ace gunicorn_conf.py .
 COPY --chown=ace:ace start.sh .
+COPY --chown=ace:ace start-debug.sh .
 CMD /opt/ace/start.sh

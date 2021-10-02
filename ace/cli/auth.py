@@ -11,7 +11,9 @@ async def create_api_key(args):
 async def list_api_keys(args):
     system = await get_system()
     for api_key in await system.get_api_keys():
-        print(api_key)
+        admin = "(admin)" if api_key.is_admin else ""
+        description = api_key.description if api_key.description else ""
+        print(f"{api_key.name}\t{admin}\t{description}")
 
     return True
 
@@ -39,7 +41,15 @@ def initialize_argparse(parser, subparsers):
 
     create_api_key_parser.set_defaults(func=create_api_key)
 
-    list_api_key_parser = api_key_sp.add_parser("list", help="List all API keys.")
+    list_api_key_parser = api_key_sp.add_parser(
+        "list",
+        help="""List all API keys.
+
+Each key is listed on a line in the following format:
+name [(admin)] [description]
+The values are tab separated.""",
+    )
+
     list_api_key_parser.set_defaults(func=list_api_keys)
 
     delete_api_key_parser = api_key_sp.add_parser("delete", help="Delete an API key.")

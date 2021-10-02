@@ -24,7 +24,6 @@ def test_display_analysis(capsys):
     user_observable.add_directive("SCOLD_EMPLOYEE")
     display_analysis(root)
     captured = capsys.readouterr()
-    print(captured.out)
 
     # NOTE below that some of the lines have an extra space at the end
     expected_output = """Test Root

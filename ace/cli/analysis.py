@@ -2,10 +2,12 @@ import sys
 import tempfile
 
 # from ace.cli import CommandLineSystem, display_analysis
+from ace.analysis import RootAnalysis
 from ace.env import get_uri, get_api_key
 from ace.logging import get_logger
 from ace.module.manager import AnalysisModuleManager, CONCURRENCY_MODE_PROCESS, CONCURRENCY_MODE_THREADED
 from ace.system.remote import RemoteACESystem
+from ace.time import event_time_format_tz
 
 
 def recurse_analysis(analysis, level=0, current_tree=[]):
@@ -31,7 +33,7 @@ def recurse_analysis(analysis, level=0, current_tree=[]):
         "\t" * level, "<" + "!" * len(analysis.detections) + "> " if analysis.detections else "", analysis_display
     )
     if analysis.tags:
-        display += " [ {} ] ".format(", ".join([x.name for x in analysis.tags]))
+        display += " [ {} ] ".format(", ".join(analysis.tags))
 
     print(display)
 
@@ -43,11 +45,11 @@ def recurse_analysis(analysis, level=0, current_tree=[]):
             observable.value,
         )
         if observable.time is not None:
-            display += " @ {0}".format(observable.time)
+            display += f" @ {observable.time.strftime(event_time_format_tz)}"
         if observable.directives:
             display += " {{ {} }} ".format(", ".join([x for x in observable.directives]))
         if observable.tags:
-            display += " [ {} ] ".format(", ".join([x.name for x in observable.tags]))
+            display += " [ {} ] ".format(", ".join(observable.tags))
         print(display)
 
         for observable_analysis in observable.all_analysis:

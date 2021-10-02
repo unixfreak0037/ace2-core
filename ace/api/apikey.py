@@ -16,6 +16,10 @@ class ApiKey:
     # is this an admin key?
     is_admin: bool = False
 
+    def __post_init__(self):
+        if not self.name:
+            raise TypeError("name must be a non-zero length string")
+
     #
     # json serialization
     #

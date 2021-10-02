@@ -24,12 +24,6 @@ async def test_create_api_key(system, monkeypatch):
     # with pytest.raises(InvalidPasswordError):
     # api_key = await system.create_api_key("t3st", "api_key_2")
 
-    # the client side of the remote system interface does not have encryption settings
-    if system.encryption_settings:
-        monkeypatch.setattr(system, "encryption_settings", None)
-        with pytest.raises(MissingEncryptionSettingsError):
-            api_key = await system.create_api_key("api_key_3")
-
 
 @pytest.mark.asyncio
 @pytest.mark.unit
@@ -44,9 +38,3 @@ async def test_delete_api_key(system, monkeypatch):
     api_key = await system.create_api_key("api_key_1")
     # with pytest.raises(InvalidPasswordError):
     # await system.delete_api_key("api_key_1")
-
-    # the client side of the remote system interface does not have encryption settings
-    if system.encryption_settings:
-        monkeypatch.setattr(system, "encryption_settings", None)
-        with pytest.raises(MissingEncryptionSettingsError):
-            api_key = await system.delete_api_key("api_key_1")

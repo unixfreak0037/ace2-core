@@ -3,6 +3,8 @@ import os.path
 import pytest
 
 import ace.env
+from ace.system.remote import RemoteACESystem
+from ace.cli.system import CommandLineSystem
 from ace.env import get_uri, get_api_key, get_base_dir, get_package_dir, get_package_manager, register_global_env
 from ace.packages.manager import ACEPackageManager
 
@@ -52,6 +54,25 @@ def test_operating_env_init_cli_args(monkeypatch):
 @pytest.mark.unit
 def test_get_env():
     assert isinstance(ace.env.get_env(), ace.env.ACEOperatingEnvironment)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_system(monkeypatch):
+    with monkeypatch.context() as m:
+        monkeypatch.setenv("ACE_URI", "http://test")
+        monkeypatch.setenv("ACE_API_KEY", "test")
+        await ace.env.get_env().initialize_system_reference()
+        # if ACE_URI and ACE_API_KEY are set then we get a remote system
+        assert isinstance(await ace.env.get_env().get_system(), RemoteACESystem)
+
+    with monkeypatch.context() as m:
+        monkeypatch.setattr(ace.env.get_env(), "system", None)
+        monkeypatch.delenv("ACE_URI", raising=False)
+        monkeypatch.delenv("ACE_API_KEY", raising=False)
+        await ace.env.get_env().initialize_system_reference()
+        # if ACE_URI and ACE_API_KEY are NOT set then we get a local command line system
+        assert isinstance(await ace.env.get_env().get_system(), CommandLineSystem)
 
 
 @pytest.mark.unit

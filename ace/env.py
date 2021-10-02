@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import getpass
 import os
 import os.path
 import types
@@ -64,6 +65,7 @@ class ACEOperatingEnvironment:
         return parser, subparsers
 
     async def execute(self):
+        """Executes from the command line."""
         result = self.args.func(self.args)
         # this allows cli commands to optionally be defined async
         if isinstance(result, types.CoroutineType):
@@ -112,14 +114,14 @@ class ACEOperatingEnvironment:
     def get_package_manager(self) -> "ACEPackageManager":
         return self.package_manager
 
-    async def get_system(self) -> "ACESystem":
+    async def initialize_system_reference(self):
+        """Initializes the reference to whatever system should be used based on
+        environment variables and command line options."""
         from ace.crypto import EncryptionSettings
         from ace.cli.system import CommandLineSystem
         from ace.system.remote import RemoteACESystem
 
-        if self.system:
-            return self.system
-
+        # if a uri and api key are available then we want to use a remote system
         if self.get_uri() and self.get_api_key():
             is_local = False
 
@@ -128,19 +130,34 @@ class ACEOperatingEnvironment:
             if self.args.disable_ssl_verification:
                 client_kwargs["verify"] = False
 
-            self.system = RemoteACESystem(self.get_uri(), self.get_api_key(), client_kwargs=client_kwargs)
-            await self.system.initialize()
+            system = RemoteACESystem(self.get_uri(), self.get_api_key(), client_kwargs=client_kwargs)
         else:
-            self.system = CommandLineSystem()
-            self.system.encryption_settings = EncryptionSettings()
-            self.system.encryption_settings.load_from_env()
-            self.system.encryption_settings.load_aes_key(os.environ[ACE_ADMIN_PASSWORD])
-            await self.system.initialize()
+            system = CommandLineSystem()
 
+            # encryption settings are optional for local command line work
+            encryption_settings = EncryptionSettings()
+            encryption_settings.load_from_env()
+            if encryption_settings.has_settings():
+                encryption_settings.load_aes_key(self.get_admin_password())
+
+        await system.initialize()
+        self.set_system(system)
+
+    async def get_system(self) -> "ACESystem":
+        """Returns the current system reference."""
         return self.system
 
     def set_system(self, system: "ACESystem"):
         self.system = system
+
+    def get_admin_password(self) -> str:
+        """Returns the ACE admin password which is used to encrypt/decrypt data.
+        If the environment variable ACE_ADMIN_PASSWORD is set then that value is used.
+        Otherwise the value is prompted for."""
+        if ACE_ADMIN_PASSWORD in os.environ:
+            return os.environ[ACE_ADMIN_PASSWORD]
+
+        return getpass.getpass(prompt="Enter admin password:")
 
 
 # global operating environment

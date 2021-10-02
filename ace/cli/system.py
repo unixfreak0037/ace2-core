@@ -12,6 +12,7 @@ from ace.crypto import (
     ENV_CRYPTO_ITERATIONS,
     ENV_CRYPTO_ENCRYPTED_KEY,
 )
+from ace.env import get_env
 from ace.logging import get_logger
 from ace.system.database import DatabaseACESystem
 from ace.system.database.schema import Base
@@ -26,24 +27,19 @@ class CommandLineSystem(DatabaseACESystem, ThreadedACESystem):
 
 
 async def initialize(args) -> bool:
-    """Initializes the ACE system.
+    """Initializes a new ACE system.
     - creates the database if one has not already been created
     - initializes encryption settings
     - creates the initial admin api key
     Returns True on success, False on failure."""
+
     # initialize the default system
-    system = DefaultACESystem()
+    system = DefaultACESystem()  # XXX <-- missing system composition
     await system.initialize()
 
-    encryption_password = None
-    if ACE_ADMIN_PASSWORD in os.environ:
-        encryption_password = os.environ[ACE_ADMIN_PASSWORD]
-
+    encryption_password = get_env().get_admin_password()
     if not encryption_password:
-        encryption_password = getpass.getpass("Enter the ACE administration password:")
-
-    if not encryption_password:
-        get_logger().error(f"missing {ACE_ADMIN_PASSWORD}")
+        get_logger().error(f"missing admin password")
         return False
 
     get_logger().info("initializing database")
@@ -63,6 +59,7 @@ async def initialize(args) -> bool:
 
     api_key = await system.create_api_key("root", "admin", is_admin=True)
 
+    # TODO figure out the best approach to exporting this data
     print("# START EXPORT")
     print(f"export {ENV_CRYPTO_VERIFICATION_KEY}={verification_key_encoded}")
     print(f"export {ENV_CRYPTO_SALT}={salt_encoded}")

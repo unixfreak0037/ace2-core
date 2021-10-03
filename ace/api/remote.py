@@ -294,7 +294,7 @@ class RemoteAceAPI(AceAPI):
             )
 
         _raise_exception_on_error(response)
-        if response.status_code == 401:
+        if response.status_code == 201:
             return True
 
         return False

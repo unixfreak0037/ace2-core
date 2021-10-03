@@ -41,6 +41,9 @@ async def test_config_set_get(value, system):
     assert await system.delete_config("/test")
     assert await system.get_config_value("/test") is None
 
+    # attempt to delete config entry that does not exist
+    assert not await system.delete_config("/test")
+
 
 @pytest.mark.ace_remote
 @pytest.mark.asyncio

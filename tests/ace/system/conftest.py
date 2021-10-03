@@ -71,7 +71,6 @@ async def system(request, redis):
 
 @pytest.fixture(autouse=True, scope="function")
 async def reset_test_system(request, system):
-    yield
     from ace.system.distributed import app
 
     await system.reset()

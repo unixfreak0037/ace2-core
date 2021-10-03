@@ -5,6 +5,7 @@ import os
 import pytest
 
 
+@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 @pytest.mark.parametrize(
@@ -41,6 +42,7 @@ async def test_config_set_get(value, system):
     assert await system.get_config_value("/test") is None
 
 
+@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_config_default_value(system):
@@ -48,6 +50,7 @@ async def test_config_default_value(system):
     assert await system.get_config_value("/test", "test") == "test"
 
 
+@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_config_missing_value(system):
@@ -55,6 +58,7 @@ async def test_config_missing_value(system):
         await system.set_config("/test", None)
 
 
+@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_config_env_value(system, monkeypatch):
@@ -68,6 +72,7 @@ async def test_config_env_value(system, monkeypatch):
     assert await system.get_config_value("/test") == "that"
 
 
+@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_config_env_value_with_type(system, monkeypatch):

@@ -34,9 +34,20 @@ class RemoteACESystem(
     ACESystem,
 ):
     def __init__(
-        self, url, api_key, *args, client_args: Optional[list] = None, client_kwargs: Optional[dict] = None, **kwargs
+        self,
+        url: str,
+        api_key: str,
+        *args,
+        client_args: Optional[list] = None,
+        client_kwargs: Optional[dict] = None,
+        **kwargs
     ):
         super().__init__(*args, *kwargs)
+
+        assert isinstance(url, str) and url
+        assert isinstance(api_key, str) and api_key
+        assert client_args is None or isinstance(client_args, list)
+        assert client_kwargs is None or isinstance(client_kwargs, dict)
 
         self.url = url
         self.api_key = api_key

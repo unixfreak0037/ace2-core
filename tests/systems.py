@@ -117,7 +117,7 @@ class RemoteACETestSystem(RemoteACESystem):
 
 class RemoteACETestSystemProcess(RemoteACESystem):
     def __init__(self, redis_url: str, api_key: str, encryption_settings: EncryptionSettings, *args, **kwargs):
-        super().__init__("http://test", None, client_args=[], client_kwargs={"app": app}, *args, **kwargs)
+        super().__init__("http://test", api_key, client_args=[], client_kwargs={"app": app}, *args, **kwargs)
         self.redis_url = redis_url
         self.api.api_key = api_key
         self.existing_encryption_settings = encryption_settings

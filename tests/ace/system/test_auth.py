@@ -60,6 +60,17 @@ async def test_delete_api_key(system, monkeypatch):
 
 @pytest.mark.ace_remote
 @pytest.mark.asyncio
+@pytest.mark.unit
+async def test_get_api_keys(system):
+    api_key_1 = await system.create_api_key("api_key_1")
+    api_key_2 = await system.create_api_key("api_key_2")
+    keys = {_.name: _ for _ in await system.get_api_keys()}
+    assert api_key_1.name in keys
+    assert api_key_2.name in keys
+
+
+@pytest.mark.ace_remote
+@pytest.mark.asyncio
 @pytest.mark.integration
 async def test_invalid_api_key(system, monkeypatch):
     if not isinstance(system, RemoteACETestSystem):

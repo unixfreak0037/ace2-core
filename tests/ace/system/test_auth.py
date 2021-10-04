@@ -72,9 +72,7 @@ async def test_get_api_keys(system):
 @pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_invalid_api_key(system, monkeypatch):
-    if not isinstance(system, RemoteACETestSystem):
-        pytest.skip("remote-only test")
+async def test_invalid_api_key(remote_only, system, monkeypatch):
 
     monkeypatch.setattr(system.api, "api_key", "invalid_key")
     with pytest.raises(InvalidApiKeyError):
@@ -84,10 +82,7 @@ async def test_invalid_api_key(system, monkeypatch):
 @pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_invalid_access(system, monkeypatch):
-    if not isinstance(system, RemoteACETestSystem):
-        pytest.skip("remote-only test")
-
+async def test_invalid_access(remote_only, system, monkeypatch):
     # create a non-admin api key
     api_key = (await system.create_api_key("non admin key")).api_key
     assert api_key

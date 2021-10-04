@@ -88,6 +88,13 @@ async def skip_invalid_remote_tests(request, system):
             pytest.skip("not valid for remote test")
 
 
+@pytest.fixture
+def remote_only(system):
+    """Only run this test if the system being testing is a remote system."""
+    if not isinstance(system, RemoteACETestSystem):
+        pytest.skip("remote-only test")
+
+
 # def pytest_runtest_setup(item):
 # if 'ace_remote' not in [ _.name for _ in item.iter_markers() ]:
 # pytest.skip("not valid for remote")

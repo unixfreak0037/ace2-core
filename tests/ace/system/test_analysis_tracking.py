@@ -7,6 +7,7 @@ import pytest
 from ace.analysis import RootAnalysis, Observable, Analysis, AnalysisModuleType
 from ace.exceptions import UnknownRootAnalysisError
 from ace.system.base.analysis_tracking import CONFIG_ANALYSIS_ENCRYPTION_ENABLED
+from ace.system.distributed import app
 
 TEST_DETAILS = {"hello": "world"}
 OBSERVABLE_VALUE = "observable value"
@@ -34,6 +35,20 @@ async def test_track_root_analysis(system):
     assert _compare_root(await system.get_root_analysis(root.uuid), root)
     # clear it out
     assert await system.delete_root_analysis(root.uuid)
+    # make sure it's gone
+    assert await system.get_root_analysis(root.uuid) is None
+
+
+@pytest.mark.ace_remote
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_remote_track_root_analysis(remote_only, system):
+    root = system.new_root()
+    await app.state.system.track_root_analysis(root)
+    # root should be tracked
+    assert (await system.get_root_analysis(root.uuid)).uuid == root.uuid
+    # clear it out
+    assert await app.state.system.delete_root_analysis(root.uuid)
     # make sure it's gone
     assert await system.get_root_analysis(root.uuid) is None
 

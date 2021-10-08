@@ -148,6 +148,8 @@ class InvalidAccessError(Exception):
 class UnknownFileError(Exception):
     """A request was made to retrieve an unknown file."""
 
+    code = ERROR_STORE_UNKNOWN_FILE
+
 
 exception_map = {
     ERROR_AMS_UNKNOWN: UnknownAlertSystemError,

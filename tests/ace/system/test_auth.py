@@ -40,7 +40,6 @@ async def test_create_api_key(system, monkeypatch):
     # api_key = await system.create_api_key("t3st", "api_key_2")
 
 
-@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_delete_api_key(system, monkeypatch):
@@ -58,7 +57,6 @@ async def test_delete_api_key(system, monkeypatch):
     # await system.delete_api_key("api_key_1")
 
 
-@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_get_api_keys(system):
@@ -69,20 +67,23 @@ async def test_get_api_keys(system):
     assert api_key_2.name in keys
 
 
-@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_invalid_api_key(remote_only, system, monkeypatch):
+async def test_invalid_api_key(system, monkeypatch):
+    if not isinstance(system, RemoteACETestSystem):
+        pytest.skip("remote only test")
 
     monkeypatch.setattr(system.api, "api_key", "invalid_key")
     with pytest.raises(InvalidApiKeyError):
         await system.register_alert_system("test")
 
 
-@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_invalid_access(remote_only, system, monkeypatch):
+async def test_invalid_access(system, monkeypatch):
+    if not isinstance(system, RemoteACETestSystem):
+        pytest.skip("remote only test")
+
     # create a non-admin api key
     api_key = (await system.create_api_key("non admin key")).api_key
     assert api_key

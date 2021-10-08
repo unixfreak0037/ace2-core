@@ -18,3 +18,6 @@ class RemoteAlertTrackingInterface(AlertingBaseInterface):
 
     async def submit_alert(self, root: Union[RootAnalysis, str]) -> bool:
         raise NotImplementedError()
+
+    async def get_alert_count(self, name: str) -> int:
+        raise NotImplementedError()

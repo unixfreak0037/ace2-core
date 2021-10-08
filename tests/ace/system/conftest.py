@@ -80,19 +80,19 @@ async def reset_test_system(request, system):
         system.api.api_key = root_api_key.api_key
 
 
-@pytest.fixture(autouse=True, scope="function")
-async def skip_invalid_remote_tests(request, system):
-    # if we are testing the remote system then only a handful of tests are valid
-    if isinstance(system, RemoteACETestSystem):
-        if "ace_remote" not in [_.name for _ in request.node.iter_markers()]:
-            pytest.skip("not valid for remote test")
+# @pytest.fixture(autouse=True, scope="function")
+# async def skip_invalid_remote_tests(request, system):
+## if we are testing the remote system then only a handful of tests are valid
+# if isinstance(system, RemoteACETestSystem):
+# if "ace_remote" not in [_.name for _ in request.node.iter_markers()]:
+# pytest.skip("not valid for remote test")
 
 
-@pytest.fixture
-def remote_only(system):
-    """Only run this test if the system being testing is a remote system."""
-    if not isinstance(system, RemoteACETestSystem):
-        pytest.skip("remote-only test")
+# @pytest.fixture
+# def remote_only(system):
+# """Only run this test if the system being testing is a remote system."""
+# if not isinstance(system, RemoteACETestSystem):
+# pytest.skip("remote-only test")
 
 
 # def pytest_runtest_setup(item):

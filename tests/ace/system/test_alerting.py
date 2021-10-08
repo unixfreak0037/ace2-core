@@ -25,7 +25,6 @@ from ace.exceptions import UnknownAlertSystemError
 # from ace.system.work_queue import get_next_analysis_request
 
 
-@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_alert_system_registration(system):
@@ -47,16 +46,6 @@ async def test_alert_submission(system):
     assert await system.get_alert_count("test") == 0
     assert await system.submit_alert(root)
     assert await system.get_alert_count("test") == 1
-
-
-@pytest.mark.ace_remote
-@pytest.mark.asyncio
-@pytest.mark.unit
-async def test_get_alerts_remote(remote_only, system):
-    root = system.new_root()
-    await system.register_alert_system("test")
-    assert await app.state.system.submit_alert(root)
-    assert await system.get_alerts("test") == [root.uuid]
 
 
 @pytest.mark.asyncio

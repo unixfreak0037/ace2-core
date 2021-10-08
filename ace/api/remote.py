@@ -37,6 +37,7 @@ from ace.exceptions import (
     DuplicateApiKeyNameError,
     InvalidApiKeyError,
     InvalidAccessError,
+    UnknownFileError,
     exception_map,
 )
 
@@ -348,6 +349,7 @@ class RemoteAceAPI(AceAPI):
                 content = io.BytesIO(content.encode())
             elif isinstance(content, bytes):
                 content = io.BytesIO(content)
+            # XXX reads entire content of file into memory -- not what we want
             elif isinstance(content, aiofiles.threadpool.binary.AsyncBufferedReader):
                 content = io.BytesIO(await content.read())
             elif isinstance(content, Path):
@@ -368,18 +370,20 @@ class RemoteAceAPI(AceAPI):
             _raise_exception_on_error(response)
             return ContentMetadata(**response.json()).sha256
         finally:
-            if isinstance(content, io.IOBase):
-                try:
-                    content.close()
-                except Exception as e:
-                    get_logger().exception("unable to close file handle")
+            pass
+            # XXX think about why we're doing this
+            # if isinstance(content, io.IOBase):
+            # try:
+            # content.close()
+            # except Exception as e:
+            # get_logger().exception("unable to close file handle")
 
     async def get_content_bytes(self, sha256: str) -> Union[bytes, None]:
         async with self.get_client() as client:
             async with client.stream("GET", f"/storage/{sha256}") as response:
                 _raise_exception_on_error(response)
                 if response.status_code == 404:
-                    return None
+                    raise UnknownFileError()
 
                 return await response.aread()
 
@@ -388,8 +392,7 @@ class RemoteAceAPI(AceAPI):
             async with client.stream("GET", f"/storage/{sha256}") as response:
                 _raise_exception_on_error(response)
                 if response.status_code == 404:
-                    yield None
-                    return
+                    raise UnknownFileError()
 
                 async for data in response.aiter_bytes():
                     yield data

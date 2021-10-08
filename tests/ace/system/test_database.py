@@ -43,7 +43,7 @@ from sqlalchemy.sql import select, insert, text
 )
 async def test_execute_with_retry(sql, params, commit, system):
     if not isinstance(system, DatabaseACESystem):
-        return
+        pytest.skip("database-only test")
 
     async with system.get_db() as db:
         await system.execute_with_retry(db, sql, params, commit=commit)
@@ -54,7 +54,7 @@ async def test_execute_with_retry(sql, params, commit, system):
 @pytest.mark.unit
 async def test_execute_with_retry_invalid_length(system):
     if not isinstance(system, DatabaseACESystem):
-        return
+        pytest.skip("database-only test")
 
     async with system.get_db() as db:
         with pytest.raises(ValueError):
@@ -65,7 +65,7 @@ async def test_execute_with_retry_invalid_length(system):
 @pytest.mark.unit
 async def test_execute_with_retry_deadlock(system):
     if not isinstance(system, DatabaseACESystem):
-        return
+        pytest.skip("database-only test")
 
     async with system.get_db() as db:
         await db.execute(
@@ -90,7 +90,7 @@ async def test_execute_with_retry_deadlock(system):
 @pytest.mark.unit
 async def test_retry_on_deadlock_single_executable(system):
     if not isinstance(system, DatabaseACESystem):
-        return
+        pytest.skip("database-only test")
 
     await system.retry_on_deadlock(insert(Config).values(key="test", value="value"), commit=True)
     async with system.get_db() as db:
@@ -101,7 +101,7 @@ async def test_retry_on_deadlock_single_executable(system):
 @pytest.mark.unit
 async def test_retry_on_deadlock_multi_executable(system):
     if not isinstance(system, DatabaseACESystem):
-        return
+        pytest.skip("database-only test")
 
     await system.retry_on_deadlock(
         [
@@ -120,7 +120,7 @@ async def test_retry_on_deadlock_multi_executable(system):
 @pytest.mark.unit
 async def test_retry_on_deadlock_rollback(system):
     if not isinstance(system, DatabaseACESystem):
-        return
+        pytest.skip("database-only test")
 
     async with system.get_db() as db:
         await db.execute(
@@ -149,6 +149,9 @@ async def test_retry_on_deadlock_rollback(system):
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_retry_function_on_deadlock(system):
+    if not isinstance(system, DatabaseACESystem):
+        pytest.skip("database-only test")
+
     def test_function():
         pass
 
@@ -159,7 +162,7 @@ async def test_retry_function_on_deadlock(system):
 @pytest.mark.unit
 async def test_retry_sql_on_deadlock(system):
     if not isinstance(system, DatabaseACESystem):
-        return
+        pytest.skip("database-only test")
 
     await system.retry_sql_on_deadlock(insert(Config).values(key="test", value="value"), commit=True)
 
@@ -168,7 +171,7 @@ async def test_retry_sql_on_deadlock(system):
 @pytest.mark.unit
 async def test_retry_multi_sql_on_deadlock(system):
     if not isinstance(system, DatabaseACESystem):
-        return
+        pytest.skip("database-only test")
 
     await system.retry_multi_sql_on_deadlock(
         [

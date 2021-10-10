@@ -44,9 +44,8 @@ class DatabaseACETestSystem(DatabaseACESystem, ThreadedACESystem):
     # db_url = "sqlite+aiosqlite://"
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, storage_root=tempfile.mkdtemp())
         self.db_url = "sqlite+aiosqlite://"
-        self.storage_root = tempfile.mkdtemp()
 
     async def initialize(self):
         await super().initialize()

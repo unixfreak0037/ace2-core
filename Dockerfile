@@ -27,4 +27,5 @@ COPY --chown=ace:ace tests tests
 COPY --chown=ace:ace gunicorn_conf.py .
 COPY --chown=ace:ace start.sh .
 COPY --chown=ace:ace start-debug.sh .
+RUN mkdir /opt/ace/data
 CMD /opt/ace/start.sh

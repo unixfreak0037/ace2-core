@@ -36,6 +36,9 @@ class LocalStorageInterface(DatabaseStorageInterface):
             if ACE_STORAGE_ROOT in os.environ:
                 self.storage_root = os.environ[ACE_STORAGE_ROOT]
 
+        if not self.storage_root:
+            raise RuntimeError("missing storage root for local storage (see ACE_STORAGE_ROOT)")
+
     async def get_file_path(self, sha256: str) -> str:
         """Returns the full path to the local path that should be used to store
         the file with the given sha256 hash."""

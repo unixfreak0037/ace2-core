@@ -21,39 +21,39 @@ services:
         volumes:
             - postgres_data:/var/lib/postgresql/data/
 
-    #ace:
-        #build:
-            #context: .
-        #image: ace2:latest
-        #entrypoint: /opt/ace/sleep.sh
-        #depends_on:
-            #- database
-            #- redis
-        #ports:
-            #- "443:443"
-        #restart: always
-        #environment:
-            #- ACE_API_KEY
-            #- ACE_ADMIN_PASSWORD
-            #- ACE_BASE_DIR=/opt/ace
-            #- ACE_CRYPTO_VERIFICATION_KEY
-            #- ACE_CRYPTO_SALT
-            #- ACE_CRYPTO_SALT_SIZE
-            #- ACE_CRYPTO_ITERATIONS
-            #- ACE_CRYPTO_ENCRYPTED_KEY
-            #- ACE_DB_URL=postgresql+asyncpg://ace:ace@database/ace
-            #- ACE_REDIS_HOST=redis
-            #- ACE_REDIS_PORT=6379
-            #- ACE_STORAGE_ROOT
-            #- ACE_URI=https://ace/core
-            #- PORT=443
-        #networks:
-            #- ace
-        #volumes:
-            #- .:/opt/ace
+    ace:
+        build:
+            context: .
+        image: ace2:latest
+        depends_on:
+            - database
+            - redis
+        ports:
+            - "443:443"
+        restart: always
+        environment:
+            - ACE_API_KEY
+            - ACE_ADMIN_PASSWORD
+            - ACE_BASE_DIR=/opt/ace
+            - ACE_CRYPTO_VERIFICATION_KEY
+            - ACE_CRYPTO_SALT
+            - ACE_CRYPTO_SALT_SIZE
+            - ACE_CRYPTO_ITERATIONS
+            - ACE_CRYPTO_ENCRYPTED_KEY
+            - ACE_DB_URL=postgresql+asyncpg://ace:ace@database/ace
+            - ACE_REDIS_HOST=redis
+            - ACE_REDIS_PORT=6379
+            - ACE_STORAGE_ROOT=/opt/ace/data
+            - ACE_URI=https://ace/core
+            - PORT=443
+        networks:
+            - ace
+        volumes:
+            - ace_data:/opt/ace/data
 
 volumes:
     postgres_data:
+    ace_data:
 
 networks:
     ace:

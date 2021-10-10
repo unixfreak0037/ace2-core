@@ -30,14 +30,26 @@ class LocalStorageInterface(DatabaseStorageInterface):
 
     def __init__(self, *args, storage_root=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.storage_root = storage_root
+        self._storage_root = storage_root
 
-        if not self.storage_root:
-            if ACE_STORAGE_ROOT in os.environ:
-                self.storage_root = os.environ[ACE_STORAGE_ROOT]
+    @property
+    def storage_root(self) -> str:
+        """Returns the path to the root of local file storage.
+        If storage_root was passed into the constructor then that value is returned.
+        If not, then the value of the environment variable ACE_STORAGE_ROOT is returned.
+        Otherwise a RuntimeError is raised."""
+        if self._storage_root:
+            return self._storage_root
 
-        if not self.storage_root:
-            raise RuntimeError("missing storage root for local storage (see ACE_STORAGE_ROOT)")
+        if ACE_STORAGE_ROOT in os.environ:
+            return os.environ[ACE_STORAGE_ROOT]
+
+        raise RuntimeError("missing ACE_STORAGE_ROOT")
+
+    @storage_root.setter
+    def storage_root(self, value: str):
+        assert value is None or (isinstance(value, str) and value)
+        self._storage_root = value
 
     async def get_file_path(self, sha256: str) -> str:
         """Returns the full path to the local path that should be used to store

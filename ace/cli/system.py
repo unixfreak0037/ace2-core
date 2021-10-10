@@ -66,7 +66,7 @@ async def initialize(args) -> bool:
     print(f"export {ENV_CRYPTO_SALT_SIZE}={salt_size_encoded}")
     print(f"export {ENV_CRYPTO_ITERATIONS}={iterations_encoded}")
     print(f"export {ENV_CRYPTO_ENCRYPTED_KEY}={encrypted_key_encoded}")
-    print(f"export ACE_API_KEY={api_key}")
+    print(f"export ACE_API_KEY={api_key.api_key}")
     print("# STOP EXPORT")
 
     return True

@@ -64,21 +64,21 @@ python3.9 -m venv .venv
 source .venv/bin/activate
 
 # this installs everything at once
-pip install ace2[all]
+pip install ace-ecosystem[all]
 
 # install the packages we know about
 # this connects to our public github page and gets the list of all the known packages
 # it can also use the env var ACE_PACKAGE_URI to get a different custom list
-ace2 package install --all
+acecli package install --all
 
 # now analyze that suspicious file your boss's boss sent your boss who sent it to you
-ace2 analyze file email_attachment.doc
+acecli analyze file email_attachment.doc
 
 # or a URL
-ace2 analyze url http://bit.ly/blahblah
+acecli analyze url http://bit.ly/blahblah
 
 # or an IP (v4) address
-ace2 analyze ipv4 8.8.4.4 
+acecli analyze ipv4 8.8.4.4 
 ```
 
 ## Advanced Usage
@@ -89,29 +89,29 @@ ace2 analyze ipv4 8.8.4.4
 #
 # we could install packages manually
 # directly from github
-ace2 package install ace2 package install git@github.com:ace-ecosystem/ace2-modules.git
+acecli package install ace2 package install git@github.com:ace-ecosystem/ace2-modules.git
 # or from a url
-ace2 package install ace2 package install http://someserver.com/ace2-package.zip
+acecli package install ace2 package install http://someserver.com/ace2-package.zip
 # or from a local zip file you downloaded with curl
-ace2 package install ace2 package install /path/to/ace2-package.zip
+acecli package install ace2 package install /path/to/ace2-package.zip
 
 # make sure all the packages are up to date
 # this also updates all the modules
-ace2 package update
+acecli package update
 
 # could also do this to just update modules (signatures and such)
 # for the ones that support it
-ace2 module update
+acecli module update
 
 # now I can see what packages I have installed
-ace2 package list
+acecli package list
 
 # and even see what modules I have available
 # from all the packages I have installed
-ace2 module list
+acecli module list
 
 # and what services I can start
-ace2 service list
+acecli service list
 
 #
 # PARTICIPATING IN A CORE
@@ -126,7 +126,7 @@ export ACE_API_KEY="6a36ffce-507e-469f-8d68-39ca00fa9ccb"
 # attach all the modules we have on this system to the remote core
 # and start processing requests
 # this is an example of how to scale (manually anyways)
-ace2 service start manager
+acecli service start manager
 
 #
 # REMOTE USAGE OF A CORE
@@ -134,10 +134,10 @@ ace2 service start manager
 
 # now this command uses the remote core
 # since we have our env vars set up
-ace2 analyze ipv4 3.127.0.4
+acecli analyze ipv4 3.127.0.4
 
 # this lists the analysis modules of the remote core
-ace2 module list
+acecli module list
 
 #
 # PRODUCTION COMMANDS

@@ -1,0 +1,8 @@
+---
+  name: Core Package
+  description: Contains the ACE core system components.
+  version: 1.0.0
+
+  services:
+    - ace.module.manager.AnalysisModuleService
+    - ace.debug.NullService

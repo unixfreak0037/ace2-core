@@ -58,6 +58,10 @@ class EncryptionSettings:
         if ENV_CRYPTO_ENCRYPTED_KEY in os.environ:
             self.encrypted_key = base64.b64decode(os.environ[ENV_CRYPTO_ENCRYPTED_KEY])
 
+    def has_settings(self) -> bool:
+        """Returns True if the required settings are available."""
+        return self.verification_key and self.salt and self.salt_size and self.iterations and self.encrypted_key
+
     def load_aes_key(self, password: str):
         """Loads the AES key into the aes_key field, making it available for encryption/decryption."""
         self.aes_key = get_decryption_key(password, self)

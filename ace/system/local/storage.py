@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Union, Iterator, AsyncGenerator
 
+from ace.constants import ACE_STORAGE_ROOT
 from ace.data_model import ContentMetadata, CustomJSONEncoder
 from ace.exceptions import UnknownFileError
 from ace.logging import get_logger
@@ -29,7 +30,26 @@ class LocalStorageInterface(DatabaseStorageInterface):
 
     def __init__(self, *args, storage_root=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.storage_root = storage_root
+        self._storage_root = storage_root
+
+    @property
+    def storage_root(self) -> str:
+        """Returns the path to the root of local file storage.
+        If storage_root was passed into the constructor then that value is returned.
+        If not, then the value of the environment variable ACE_STORAGE_ROOT is returned.
+        Otherwise a RuntimeError is raised."""
+        if self._storage_root:
+            return self._storage_root
+
+        if ACE_STORAGE_ROOT in os.environ:
+            return os.environ[ACE_STORAGE_ROOT]
+
+        raise RuntimeError("missing ACE_STORAGE_ROOT")
+
+    @storage_root.setter
+    def storage_root(self, value: str):
+        assert value is None or (isinstance(value, str) and value)
+        self._storage_root = value
 
     async def get_file_path(self, sha256: str) -> str:
         """Returns the full path to the local path that should be used to store

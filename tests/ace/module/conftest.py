@@ -40,7 +40,9 @@ async def manager(request, redis, redis_url, tmpdir):
     await app.state.system.initialize()
     await app.state.system.reset()  # XXX do we need this here?
 
-    app.state.system.root_api_key = await app.state.system.create_api_key("test_root", "test_root", is_admin=True)
+    app.state.system.root_api_key = (
+        await app.state.system.create_api_key("test_root", "test_root", is_admin=True)
+    ).api_key
     await app.state.system.start()
 
     # initialize the "client side" system

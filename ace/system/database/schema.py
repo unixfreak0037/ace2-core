@@ -21,18 +21,20 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
+import tzlocal
+
 
 # https://mike.depalatis.net/blog/sqlalchemy-timestamps.html
 class TimeStamp(sqlalchemy.types.TypeDecorator):
     impl = sqlalchemy.types.DateTime
-    LOCAL_TIMEZONE = datetime.utcnow().astimezone().tzinfo
+    cache_ok = True
 
     def process_bind_param(self, value: datetime, dialect):
         if value is None:
             return None
 
         if value.tzinfo is None:
-            value = value.astimezone(self.LOCAL_TIMEZONE)
+            value = value.replace(tzinfo=tzlocal.get_localzone())
 
         return value.astimezone(timezone.utc)
 

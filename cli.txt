@@ -55,14 +55,14 @@ ace2 service list
 ace2 service start
 
 # start a specific thing
-ace2 service start core
+ace2 service start core # <-- not sure this actually makes sense
 ace2 service start hunter
 
 # stops everything ace knows is running
 ace2 service stop
 
 # stops the core
-ace2 service stop core
+ace2 service stop core # <-- ???
 
 # print the status of everything
 ace2 status

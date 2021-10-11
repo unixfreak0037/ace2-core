@@ -5,6 +5,7 @@ import os
 import pytest
 
 
+@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 @pytest.mark.parametrize(
@@ -40,7 +41,11 @@ async def test_config_set_get(value, system):
     assert await system.delete_config("/test")
     assert await system.get_config_value("/test") is None
 
+    # attempt to delete config entry that does not exist
+    assert not await system.delete_config("/test")
 
+
+@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_config_default_value(system):
@@ -48,6 +53,7 @@ async def test_config_default_value(system):
     assert await system.get_config_value("/test", "test") == "test"
 
 
+@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_config_missing_value(system):
@@ -55,10 +61,11 @@ async def test_config_missing_value(system):
         await system.set_config("/test", None)
 
 
+@pytest.mark.ace_remote
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_config_env_value(system):
-    os.environ["ACE_TEST"] = "test"
+async def test_config_env_value(system, monkeypatch):
+    monkeypatch.setitem(os.environ, "ACE_TEST", "test")
 
     # without the setting it should return what is in the env var
     assert await system.get_config_value("/test", env="ACE_TEST") == "test"
@@ -66,3 +73,11 @@ async def test_config_env_value(system):
     # but when it gets set it should return that
     await system.set_config("/test", "that")
     assert await system.get_config_value("/test") == "that"
+
+
+@pytest.mark.ace_remote
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_config_env_value_with_type(system, monkeypatch):
+    monkeypatch.setitem(os.environ, "ACE_TEST", "1")
+    assert await system.get_config_value("/test", env="ACE_TEST", env_type=int) == 1

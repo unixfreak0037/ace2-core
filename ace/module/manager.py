@@ -22,6 +22,7 @@ from ace.error_reporting.reporter import format_error_report
 from ace.exceptions import AnalysisModuleTypeVersionError, AnalysisModuleTypeExtendedVersionError
 from ace.logging import get_logger
 from ace.module.base import AnalysisModule
+from ace.service.base import ACEService
 from ace.system import ACESystem
 from ace.system.remote import RemoteACESystem
 
@@ -182,6 +183,30 @@ def _cpu_task_executor_upgrade_module(amt_json: str) -> str:
     return task_executor_map[task_executor_map_key()].upgrade_module(amt_json)
 
 
+class AnalysisModuleService(ACEService):
+    name = "modules"
+    description = "Manages the execution of analysis modules."
+
+    async def run(self):
+        from ace.env import get_uri, get_api_key  # XXX
+
+        uri = get_uri()
+        api_key = get_api_key()
+
+        if not uri:
+            raise RuntimeError("missing remote uri")
+
+        if not api_key:
+            raise RuntimeError("missing api key")
+
+        manager = AnalysisModuleManager(RemoteACESystem(uri, api_key))
+        manager.load_modules()
+        task = asyncio.create_task(manager.run())
+        await self.shutdown_event.wait()
+        manager.stop()
+        await task
+
+
 class AnalysisModuleManager:
     """Executes and manages ace.module.AnalysisModule objects."""
 
@@ -301,48 +326,11 @@ class AnalysisModuleManager:
         return SCALE_DOWN
 
     def load_modules(self):
-        package_dir = os.path.join(os.path.expanduser("~"), ".ace", "packages")
-        if not os.path.isdir(package_dir):
-            return
+        from ace.packages import get_package_manager
 
-        package_dirs = []
-        for target in os.listdir(package_dir):
-            target = os.path.join(package_dir, target)
-            if os.path.isdir(os.path.realpath(target)):
-                package_dirs.append(target)
-
-        for package_dir in package_dirs:
-            get_logger().debug(f"processing package directory {package_dir}")
-            pkg_path = os.path.join(package_dir, "ace.pkg")
-            if not os.path.exists(pkg_path):
-                get_logger().warning(f"ace package dir {package_dir} missing ace.pkg file")
-                continue
-
-            sys.path.append(package_dir)
-            with open(pkg_path, "r") as fp:
-                for module_spec in fp:
-                    module_spec = module_spec.strip()
-                    get_logger().info(f"loading module {module_spec}")
-
-                    module_name, module_class = module_spec.rsplit(".", 1)
-
-                    try:
-                        _module = importlib.import_module(module_name)
-                    except Exception as e:
-                        get_logger().exception(f"unable to import module {module_name}")
-                        continue
-
-                    try:
-                        _class = getattr(_module, module_class)
-                    except AttributeError as e:
-                        get_logger().exception(f"class {module_class} does not exist in module {module_name}")
-                        continue
-
-                    try:
-                        self.add_module(_class())
-                    except Exception as e:
-                        get_logger().exception(f"unable to load analysis module {module_spec}")
-                        continue
+        for module_type in get_package_manager().modules:
+            logging.info(f"loading {module_type}")
+            self.add_module(module_type())
 
     def add_module(self, module: AnalysisModule) -> AnalysisModule:
         """Adds the given AnalysisModule to this manager. Duplicate modules are ignored.
@@ -404,7 +392,7 @@ class AnalysisModuleManager:
             return
 
         for process in psutil.Process(os.getpid()).children():
-            get_logger().warning(f"sending KILL to {process}")
+            get_logger().warning(f"sending TERM to {process}")
             process.send_signal(signal.SIGTERM)
 
     async def run_once(self) -> bool:

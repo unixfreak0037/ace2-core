@@ -1,0 +1,59 @@
+version: '3.8'
+services:
+    redis:
+        image: redis:latest
+        ports:
+            - "6379:6379"
+        restart: always
+        networks:
+            - ace
+
+    database:
+        image: postgres:latest
+        ports:
+            - "5432:5432"
+        restart: always
+        environment:
+            POSTGRES_PASSWORD: ace
+            POSTGRES_USER: ace
+        networks:
+            - ace
+        volumes:
+            - postgres_data:/var/lib/postgresql/data/
+
+    ace:
+        build:
+            context: .
+        image: ace2:latest
+        depends_on:
+            - database
+            - redis
+        ports:
+            - "443:443"
+        restart: always
+        environment:
+            - ACE_API_KEY
+            - ACE_ADMIN_PASSWORD
+            - ACE_BASE_DIR=/opt/ace
+            - ACE_CRYPTO_VERIFICATION_KEY
+            - ACE_CRYPTO_SALT
+            - ACE_CRYPTO_SALT_SIZE
+            - ACE_CRYPTO_ITERATIONS
+            - ACE_CRYPTO_ENCRYPTED_KEY
+            - ACE_DB_URL=postgresql+asyncpg://ace:ace@database/ace
+            - ACE_REDIS_HOST=redis
+            - ACE_REDIS_PORT=6379
+            - ACE_STORAGE_ROOT=/opt/ace/data
+            - ACE_URI=https://ace/core
+            - PORT=443
+        networks:
+            - ace
+        volumes:
+            - ace_data:/opt/ace/data
+
+volumes:
+    postgres_data:
+    ace_data:
+
+networks:
+    ace:

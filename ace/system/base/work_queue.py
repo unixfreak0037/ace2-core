@@ -181,5 +181,3 @@ class WorkQueueBaseInterface:
                 await self.fire_event(EVENT_WORK_ASSIGNED, next_ar)
 
             return next_ar
-
-    encryption_settings: EncryptionSettings = None

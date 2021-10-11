@@ -7,6 +7,7 @@ import pytest
 from ace.analysis import RootAnalysis, Observable, Analysis, AnalysisModuleType
 from ace.exceptions import UnknownRootAnalysisError
 from ace.system.base.analysis_tracking import CONFIG_ANALYSIS_ENCRYPTION_ENABLED
+from ace.system.distributed import app
 
 TEST_DETAILS = {"hello": "world"}
 OBSERVABLE_VALUE = "observable value"

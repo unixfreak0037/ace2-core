@@ -12,6 +12,8 @@ from typing import Union, Any, Optional, AsyncGenerator
 import ace.data_model
 
 from ace.data_model import (
+    ApiKeyModel,
+    ApiKeyListModel,
     AlertListModel,
     AnalysisRequestQueryModel,
     ConfigurationSetting,
@@ -21,7 +23,9 @@ from ace.data_model import (
     Event,
 )
 from ace.analysis import RootAnalysis, AnalysisModuleType, Observable
+from ace.api import ApiKey
 from ace.api.base import AceAPI
+from ace.logging import get_logger
 from ace.system import ACESystem
 from ace.system.requests import AnalysisRequest
 from ace.constants import ERROR_AMT_VERSION, ERROR_AMT_EXTENDED_VERSION, ERROR_AMT_DEP
@@ -33,6 +37,7 @@ from ace.exceptions import (
     DuplicateApiKeyNameError,
     InvalidApiKeyError,
     InvalidAccessError,
+    UnknownFileError,
     exception_map,
 )
 
@@ -290,7 +295,7 @@ class RemoteAceAPI(AceAPI):
             )
 
         _raise_exception_on_error(response)
-        if response.status_code == 401:
+        if response.status_code == 201:
             return True
 
         return False
@@ -344,6 +349,7 @@ class RemoteAceAPI(AceAPI):
                 content = io.BytesIO(content.encode())
             elif isinstance(content, bytes):
                 content = io.BytesIO(content)
+            # XXX reads entire content of file into memory -- not what we want
             elif isinstance(content, aiofiles.threadpool.binary.AsyncBufferedReader):
                 content = io.BytesIO(await content.read())
             elif isinstance(content, Path):
@@ -364,18 +370,20 @@ class RemoteAceAPI(AceAPI):
             _raise_exception_on_error(response)
             return ContentMetadata(**response.json()).sha256
         finally:
-            if isinstance(content, io.IOBase):
-                try:
-                    content.close()
-                except Exception as e:
-                    get_logger().exception("unable to close file handle")
+            pass
+            # XXX think about why we're doing this
+            # if isinstance(content, io.IOBase):
+            # try:
+            # content.close()
+            # except Exception as e:
+            # get_logger().exception("unable to close file handle")
 
     async def get_content_bytes(self, sha256: str) -> Union[bytes, None]:
         async with self.get_client() as client:
             async with client.stream("GET", f"/storage/{sha256}") as response:
                 _raise_exception_on_error(response)
                 if response.status_code == 404:
-                    return None
+                    raise UnknownFileError()
 
                 return await response.aread()
 
@@ -384,8 +392,7 @@ class RemoteAceAPI(AceAPI):
             async with client.stream("GET", f"/storage/{sha256}") as response:
                 _raise_exception_on_error(response)
                 if response.status_code == 404:
-                    yield None
-                    return
+                    raise UnknownFileError()
 
                 async for data in response.aiter_bytes():
                     yield data
@@ -481,7 +488,7 @@ class RemoteAceAPI(AceAPI):
 
     async def create_api_key(
         self, name: str, description: Optional[str] = None, is_admin: Optional[bool] = False
-    ) -> str:
+    ) -> ApiKey:
         async with self.get_client() as client:
             data = {"name": name, "is_admin": is_admin}
             if description is not None:
@@ -497,7 +504,7 @@ class RemoteAceAPI(AceAPI):
         if response.status_code == 200:
             raise DuplicateApiKeyNameError()
 
-        return ace.data_model.ApiKeyResponseModel(**response.json()).api_key
+        return ApiKey.from_dict(response.json())
 
     async def delete_api_key(self, name: str) -> bool:
         async with self.get_client() as client:
@@ -512,3 +519,15 @@ class RemoteAceAPI(AceAPI):
 
     async def verify_api_key(self, api_key: str, is_admin: Optional[bool] = False) -> bool:
         raise NotImplementedError()
+
+    async def get_api_keys(self) -> list[ApiKey]:
+        async with self.get_client() as client:
+            response = await client.get(f"/auth")
+
+        _raise_exception_on_error(response)
+
+        if response.status_code == 200:
+            api_key_list = ApiKeyListModel(**response.json())
+            return [ApiKey.from_dict(_.dict()) for _ in api_key_list.api_keys]
+        else:
+            return []

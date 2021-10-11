@@ -4,9 +4,12 @@ import os.path
 import shutil
 
 import pytest
+import pytz
 
-from ace.analysis import RootAnalysis, AnalysisModuleType, Analysis
-from ace.time import utc_now
+from ace.analysis import RootAnalysis, AnalysisModuleType, Analysis, Observable
+from ace.time import utc_now, event_time_format_tz, event_time_format
+
+from tests.ace.test_time import mock_tz
 
 
 @pytest.mark.unit
@@ -45,6 +48,37 @@ def test_observable_eq():
     assert RootAnalysis().add_observable("test", "test") != RootAnalysis().add_observable("other", "test")
     # wrong object
     assert RootAnalysis().add_observable("test", "test") != object()
+
+
+@pytest.mark.parametrize(
+    "source_time,expected_time",
+    [
+        # None
+        (None, None),
+        # with UTC timezone
+        (
+            datetime.datetime(2021, 12, 12, 1, 0, 0, tzinfo=pytz.utc),
+            datetime.datetime(2021, 12, 12, 1, 0, 0, tzinfo=pytz.utc),
+        ),
+        # without a timezone
+        (datetime.datetime(2021, 12, 12, 1, 0, 0), datetime.datetime(2021, 12, 12, 2, 0, 0, tzinfo=pytz.utc)),
+        # string with UTC timezone
+        (
+            datetime.datetime(2021, 12, 12, 1, 0, 0, tzinfo=pytz.utc).strftime(event_time_format_tz),
+            datetime.datetime(2021, 12, 12, 1, 0, 0, tzinfo=pytz.utc),
+        ),
+        # string without timezone
+        (
+            datetime.datetime(2021, 12, 12, 1, 0, 0).strftime(event_time_format),
+            datetime.datetime(2021, 12, 12, 2, 0, 0, tzinfo=pytz.utc),
+        ),
+    ],
+)
+@pytest.mark.unit
+def test_set_time(source_time, expected_time, mock_tz):
+    observable = Observable("test", "test")
+    observable.time = source_time
+    assert observable.time == expected_time
 
 
 @pytest.mark.unit
